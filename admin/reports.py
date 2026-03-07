@@ -8,11 +8,23 @@ from typing import List
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+def get_downloads_dir() -> Path:
+    """Return the user's Downloads directory."""
+    return Path.home() / "Downloads"
+
+
+def get_reports_dir() -> Path:
+    """Return the folder where generated Excel reports are stored."""
+    reports_dir = get_downloads_dir() / "Hygiene Vending Reports"
+    reports_dir.mkdir(parents=True, exist_ok=True)
+    return reports_dir
+
+
 def list_sales_reports() -> List[Path]:
     """Return a list of available sales report Excel files, newest first."""
     pattern = "sales_report_*.xlsx"
     reports = sorted(
-        BASE_DIR.glob(pattern),
+        get_reports_dir().glob(pattern),
         key=lambda p: p.stat().st_mtime,
         reverse=True,
     )

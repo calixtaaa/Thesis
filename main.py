@@ -2,15 +2,36 @@ import os
 import sys
 import time
 import uuid
+import json
 import datetime
-import hashlib
-import sqlite3
 from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox, simpledialog
-from openpyxl import Workbook
 
-from admin.reports import list_sales_reports, open_sales_report
+from admin.admin import AdminMixin
+from admin.reports import get_reports_dir
+from staff.staff import StaffMixin
+from database import (
+    init_db,
+    get_admin_credentials,
+    update_admin_credentials,
+    get_all_products,
+    get_product_by_id,
+    decrement_stock,
+    record_transaction,
+    get_user_by_uid,
+    create_user,
+    update_user_balance,
+    adjust_user_balance,
+    restock_product,
+    export_sales_report,
+    get_admin_overview_stats,
+    get_sales_trend_data,
+    get_monthly_sales_data,
+    get_top_selling_products,
+    get_low_stock_chart_data,
+)
+from patchNotes import get_patch_notes_text, VERSION
 
 # ======================
 #  ENV & GPIO HANDLING
@@ -45,7 +66,7 @@ except ImportError:
 # ======================
 
 BASE_DIR = Path(__file__).resolve().parent
-DB_PATH = BASE_DIR / "vending.db"
+DEBUG_LOGS_DIR = BASE_DIR / "debug_logs"
 
 # Simple theming (light / dark)
 THEMES = {
@@ -63,6 +84,13 @@ THEMES = {
     },
 }
 
+UI_FONT = "Segoe UI"
+UI_FONT_BOLD = (UI_FONT, 20, "bold")
+UI_FONT_TITLE = (UI_FONT, 18, "bold")
+UI_FONT_BODY = (UI_FONT, 12)
+UI_FONT_SMALL = (UI_FONT, 10)
+UI_FONT_BUTTON = (UI_FONT, 12, "bold")
+
 # Simple pin assignments (adjust on real Pi)
 PRODUCT_STEPPER_PINS = {
     1: {"step": 17, "dir": 27},   # Slot 1
@@ -72,367 +100,6 @@ COIN_HOPPER_PIN = 24
 STEPS_PER_PRODUCT = 200  # adjust per mechanism
 COINS_PER_SECOND = 5     # for hopper simulation
 COIN_VALUE = 1.0         # 1 peso per coin (example)
-
-
-# ======================
-#  DATABASE LAYER
-# ======================
-
-def get_connection():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-def init_db():
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.executescript("""
-    CREATE TABLE IF NOT EXISTS products (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        price REAL NOT NULL,
-        slot_number INTEGER NOT NULL UNIQUE,
-        capacity INTEGER NOT NULL,
-        current_stock INTEGER NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS transactions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-        product_id INTEGER,
-        quantity INTEGER,
-        total_amount REAL,
-        payment_method TEXT,
-        rfid_user_id INTEGER,
-        FOREIGN KEY(product_id) REFERENCES products(id)
-    );
-
-    CREATE TABLE IF NOT EXISTS rfid_users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        rfid_uid TEXT NOT NULL UNIQUE,
-        name TEXT,
-        balance REAL NOT NULL DEFAULT 0,
-        is_staff INTEGER NOT NULL DEFAULT 0
-    );
-    """)
-    conn.commit()
-
-    # Ensure new column exists if upgrading from older schema
-    cur.execute("PRAGMA table_info(transactions)")
-    cols = [row["name"] for row in cur.fetchall()]
-    if "rfid_user_id" not in cols:
-        cur.execute("ALTER TABLE transactions ADD COLUMN rfid_user_id INTEGER")
-        conn.commit()
-
-    # Seed sample data if empty
-    cur.execute("SELECT COUNT(*) AS c FROM products")
-    if cur.fetchone()["c"] == 0:
-        # Approximate SRP prices in PHP for each product in the Philippines
-        sample_products = [
-            ("All Night Pads",          12.0, 1, 10, 5),
-            ("Panty Liners",            8.0,  2, 10, 5),
-            ("Regular W/ Wings Pads",   10.0, 3, 10, 5),
-            ("Non-Wing Pads",           9.0,  4, 10, 5),
-            ("Alcohol",                 25.0, 5, 10, 5),
-            ("Mouthwash",               35.0, 6, 10, 5),
-            ("Tissues",                 15.0, 7, 10, 5),
-            ("Wet Wipes",               25.0, 8, 10, 5),
-            ("Deodorant",               50.0, 9, 10, 5),
-            ("Soap",                    30.0, 10, 10, 5),
-        ]
-        cur.executemany(
-            """
-            INSERT INTO products (name, price, slot_number, capacity, current_stock)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            sample_products,
-        )
-        conn.commit()
-
-    # Seed a default staff RFID user for testing
-    cur.execute("SELECT COUNT(*) AS c FROM rfid_users")
-    if cur.fetchone()["c"] == 0:
-        cur.execute("""
-            INSERT INTO rfid_users (rfid_uid, name, balance, is_staff)
-            VALUES (?, ?, ?, ?)
-        """, ("STAFF001", "Default Staff", 0.0, 1))
-        conn.commit()
-
-    # Admin credentials table (single row) with hashed password
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS admin_settings (
-            id INTEGER PRIMARY KEY CHECK (id = 1),
-            username TEXT NOT NULL,
-            password_hash TEXT NOT NULL
-        );
-        """
-    )
-    cur.execute("SELECT COUNT(*) AS c FROM admin_settings")
-    if cur.fetchone()["c"] == 0:
-        # Default admin/admin (hashed)
-        default_user = "admin"
-        default_pass = "admin"
-        pwd_hash = hashlib.sha256(default_pass.encode("utf-8")).hexdigest()
-        cur.execute(
-            "INSERT INTO admin_settings (id, username, password_hash) VALUES (1, ?, ?)",
-            (default_user, pwd_hash),
-        )
-        conn.commit()
-
-    conn.close()
-
-
-def get_admin_credentials():
-    """Return (username, password_hash) for the single admin account."""
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute("SELECT username, password_hash FROM admin_settings WHERE id = 1")
-    row = cur.fetchone()
-    conn.close()
-    if not row:
-        return None, None
-    return row["username"], row["password_hash"]
-
-
-def update_admin_credentials(new_username: str, new_password: str):
-    """Update the single admin username and password (stored as SHA-256 hash)."""
-    pwd_hash = hashlib.sha256(new_password.encode("utf-8")).hexdigest()
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute(
-        """
-        UPDATE admin_settings
-        SET username = ?, password_hash = ?
-        WHERE id = 1
-        """,
-        (new_username, pwd_hash),
-    )
-    conn.commit()
-    conn.close()
-
-def get_all_products():
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM products ORDER BY slot_number")
-    rows = cur.fetchall()
-    conn.close()
-    return rows
-
-
-def get_product_by_id(product_id: int):
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM products WHERE id = ?", (product_id,))
-    row = cur.fetchone()
-    conn.close()
-    return row
-
-def decrement_stock(product_id: int, quantity: int):
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute("""
-        UPDATE products
-        SET current_stock = current_stock - ?
-        WHERE id = ? AND current_stock >= ?
-    """, (quantity, product_id, quantity))
-    if cur.rowcount == 0:
-        conn.rollback()
-        conn.close()
-        raise ValueError("Insufficient stock")
-    conn.commit()
-    conn.close()
-
-def record_transaction(product_id, quantity, total_amount, payment_method, rfid_user_id=None):
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute("""
-        INSERT INTO transactions (product_id, quantity, total_amount, payment_method, rfid_user_id)
-        VALUES (?, ?, ?, ?, ?)
-    """, (product_id, quantity, total_amount, payment_method, rfid_user_id))
-    conn.commit()
-    conn.close()
-
-
-def get_user_by_uid(rfid_uid: str):
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM rfid_users WHERE rfid_uid = ?", (rfid_uid,))
-    row = cur.fetchone()
-    conn.close()
-    return row
-
-
-def create_user(rfid_uid: str, name: str | None = None, is_staff: int = 0, initial_balance: float = 0.0):
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute("""
-        INSERT INTO rfid_users (rfid_uid, name, balance, is_staff)
-        VALUES (?, ?, ?, ?)
-    """, (rfid_uid, name, initial_balance, is_staff))
-    conn.commit()
-    user_id = cur.lastrowid
-    conn.close()
-    return user_id
-
-
-def update_user_balance(user_id: int, new_balance: float):
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute("UPDATE rfid_users SET balance = ? WHERE id = ?", (new_balance, user_id))
-    conn.commit()
-    conn.close()
-
-
-def adjust_user_balance(user_id: int, delta: float):
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute("UPDATE rfid_users SET balance = balance + ? WHERE id = ?", (delta, user_id))
-    conn.commit()
-    conn.close()
-
-
-def restock_product(product_id: int, amount: int, new_price: float | None = None):
-    conn = get_connection()
-    cur = conn.cursor()
-    if new_price is not None:
-        cur.execute("""
-            UPDATE products
-            SET current_stock = MIN(capacity, current_stock + ?),
-                price = ?
-            WHERE id = ?
-        """, (amount, new_price, product_id))
-    else:
-        cur.execute("""
-            UPDATE products
-            SET current_stock = MIN(capacity, current_stock + ?)
-            WHERE id = ?
-        """, (amount, product_id))
-    conn.commit()
-    conn.close()
-
-
-def export_sales_report():
-    """Create an Excel file with all transactions, and daily/monthly summaries."""
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute("""
-        SELECT
-            t.timestamp,
-            DATE(t.timestamp) AS sale_date,
-            strftime('%Y-%m', t.timestamp) AS sale_month,
-            p.name AS product_name,
-            t.quantity,
-            t.total_amount,
-            t.payment_method,
-            u.rfid_uid
-        FROM transactions t
-        LEFT JOIN products p ON t.product_id = p.id
-        LEFT JOIN rfid_users u ON t.rfid_user_id = u.id
-        ORDER BY t.timestamp
-    """)
-    rows = cur.fetchall()
-    conn.close()
-
-    # Prepare Excel workbook
-    wb = Workbook()
-
-    # Sheet 1: All Transactions
-    ws_all = wb.active
-    ws_all.title = "All Transactions"
-    headers = [
-        "Timestamp", "Date", "Month (YYYY-MM)", "Product",
-        "Quantity", "Total Amount", "Payment Method", "RFID UID",
-    ]
-    ws_all.append(headers)
-
-    daily_summary = {}
-    monthly_summary = {}
-
-    for r in rows:
-        ts = r["timestamp"]
-        date = r["sale_date"]
-        month = r["sale_month"]
-        product = r["product_name"] or ""
-        qty = r["quantity"] if r["quantity"] is not None else 0
-        total_amt = r["total_amount"] if r["total_amount"] is not None else 0.0
-        method = r["payment_method"] or ""
-        uid = r["rfid_uid"] or ""
-
-        ws_all.append([ts, date, month, product, qty, total_amt, method, uid])
-
-        # Build daily summary
-        if date not in daily_summary:
-            daily_summary[date] = {"quantity": 0, "amount": 0.0}
-        daily_summary[date]["quantity"] += qty
-        daily_summary[date]["amount"] += total_amt
-
-        # Build monthly summary
-        if month not in monthly_summary:
-            monthly_summary[month] = {"quantity": 0, "amount": 0.0}
-        monthly_summary[month]["quantity"] += qty
-        monthly_summary[month]["amount"] += total_amt
-
-    # Sheet 2: Daily Summary
-    ws_daily = wb.create_sheet(title="Daily Summary")
-    ws_daily.append(["Date", "Total Quantity", "Total Amount"])
-    for date, agg in sorted(daily_summary.items()):
-        ws_daily.append([date, agg["quantity"], agg["amount"]])
-
-    # Sheet 3: Monthly Summary
-    ws_monthly = wb.create_sheet(title="Monthly Summary")
-    ws_monthly.append(["Month (YYYY-MM)", "Total Quantity", "Total Amount"])
-    for month, agg in sorted(monthly_summary.items()):
-        ws_monthly.append([month, agg["quantity"], agg["amount"]])
-
-    # Save file
-    stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = BASE_DIR / f"sales_report_{stamp}.xlsx"
-    wb.save(filename)
-    return filename
-
-
-def get_admin_overview_stats():
-    """Compute high-level stats for the admin dashboard."""
-    conn = get_connection()
-    cur = conn.cursor()
-
-    # Total sales amount and number of orders (completed transactions with amount)
-    cur.execute(
-        """
-        SELECT
-            COALESCE(SUM(total_amount), 0) AS total_sales,
-            COUNT(*) AS orders
-        FROM transactions
-        WHERE total_amount IS NOT NULL
-        """
-    )
-    row = cur.fetchone()
-    total_sales = row["total_sales"]
-    orders = row["orders"]
-
-    # Active customers: distinct RFID users that have at least one transaction
-    cur.execute(
-        """
-        SELECT COUNT(DISTINCT rfid_user_id) AS active_customers
-        FROM transactions
-        WHERE rfid_user_id IS NOT NULL
-        """
-    )
-    active_customers = cur.fetchone()["active_customers"]
-
-    # Low-stock products (stock <= 20% of capacity)
-    cur.execute("SELECT COUNT(*) AS low_count FROM products WHERE capacity > 0 AND current_stock <= capacity * 0.2")
-    low_stock = cur.fetchone()["low_count"]
-
-    conn.close()
-
-    return {
-        "total_sales": total_sales,
-        "orders": orders,
-        "active_customers": active_customers,
-        "low_stock": low_stock,
-    }
 
 
 # ======================
@@ -508,10 +175,10 @@ cash_session = CashSession()
 #  TKINTER GUI
 # ======================
 
-class MainApp(tk.Tk):
+class MainApp(AdminMixin, StaffMixin, tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Hygiene Vending Machine")
+        self.title(f"Hygiene Vending Machine  {VERSION}")
 
         # On the Raspberry Pi 7\" touchscreen, use fullscreen.
         # On desktop (development), use a resizable 800x480 window.
@@ -534,6 +201,8 @@ class MainApp(tk.Tk):
         self.admin_icon = None
         self.menu_icon = None
         self.search_icon = None
+        self.light_theme_icon = None
+        self.dark_theme_icon = None
 
         # Staff icon
         try:
@@ -575,6 +244,22 @@ class MainApp(tk.Tk):
         except Exception:
             self.search_icon = None
 
+        # Theme icons for light/dark toggle
+        try:
+            theme_path = BASE_DIR / "images" / "light-mode.png"
+            if theme_path.exists():
+                img = tk.PhotoImage(file=str(theme_path))
+                self.light_theme_icon = img.subsample(5, 5)
+        except Exception:
+            self.light_theme_icon = None
+        try:
+            theme_path = BASE_DIR / "images" / "darkMode.png"
+            if theme_path.exists():
+                img = tk.PhotoImage(file=str(theme_path))
+                self.dark_theme_icon = img.subsample(5, 5)
+        except Exception:
+            self.dark_theme_icon = None
+
         # Backspace icon for clearing search text
         self.backspace_icon = None
         try:
@@ -590,14 +275,71 @@ class MainApp(tk.Tk):
         self.sidebar_frame = None
 
         self.search_var = tk.StringVar()
+        self.theme_animating = False
 
         self.build_main_menu()
 
     # ---------- Screen helpers ----------
 
     def clear_screen(self):
+        # region agent log
+        self._debug_log(
+            "H5",
+            "main.py:clear_screen",
+            "clear_screen called",
+            {"child_count": len(self.winfo_children())},
+        )
+        # endregion
         for w in self.winfo_children():
             w.destroy()
+
+    def _debug_log(self, hypothesis_id: str, location: str, message: str, data: dict):
+        DEBUG_LOGS_DIR.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "sessionId": "14d174",
+            "runId": "initial",
+            "hypothesisId": hypothesis_id,
+            "location": location,
+            "message": message,
+            "data": data,
+            "timestamp": int(time.time() * 1000),
+        }
+        with open(DEBUG_LOGS_DIR / "debug-14d174.log", "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(payload, ensure_ascii=True) + "\n")
+        # Keep a compatibility copy in the project root for existing tooling.
+        with open(BASE_DIR / "debug-14d174.log", "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(payload, ensure_ascii=True) + "\n")
+
+    # Data wrappers for extracted admin/staff modules
+    def get_user_by_uid_data(self, rfid_uid: str):
+        return get_user_by_uid(rfid_uid)
+
+    def get_all_products_data(self):
+        return get_all_products()
+
+    def restock_product_data(self, product_id: int, amount: int, new_price: float | None = None):
+        return restock_product(product_id, amount, new_price)
+
+    def get_admin_credentials_data(self):
+        return get_admin_credentials()
+
+    def update_admin_credentials_data(self, new_username: str, new_password: str):
+        return update_admin_credentials(new_username, new_password)
+
+    def get_admin_overview_stats_data(self):
+        return get_admin_overview_stats()
+
+    def get_sales_trend_data_points(self, days: int = 15):
+        return get_sales_trend_data(days)
+
+    def get_monthly_sales_data_points(self, months: int = 6):
+        return get_monthly_sales_data(months)
+
+    def get_top_selling_products_data(self, limit: int = 5):
+        return get_top_selling_products(limit)
+
+    def get_low_stock_chart_data_points(self, limit: int = 5):
+        return get_low_stock_chart_data(limit)
 
     def apply_theme_to_widget(self, widget):
         """Apply current theme colors to a widget and its children."""
@@ -630,18 +372,132 @@ class MainApp(tk.Tk):
         self.configure(bg=self.current_theme["bg"])
         self.apply_theme_to_widget(self)
 
+    def animate_button_press(self, button, callback):
+        """Play a quick press animation before running a button action."""
+        normal_bg = button.cget("bg")
+        normal_relief = button.cget("relief")
+        normal_bd = button.cget("bd")
+
+        pressed_bg = "#d9e7ff" if self.current_theme_name == "light" else "#5a6a85"
+
+        try:
+            button.configure(bg=pressed_bg, relief=tk.SUNKEN, bd=3)
+        except tk.TclError:
+            callback()
+            return
+
+        def finish():
+            if button.winfo_exists():
+                try:
+                    button.configure(bg=normal_bg, relief=normal_relief, bd=normal_bd)
+                except tk.TclError:
+                    pass
+            callback()
+
+        button.after(100, finish)
+
+    def create_theme_slider(self, parent):
+        """Create a small animated theme slider near the hamburger icon."""
+        width = 64
+        height = 30
+        padding = 3
+        knob_size = height - (padding * 2)
+
+        track_light = "#DDE6F2"
+        track_dark = "#1F2A44"
+        knob_fill = "#FFFFFF"
+        border_light = "#C8D4E3"
+        border_dark = "#2F3B57"
+
+        is_dark = self.current_theme_name == "dark"
+        start_x = width - padding - knob_size if is_dark else padding
+        icon_image = self.dark_theme_icon if is_dark else self.light_theme_icon
+
+        canvas = tk.Canvas(
+            parent,
+            width=width,
+            height=height,
+            bg=self.current_theme["bg"],
+            highlightthickness=0,
+            bd=0,
+        )
+
+        track = canvas.create_oval(
+            padding,
+            padding,
+            width - padding,
+            height - padding,
+            fill=track_dark if is_dark else track_light,
+            outline=border_dark if is_dark else border_light,
+        )
+        knob = canvas.create_oval(
+            start_x,
+            padding,
+            start_x + knob_size,
+            padding + knob_size,
+            fill=knob_fill,
+            outline="",
+        )
+
+        knob_icon = None
+        if icon_image is not None:
+            knob_icon = canvas.create_image(
+                start_x + (knob_size / 2),
+                padding + (knob_size / 2),
+                image=icon_image,
+            )
+
+        def animate_toggle(_event=None):
+            if self.theme_animating:
+                return
+
+            self.theme_animating = True
+            target_dark = self.current_theme_name != "dark"
+            end_x = width - padding - knob_size if target_dark else padding
+            current_coords = canvas.coords(knob)
+            current_x = current_coords[0]
+            step_count = 10
+            delta = (end_x - current_x) / step_count if step_count else 0
+
+            def step(index=0):
+                if index >= step_count:
+                    self.current_theme_name = "dark" if target_dark else "light"
+                    self.current_theme = THEMES[self.current_theme_name]
+                    self.configure(bg=self.current_theme["bg"])
+                    self.theme_animating = False
+                    self.build_main_menu()
+                    return
+
+                canvas.move(knob, delta, 0)
+                if knob_icon is not None:
+                    canvas.move(knob_icon, delta, 0)
+                progress = (index + 1) / step_count
+                if progress > 0.5:
+                    canvas.itemconfigure(
+                        track,
+                        fill=track_dark if target_dark else track_light,
+                        outline=border_dark if target_dark else border_light,
+                    )
+                canvas.after(18, lambda: step(index + 1))
+
+            step()
+
+        canvas.bind("<Button-1>", animate_toggle)
+        return canvas
+
     def add_theme_toggle_footer(self):
         """Add a bottom bar with a theme toggle button to the current screen."""
         bottom = tk.Frame(self, bg=self.current_theme["bg"])
         bottom.pack(side=tk.BOTTOM, fill=tk.X, pady=5)
-        # Trademark / footer label
+        # Trademark / version footer label
         tk.Label(
             bottom,
-            text="SyntaxError™",
+            text=f"SyntaxError™  ·  {VERSION}",
             font=("Arial", 9),
             bg=self.current_theme["bg"],
             fg=self.current_theme["fg"],
         ).pack(side=tk.LEFT, padx=10)
+        self.add_ph_datetime_label(bottom)
         tk.Button(
             bottom,
             text=f"Theme: {self.current_theme_name.capitalize()}",
@@ -650,6 +506,32 @@ class MainApp(tk.Tk):
             fg=self.current_theme["button_fg"],
         ).pack(side=tk.RIGHT, padx=10)
         self.apply_theme_to_widget(self)
+
+    def add_ph_datetime_label(self, parent):
+        """Show a live Philippine date/time label inside the given parent."""
+        label = tk.Label(
+            parent,
+            font=("Arial", 9),
+            bg=self.current_theme["bg"],
+            fg=self.current_theme["fg"],
+        )
+        label.pack(side=tk.RIGHT, padx=10)
+
+        ph_tz = datetime.timezone(datetime.timedelta(hours=8))
+
+        def _refresh():
+            if not label.winfo_exists():
+                return
+            now = datetime.datetime.now(ph_tz)
+            label.config(text=now.strftime("PH Time: %b %d, %Y %I:%M:%S %p"))
+            label.after(1000, _refresh)
+
+        _refresh()
+        return label
+
+    def show_patch_notes_dialog(self):
+        """Show recent UI and feature updates from patchNotes.py."""
+        messagebox.showinfo(f"Patch Notes  ·  {VERSION}", get_patch_notes_text())
 
     def show_help_dialog(self):
         """Explain the basic usage steps to the user."""
@@ -664,6 +546,17 @@ class MainApp(tk.Tk):
 
     def show_role_menu(self):
         """Toggle a left sidebar for Staff/Admin actions (hamburger menu)."""
+        # region agent log
+        self._debug_log(
+            "H3",
+            "main.py:show_role_menu",
+            "hamburger action invoked",
+            {
+                "sidebar_exists_before": bool(self.sidebar_frame and self.sidebar_frame.winfo_exists()),
+                "current_theme": self.current_theme_name,
+            },
+        )
+        # endregion
         # If sidebar already open, close it
         if self.sidebar_frame is not None and self.sidebar_frame.winfo_exists():
             self.sidebar_frame.destroy()
@@ -722,6 +615,17 @@ class MainApp(tk.Tk):
 
         self.apply_theme_to_widget(sidebar)
         self.sidebar_frame = sidebar
+        # region agent log
+        self._debug_log(
+            "H3",
+            "main.py:show_role_menu",
+            "sidebar created",
+            {
+                "sidebar_width": sidebar_width,
+                "sidebar_exists_after": bool(self.sidebar_frame and self.sidebar_frame.winfo_exists()),
+            },
+        )
+        # endregion
 
     # ---------- Main Menu ----------
 
@@ -752,9 +656,10 @@ class MainApp(tk.Tk):
             fg=self.current_theme["fg"],
         ).pack(anchor="w")
 
-        # Hamburger menu icon on the top-right
+        # Header action buttons on the top-right
         icons_frame = tk.Frame(header, bg=self.current_theme["bg"])
         icons_frame.pack(side=tk.RIGHT)
+        self.create_theme_slider(icons_frame).pack(side=tk.RIGHT, padx=6, pady=0)
         if self.menu_icon is not None:
             tk.Button(
                 icons_frame,
@@ -813,14 +718,38 @@ class MainApp(tk.Tk):
             self.search_var.set("Search for products")
 
         def on_search_focus_in(_event):
+            # region agent log
+            self._debug_log(
+                "H6",
+                "main.py:on_search_focus_in",
+                "search focus in",
+                {"query_before": self.search_var.get()},
+            )
+            # endregion
             if self.search_var.get() == "Search for products":
                 self.search_var.set("")
 
         def on_search_focus_out(_event):
+            # region agent log
+            self._debug_log(
+                "H6",
+                "main.py:on_search_focus_out",
+                "search focus out",
+                {"query_before": self.search_var.get()},
+            )
+            # endregion
             if not self.search_var.get().strip():
                 self.search_var.set("Search for products")
 
         def refresh_products(_event=None):
+            # region agent log
+            self._debug_log(
+                "H5",
+                "main.py:refresh_products",
+                "search refresh requested",
+                {"query": self.search_var.get(), "event_type": getattr(_event, "type", None)},
+            )
+            # endregion
             self.build_main_menu()
 
         def clear_one_char():
@@ -828,6 +757,14 @@ class MainApp(tk.Tk):
             if current == "Search for products" or not current:
                 return
             self.search_var.set(current[:-1])
+            # region agent log
+            self._debug_log(
+                "H5",
+                "main.py:clear_one_char",
+                "backspace icon used",
+                {"new_query": self.search_var.get()},
+            )
+            # endregion
             refresh_products()
 
         search_entry.bind("<FocusIn>", on_search_focus_in)
@@ -852,6 +789,22 @@ class MainApp(tk.Tk):
             products = [p for p in all_products if query.lower() in p["name"].lower()]
         else:
             products = all_products
+
+        # region agent log
+        self._debug_log(
+            "H4",
+            "main.py:build_main_menu",
+            "main menu rendered",
+            {
+                "all_products_count": len(all_products),
+                "filtered_products_count": len(products),
+                "query": query,
+                "menu_icon_loaded": self.menu_icon is not None,
+                "light_theme_icon_loaded": self.light_theme_icon is not None,
+                "dark_theme_icon_loaded": self.dark_theme_icon is not None,
+            },
+        )
+        # endregion
 
         # Scrollable product area
         content_frame = tk.Frame(self, bg=self.current_theme["bg"])
@@ -888,7 +841,6 @@ class MainApp(tk.Tk):
                 grid,
                 text=btn_text,
                 state=state,
-                command=lambda prod=p: self.select_product(prod),
                 bg=self.current_theme["button_bg"],
                 fg=self.current_theme["button_fg"],
                 activebackground=self.current_theme["button_bg"],
@@ -896,7 +848,13 @@ class MainApp(tk.Tk):
                 wraplength=200,
                 padx=10,
                 pady=10,
+                relief=tk.RAISED,
+                bd=2,
             )
+            btn.configure(command=lambda prod=p, button=btn: self.animate_button_press(
+                button,
+                lambda: self.select_product(prod),
+            ))
             r = idx // 3
             c = idx % 3
             btn.grid(row=r, column=c, padx=10, pady=10, sticky="nsew")
@@ -911,6 +869,14 @@ class MainApp(tk.Tk):
         def _on_mousewheel(event):
             # Windows / Mac delta handling
             delta = -1 * int(event.delta / 120)
+            # region agent log
+            self._debug_log(
+                "H7",
+                "main.py:_on_mousewheel",
+                "mousewheel scroll",
+                {"delta": delta},
+            )
+            # endregion
             canvas.yview_scroll(delta, "units")
 
         canvas.bind_all("<MouseWheel>", _on_mousewheel)
@@ -942,23 +908,24 @@ class MainApp(tk.Tk):
             bg=self.current_theme["button_bg"],
             fg=self.current_theme["button_fg"],
         ).pack(side=tk.LEFT, padx=10)
+        tk.Button(
+            bottom,
+            text="Patch Notes",
+            command=self.show_patch_notes_dialog,
+            bg=self.current_theme["button_bg"],
+            fg=self.current_theme["button_fg"],
+        ).pack(side=tk.LEFT, padx=10)
 
-        # Trademark footer label
+        # Trademark / version footer label
         tk.Label(
             bottom,
-            text="SyntaxError™",
+            text=f"SyntaxError™  ·  {VERSION}",
             font=("Arial", 9),
             bg=self.current_theme["bg"],
             fg=self.current_theme["fg"],
         ).pack(side=tk.LEFT, padx=10)
 
-        tk.Button(
-            bottom,
-            text=f"Theme: {self.current_theme_name.capitalize()}",
-            command=self.toggle_theme,
-            bg=self.current_theme["button_bg"],
-            fg=self.current_theme["button_fg"],
-        ).pack(side=tk.RIGHT, padx=10)
+        self.add_ph_datetime_label(bottom)
 
         self.apply_theme_to_widget(self)
 
@@ -979,14 +946,52 @@ class MainApp(tk.Tk):
         tk.Label(
             frame,
             text="Step 2 of 3 – Choose quantity",
-            font=("Arial", 12),
+            font=UI_FONT_SMALL,
             bg=self.current_theme["bg"],
             fg=self.current_theme["fg"],
         ).pack(pady=(10, 0))
 
-        tk.Label(frame, text=f"Selected: {p['name']}", font=("Arial", 18)).pack(pady=10)
-        tk.Label(frame, text=f"Price: ₱{p['price']:.2f}", font=("Arial", 14)).pack(pady=5)
-        tk.Label(frame, text=f"Available: {p['current_stock']}", font=("Arial", 12)).pack(pady=5)
+        tk.Label(
+            frame,
+            text="Choose Quantity",
+            font=UI_FONT_BOLD,
+            bg=self.current_theme["bg"],
+            fg=self.current_theme["fg"],
+        ).pack(pady=6)
+
+        card = tk.Frame(
+            frame,
+            bg=self.current_theme["button_bg"],
+            bd=1,
+            relief="solid",
+            padx=20,
+            pady=18,
+        )
+        card.pack(padx=24, pady=10)
+
+        tk.Label(
+            card,
+            text=f"Selected: {p['name']}",
+            font=UI_FONT_BODY,
+            bg=self.current_theme["button_bg"],
+            fg=self.current_theme["button_fg"],
+            wraplength=360,
+            justify="center",
+        ).pack(pady=(0, 8))
+        tk.Label(
+            card,
+            text=f"Price: ₱{p['price']:.2f}",
+            font=UI_FONT_BODY,
+            bg=self.current_theme["button_bg"],
+            fg=self.current_theme["button_fg"],
+        ).pack(pady=3)
+        tk.Label(
+            card,
+            text=f"Available: {p['current_stock']}",
+            font=UI_FONT_BODY,
+            bg=self.current_theme["button_bg"],
+            fg=self.current_theme["button_fg"],
+        ).pack(pady=(3, 12))
 
         qty_var = tk.IntVar(value=self.current_quantity)
 
@@ -995,19 +1000,52 @@ class MainApp(tk.Tk):
             if 1 <= new <= p["current_stock"]:
                 qty_var.set(new)
 
-        qty_frame = tk.Frame(frame, bg=self.current_theme["bg"])
-        qty_frame.pack(pady=20)
+        qty_frame = tk.Frame(card, bg=self.current_theme["button_bg"])
+        qty_frame.pack(pady=12)
 
-        tk.Button(qty_frame, text="-", width=5, command=lambda: update_qty(-1)).pack(side=tk.LEFT, padx=10)
-        tk.Label(qty_frame, textvariable=qty_var, font=("Arial", 24)).pack(side=tk.LEFT, padx=10)
-        tk.Button(qty_frame, text="+", width=5, command=lambda: update_qty(1)).pack(side=tk.LEFT, padx=10)
+        tk.Button(
+            qty_frame,
+            text="-",
+            width=4,
+            font=UI_FONT_BUTTON,
+            command=lambda: update_qty(-1),
+        ).pack(side=tk.LEFT, padx=10)
+        tk.Label(
+            qty_frame,
+            textvariable=qty_var,
+            font=(UI_FONT, 24, "bold"),
+            bg=self.current_theme["button_bg"],
+            fg=self.current_theme["button_fg"],
+            width=4,
+        ).pack(side=tk.LEFT, padx=10)
+        tk.Button(
+            qty_frame,
+            text="+",
+            width=4,
+            font=UI_FONT_BUTTON,
+            command=lambda: update_qty(1),
+        ).pack(side=tk.LEFT, padx=10)
 
         def proceed():
             self.current_quantity = qty_var.get()
             self.show_payment_method_screen()
 
-        tk.Button(frame, text="Continue to payment", font=("Arial", 14), command=proceed).pack(pady=10)
-        tk.Button(frame, text="Back to products", font=("Arial", 12), command=self.build_main_menu).pack(pady=5)
+        tk.Button(
+            card,
+            text="Continue to payment",
+            font=UI_FONT_BUTTON,
+            width=28,
+            height=2,
+            command=proceed,
+        ).pack(pady=(14, 8), fill=tk.X)
+        tk.Button(
+            frame,
+            text="Back to products",
+            font=UI_FONT_BODY,
+            padx=16,
+            pady=6,
+            command=self.build_main_menu,
+        ).pack(pady=5)
 
         self.add_theme_toggle_footer()
 
@@ -1025,31 +1063,75 @@ class MainApp(tk.Tk):
         tk.Label(
             frame,
             text="Step 3 of 3 – Choose payment method",
-            font=("Arial", 12),
+            font=UI_FONT_SMALL,
             bg=self.current_theme["bg"],
             fg=self.current_theme["fg"],
         ).pack(pady=(10, 0))
-        tk.Label(frame, text="Choose Payment Method", font=("Arial", 20)).pack(pady=5)
-        tk.Label(frame, text=f"Product: {p['name']} x{q}", font=("Arial", 14)).pack(pady=5)
-        tk.Label(frame, text=f"Total: ₱{total:.2f}", font=("Arial", 18)).pack(pady=10)
+        tk.Label(
+            frame,
+            text="Choose Payment Method",
+            font=UI_FONT_BOLD,
+            bg=self.current_theme["bg"],
+            fg=self.current_theme["fg"],
+        ).pack(pady=6)
+
+        card = tk.Frame(
+            frame,
+            bg=self.current_theme["button_bg"],
+            bd=1,
+            relief="solid",
+            padx=20,
+            pady=18,
+        )
+        card.pack(padx=24, pady=10)
+
+        tk.Label(
+            card,
+            text=f"Product: {p['name']} x{q}",
+            font=UI_FONT_BODY,
+            bg=self.current_theme["button_bg"],
+            fg=self.current_theme["button_fg"],
+            wraplength=360,
+            justify="center",
+        ).pack(pady=(0, 8))
+        tk.Label(
+            card,
+            text=f"Total: ₱{total:.2f}",
+            font=UI_FONT_TITLE,
+            bg=self.current_theme["button_bg"],
+            fg=self.current_theme["button_fg"],
+        ).pack(pady=(0, 16))
+
+        tk.Button(
+            card,
+            text="Pay with Cash\nInsert coins or bills",
+            font=UI_FONT_BUTTON,
+            width=28,
+            height=3,
+            wraplength=300,
+            justify="center",
+            command=lambda: self.cash_payment_flow(total),
+        ).pack(pady=8, fill=tk.X)
+
+        tk.Button(
+            card,
+            text="Pay with RFID Card\nCashless payment",
+            font=UI_FONT_BUTTON,
+            width=28,
+            height=3,
+            wraplength=300,
+            justify="center",
+            command=lambda: self.rfid_payment_flow(total),
+        ).pack(pady=8, fill=tk.X)
 
         tk.Button(
             frame,
-            text="Pay with Cash (insert coins/bills)",
-            width=20,
-            height=2,
-            command=lambda: self.cash_payment_flow(total)
+            text="Back to quantity",
+            font=UI_FONT_BODY,
+            padx=16,
+            pady=6,
+            command=self.show_quantity_screen,
         ).pack(pady=10)
-
-        tk.Button(
-            frame,
-            text="Pay with RFID Card (cashless)",
-            width=25,
-            height=2,
-            command=lambda: self.rfid_payment_flow(total)
-        ).pack(pady=10)
-
-        tk.Button(frame, text="Back to quantity", command=self.show_quantity_screen).pack(pady=10)
 
         self.add_theme_toggle_footer()
 
@@ -1065,26 +1147,71 @@ class MainApp(tk.Tk):
         tk.Label(
             frame,
             text="Pay with Cash",
-            font=("Arial", 20),
-        ).pack(pady=(10, 0))
+            font=UI_FONT_BOLD,
+            bg=self.current_theme["bg"],
+            fg=self.current_theme["fg"],
+        ).pack(pady=(10, 6))
         tk.Label(
             frame,
             text="Press the buttons below to simulate inserting coins/bills.",
-            font=("Arial", 10),
+            font=UI_FONT_SMALL,
+            bg=self.current_theme["bg"],
+            fg=self.current_theme["fg"],
         ).pack(pady=2)
-        tk.Label(frame, text=f"Total to Pay: ₱{total_amount:.2f}", font=("Arial", 14)).pack(pady=5)
+
+        card = tk.Frame(
+            frame,
+            bg=self.current_theme["button_bg"],
+            bd=1,
+            relief="solid",
+            padx=20,
+            pady=18,
+        )
+        card.pack(padx=24, pady=10)
+
+        tk.Label(
+            card,
+            text=f"Total to Pay: ₱{total_amount:.2f}",
+            font=UI_FONT_TITLE,
+            bg=self.current_theme["button_bg"],
+            fg=self.current_theme["button_fg"],
+        ).pack(pady=(0, 12))
 
         amount_var = tk.DoubleVar(value=0.0)
         remaining_var = tk.DoubleVar(value=total_amount)
 
-        tk.Label(frame, text="Amount Inserted:", font=("Arial", 14)).pack(pady=5)
-        tk.Label(frame, textvariable=amount_var, font=("Arial", 22)).pack()
+        tk.Label(
+            card,
+            text="Amount Inserted:",
+            font=UI_FONT_BODY,
+            bg=self.current_theme["button_bg"],
+            fg=self.current_theme["button_fg"],
+        ).pack(pady=4)
+        tk.Label(
+            card,
+            textvariable=amount_var,
+            font=(UI_FONT, 22, "bold"),
+            bg=self.current_theme["button_bg"],
+            fg=self.current_theme["button_fg"],
+        ).pack()
 
-        tk.Label(frame, text="Remaining:", font=("Arial", 14)).pack(pady=5)
-        tk.Label(frame, textvariable=remaining_var, font=("Arial", 22)).pack()
+        tk.Label(
+            card,
+            text="Remaining:",
+            font=UI_FONT_BODY,
+            bg=self.current_theme["button_bg"],
+            fg=self.current_theme["button_fg"],
+        ).pack(pady=(10, 4))
+        tk.Label(
+            card,
+            textvariable=remaining_var,
+            font=(UI_FONT, 22, "bold"),
+            bg=self.current_theme["button_bg"],
+            fg=self.current_theme["button_fg"],
+        ).pack()
 
         # Simulated cash buttons for development
-        btn_frame = tk.Frame(frame, bg=self.current_theme["bg"])
+        btn_frame = tk.Frame(card, bg=self.current_theme["button_bg"])
         btn_frame.pack(pady=15)
 
         def add_money(val):
@@ -1093,10 +1220,10 @@ class MainApp(tk.Tk):
             amount_var.set(current)
             remaining_var.set(max(0.0, total_amount - current))
 
-        tk.Button(btn_frame, text="+₱1", width=8, command=lambda: add_money(1)).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame, text="+₱5", width=8, command=lambda: add_money(5)).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame, text="+₱10", width=8, command=lambda: add_money(10)).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame, text="+₱20", width=8, command=lambda: add_money(20)).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="+₱1", width=7, font=UI_FONT_BODY, command=lambda: add_money(1)).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="+₱5", width=7, font=UI_FONT_BODY, command=lambda: add_money(5)).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="+₱10", width=7, font=UI_FONT_BODY, command=lambda: add_money(10)).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="+₱20", width=7, font=UI_FONT_BODY, command=lambda: add_money(20)).pack(side=tk.LEFT, padx=5)
 
         def finish_if_enough():
             current = cash_session.get_amount()
@@ -1106,20 +1233,25 @@ class MainApp(tk.Tk):
             self.complete_purchase_cash(total_amount, current)
 
         tk.Button(
-            frame,
+            card,
             text="Dispense product",
-            font=("Arial", 14),
+            font=UI_FONT_BUTTON,
             command=finish_if_enough,
             bg="#4CAF50",
             fg=self.current_theme["button_fg"],
-        ).pack(pady=15)
+            width=28,
+            height=2,
+        ).pack(pady=(10, 8), fill=tk.X)
 
         tk.Button(
             frame,
             text="Cancel and go back",
+            font=UI_FONT_BODY,
             command=self.build_main_menu,
             bg="#E53935",
             fg=self.current_theme["button_fg"],
+            padx=16,
+            pady=6,
         ).pack(pady=5)
 
         self.add_theme_toggle_footer()
@@ -1265,26 +1397,67 @@ class MainApp(tk.Tk):
         frame = tk.Frame(self, bg=self.current_theme["bg"])
         frame.pack(expand=True, fill=tk.BOTH)
 
-        tk.Label(frame, text="Reload RFID Card", font=("Arial", 20)).pack(pady=10)
-        tk.Label(frame, text=f"Card ID: {uid}", font=("Arial", 12)).pack(pady=2)
-        tk.Label(frame, text=f"Current Balance: ₱{user['balance']:.2f}", font=("Arial", 12)).pack(pady=5)
+        tk.Label(
+            frame,
+            text="Reload RFID Card",
+            font=UI_FONT_BOLD,
+            bg=self.current_theme["bg"],
+            fg=self.current_theme["fg"],
+        ).pack(pady=10)
+
+        card = tk.Frame(
+            frame,
+            bg=self.current_theme["button_bg"],
+            bd=1,
+            relief="solid",
+            padx=20,
+            pady=18,
+        )
+        card.pack(padx=24, pady=10)
+
+        tk.Label(
+            card,
+            text=f"Card ID: {uid}",
+            font=UI_FONT_BODY,
+            bg=self.current_theme["button_bg"],
+            fg=self.current_theme["button_fg"],
+        ).pack(pady=(0, 4))
+        tk.Label(
+            card,
+            text=f"Current Balance: ₱{user['balance']:.2f}",
+            font=UI_FONT_BODY,
+            bg=self.current_theme["button_bg"],
+            fg=self.current_theme["button_fg"],
+        ).pack(pady=(0, 10))
 
         amount_var = tk.DoubleVar(value=0.0)
 
-        tk.Label(frame, text="Amount to Load:", font=("Arial", 14)).pack(pady=5)
-        tk.Label(frame, textvariable=amount_var, font=("Arial", 22)).pack()
+        tk.Label(
+            card,
+            text="Amount to Load:",
+            font=UI_FONT_BODY,
+            bg=self.current_theme["button_bg"],
+            fg=self.current_theme["button_fg"],
+        ).pack(pady=5)
+        tk.Label(
+            card,
+            textvariable=amount_var,
+            font=(UI_FONT, 22, "bold"),
+            bg=self.current_theme["button_bg"],
+            fg=self.current_theme["button_fg"],
+        ).pack()
 
-        btn_frame = tk.Frame(frame, bg=self.current_theme["bg"])
+        btn_frame = tk.Frame(card, bg=self.current_theme["button_bg"])
         btn_frame.pack(pady=15)
 
         def add_money(val):
             cash_session.add(val)
             amount_var.set(cash_session.get_amount())
 
-        tk.Button(btn_frame, text="+₱1", width=8, command=lambda: add_money(1)).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame, text="+₱5", width=8, command=lambda: add_money(5)).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame, text="+₱10", width=8, command=lambda: add_money(10)).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame, text="+₱20", width=8, command=lambda: add_money(20)).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="+₱1", width=7, font=UI_FONT_BODY, command=lambda: add_money(1)).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="+₱5", width=7, font=UI_FONT_BODY, command=lambda: add_money(5)).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="+₱10", width=7, font=UI_FONT_BODY, command=lambda: add_money(10)).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="+₱20", width=7, font=UI_FONT_BODY, command=lambda: add_money(20)).pack(side=tk.LEFT, padx=5)
 
         def confirm_reload():
             amount = cash_session.get_amount()
@@ -1310,20 +1483,25 @@ class MainApp(tk.Tk):
             self.build_main_menu()
 
         tk.Button(
-            frame,
+            card,
             text="Add balance",
-            font=("Arial", 14),
+            font=UI_FONT_BUTTON,
             command=confirm_reload,
             bg="#4CAF50",
             fg=self.current_theme["button_fg"],
-        ).pack(pady=15)
+            width=28,
+            height=2,
+        ).pack(pady=(10, 8), fill=tk.X)
 
         tk.Button(
             frame,
             text="Cancel and go back",
+            font=UI_FONT_BODY,
             command=self.build_main_menu,
             bg="#E53935",
             fg=self.current_theme["button_fg"],
+            padx=16,
+            pady=6,
         ).pack(pady=5)
 
         self.add_theme_toggle_footer()
@@ -1379,334 +1557,6 @@ class MainApp(tk.Tk):
             messagebox.showerror("Error", str(e))
         finally:
             self.build_main_menu()
-
-    # ---------- Restock (Staff) ----------
-
-    def enter_restock_mode(self):
-        """Authenticate staff using RFID card ID."""
-        uid = simpledialog.askstring(
-            "Staff Login",
-            "Enter Staff RFID Card ID (simulate tap):",
-            parent=self,
-        )
-        if not uid:
-            return
-
-        user = get_user_by_uid(uid)
-        if not user or not user["is_staff"]:
-            messagebox.showerror("Access Denied", "Invalid staff card.")
-            return
-
-        self.show_restock_screen(user)
-
-    # ---------- Admin Dashboard ----------
-
-    def enter_admin_dashboard(self):
-        """Authenticate admin using username/password, then show dashboard."""
-        stored_username, stored_hash = get_admin_credentials()
-        if not stored_username or not stored_hash:
-            messagebox.showerror("Error", "Admin credentials not configured.")
-            return
-
-        username = simpledialog.askstring(
-            "Admin Login",
-            "Enter admin username:",
-            parent=self,
-        )
-        if username is None:
-            return
-
-        password = simpledialog.askstring(
-            "Admin Login",
-            "Enter admin password:",
-            parent=self,
-            show="*",
-        )
-        if password is None:
-            return
-
-        pwd_hash = hashlib.sha256(password.encode("utf-8")).hexdigest()
-        if username != stored_username or pwd_hash != stored_hash:
-            messagebox.showerror("Access Denied", "Invalid admin credentials.")
-            return
-
-        admin_user = {"name": username, "rfid_uid": ""}
-        self.show_admin_dashboard(admin_user)
-
-    def show_admin_dashboard(self, staff_user):
-        self.clear_screen()
-
-        stats = get_admin_overview_stats()
-
-        # Layout: left sidebar + main content like a dashboard
-        container = tk.Frame(self, bg=self.current_theme["bg"])
-        container.pack(fill=tk.BOTH, expand=True)
-
-        sidebar = tk.Frame(container, bg=self.current_theme["bg"], width=180)
-        sidebar.pack(side=tk.LEFT, fill=tk.Y)
-
-        main = tk.Frame(container, bg=self.current_theme["bg"])
-        main.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
-
-        # Sidebar navigation
-        tk.Label(
-            sidebar,
-            text="Admin",
-            font=("Arial", 16, "bold"),
-            bg=self.current_theme["bg"],
-            fg=self.current_theme["fg"],
-        ).pack(pady=(15, 10))
-
-        tk.Button(
-            sidebar,
-            text="Overview",
-            font=("Arial", 12),
-            anchor="w",
-            width=18,
-            command=lambda: self.show_admin_dashboard(staff_user),
-        ).pack(pady=2, padx=10)
-        tk.Button(
-            sidebar,
-            text="Sales Reports",
-            font=("Arial", 12),
-            anchor="w",
-            width=18,
-            command=self.show_sales_reports_screen,
-        ).pack(pady=2, padx=10)
-        tk.Button(
-            sidebar,
-            text="Change Credentials",
-            font=("Arial", 12),
-            anchor="w",
-            width=18,
-            command=self.change_admin_credentials_screen,
-        ).pack(pady=2, padx=10)
-        tk.Button(
-            sidebar,
-            text="Back to Main",
-            font=("Arial", 12),
-            anchor="w",
-            width=18,
-            command=self.build_main_menu,
-        ).pack(pady=(20, 0), padx=10)
-
-        # Main header
-        header = tk.Frame(main, bg=self.current_theme["bg"])
-        header.pack(fill=tk.X, pady=10, padx=20)
-
-        tk.Label(
-            header,
-            text="Overview",
-            font=("Arial", 18, "bold"),
-            bg=self.current_theme["bg"],
-            fg=self.current_theme["fg"],
-        ).pack(side=tk.LEFT)
-
-        tk.Label(
-            header,
-            text=f"Admin: {staff_user['name'] or staff_user['rfid_uid']}",
-            font=("Arial", 10),
-            bg=self.current_theme["bg"],
-            fg=self.current_theme["fg"],
-        ).pack(side=tk.RIGHT)
-
-        # Metric cards row
-        metrics_frame = tk.Frame(main, bg=self.current_theme["bg"])
-        metrics_frame.pack(fill=tk.X, padx=20, pady=10)
-
-        def metric_card(parent, title, value_text):
-            card = tk.Frame(parent, bg=self.current_theme["button_bg"], bd=1, relief="solid")
-            card.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=5)
-            tk.Label(
-                card,
-                text=title,
-                font=("Arial", 10),
-                bg=self.current_theme["button_bg"],
-                fg=self.current_theme["button_fg"],
-            ).pack(anchor="w", padx=8, pady=(6, 0))
-            tk.Label(
-                card,
-                text=value_text,
-                font=("Arial", 16, "bold"),
-                bg=self.current_theme["button_bg"],
-                fg=self.current_theme["button_fg"],
-            ).pack(anchor="w", padx=8, pady=(0, 8))
-
-        metric_card(metrics_frame, "Total Sales", f"₱{stats['total_sales']:.2f}")
-        metric_card(metrics_frame, "Orders", str(stats["orders"]))
-        metric_card(metrics_frame, "Active Customers", str(stats["active_customers"]))
-        metric_card(metrics_frame, "Low-stock Products", str(stats["low_stock"]))
-
-        # Placeholder area for future charts / tables
-        body = tk.Frame(main, bg=self.current_theme["bg"])
-        body.pack(fill=tk.BOTH, expand=True, padx=20, pady=(5, 20))
-
-        tk.Label(
-            body,
-            text="Use the sidebar to open detailed sales reports\nor manage admin credentials.",
-            font=("Arial", 11),
-            bg=self.current_theme["bg"],
-            fg=self.current_theme["fg"],
-            justify="left",
-        ).pack(anchor="nw", pady=10)
-
-        self.apply_theme_to_widget(self)
-
-    def show_restock_screen(self, staff_user):
-        self.clear_screen()
-
-        tk.Label(self, text=f"Restock Mode - Staff: {staff_user['name'] or staff_user['rfid_uid']}",
-                 font=("Arial", 16)).pack(pady=10)
-
-        products = get_all_products()
-        list_frame = tk.Frame(self, bg=self.current_theme["bg"])
-        list_frame.pack(expand=True, fill=tk.BOTH)
-
-        for idx, p in enumerate(products):
-            row = tk.Frame(list_frame, bg=self.current_theme["bg"])
-            row.pack(fill=tk.X, padx=10, pady=5)
-
-            info = f"Slot {p['slot_number']} - {p['name']} | {p['current_stock']}/{p['capacity']} | ₱{p['price']:.2f}"
-            tk.Label(row, text=info, anchor="w").pack(side=tk.LEFT, expand=True)
-
-            tk.Button(
-                row,
-                text="Restock",
-                command=lambda prod=p: self.restock_product_dialog(prod)
-            ).pack(side=tk.RIGHT, padx=5)
-
-        tk.Button(self, text="Exit Restock Mode", command=self.build_main_menu).pack(pady=10)
-
-        self.add_theme_toggle_footer()
-
-    def restock_product_dialog(self, product_row):
-        max_add = product_row["capacity"] - product_row["current_stock"]
-        if max_add <= 0:
-            messagebox.showinfo("Full", "This tray is already full.")
-            return
-
-        amount = simpledialog.askinteger(
-            "Restock Amount",
-            f"How many items to add? (max {max_add})",
-            minvalue=1,
-            maxvalue=max_add,
-            parent=self,
-        )
-        if amount is None:
-            return
-
-        new_price = simpledialog.askfloat(
-            "New Price",
-            f"Enter new price per piece (current ₱{product_row['price']:.2f}), or cancel to keep:",
-            parent=self,
-        )
-
-        try:
-            restock_product(product_row["id"], amount, new_price)
-            messagebox.showinfo(
-                "Restocked",
-                f"Added {amount} items to {product_row['name']}."
-            )
-        except Exception as e:
-            messagebox.showerror("Error", str(e))
-
-        # Refresh restock screen
-        # Fetch a dummy staff user (not needed for display name here)
-        dummy_staff = {"name": "", "rfid_uid": ""}
-        self.show_restock_screen(dummy_staff)
-
-    # ---------- Admin: Sales Reports ----------
-
-    def show_sales_reports_screen(self):
-        """Show a list of generated sales report Excel files for admin to open."""
-        self.clear_screen()
-
-        tk.Label(
-            self,
-            text="Sales Reports",
-            font=("Arial", 18),
-        ).pack(pady=10)
-
-        reports = list_sales_reports()
-        list_frame = tk.Frame(self, bg=self.current_theme["bg"])
-        list_frame.pack(expand=True, fill=tk.BOTH, padx=20, pady=10)
-
-        if not reports:
-            tk.Label(
-                list_frame,
-                text="No sales reports found. Generate one first.",
-                font=("Arial", 12),
-            ).pack(pady=10)
-        else:
-            for idx, report_path in enumerate(reports):
-                row = tk.Frame(list_frame, bg=self.current_theme["bg"])
-                row.pack(fill=tk.X, pady=5)
-
-                label_text = f"{report_path.name}"
-                tk.Label(row, text=label_text, anchor="w").pack(side=tk.LEFT, expand=True)
-
-                def make_open_cmd(p=report_path):
-                    def _cmd():
-                        try:
-                            open_sales_report(p)
-                        except Exception as exc:
-                            messagebox.showerror("Open Failed", str(exc))
-                    return _cmd
-
-                tk.Button(
-                    row,
-                    text="Open",
-                    command=make_open_cmd(),
-                ).pack(side=tk.RIGHT, padx=5)
-
-        tk.Button(
-            self,
-            text="Back to Admin Dashboard",
-            font=("Arial", 12),
-            command=lambda: self.enter_admin_dashboard(),
-        ).pack(pady=10)
-
-        self.add_theme_toggle_footer()
-
-    # ---------- Admin: Change Credentials ----------
-
-    def change_admin_credentials_screen(self):
-        """Allow the logged-in admin to change username and password."""
-        new_username = simpledialog.askstring(
-            "Change Admin Username",
-            "Enter new admin username:",
-            parent=self,
-        )
-        if not new_username:
-            return
-
-        new_password = simpledialog.askstring(
-            "Change Admin Password",
-            "Enter new admin password:",
-            parent=self,
-            show="*",
-        )
-        if not new_password:
-            return
-
-        confirm_password = simpledialog.askstring(
-            "Confirm Admin Password",
-            "Re-enter new admin password:",
-            parent=self,
-            show="*",
-        )
-        if new_password != confirm_password:
-            messagebox.showerror("Error", "Passwords do not match.")
-            return
-
-        try:
-            update_admin_credentials(new_username, new_password)
-            messagebox.showinfo(
-                "Success",
-                "Admin username and password have been updated.",
-            )
-        except Exception as exc:
-            messagebox.showerror("Error", f"Failed to update admin credentials: {exc}")
 
     # ---------- Sales Report Export ----------
 

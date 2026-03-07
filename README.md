@@ -1,17 +1,19 @@
 ## Personal Hygiene Vending Machine (Raspberry Pi Prototype)
 
-This Thesis is a Raspberry Pi–based **personal hygiene vending machine** with:
+**Version:** v.0.01
+
+A Raspberry Pi–based **personal hygiene vending machine** with:
 
 - 7" touchscreen GUI (Tkinter)
 - Cash and RFID wallet payments
 - Product search bar with icons & backspace
 - Basic inventory & staff restock mode
-- Admin dashboard (overview metrics + reports)
+- Admin dashboard (overview metrics, charts, reports)
 - SQLite logging of sales
 - Excel export for sales reporting (daily / monthly summaries)
 - Light / Dark **theme toggle** on all main screens
 
-> Current status: **single‑file prototype** in `main.py` implementing core vending, admin dashboard, search UI, and reporting logic. Hardware is partially simulated so it can run on Windows for development, and uses real GPIO when deployed on a Raspberry Pi.
+> The app runs on Windows for development (GPIO mocked) and on Raspberry Pi with real hardware. Version and patch notes are centralized in `patchNotes.py`; the database layer lives in `database.py`.
 
 ---
 
@@ -35,40 +37,46 @@ This Thesis is a Raspberry Pi–based **personal hygiene vending machine** with:
   - Restock a tray (with optional price change)
   - Updates inventory in SQLite
 
+- **Admin dashboard**
+  - Login with username/password (hashed); change credentials in dashboard
+  - Overview: total sales, orders, active customers, low‑stock count
+  - Charts: sales trend (line), monthly sales (bar), top‑selling products, low‑stock products
+  - Generate Excel report (saved to **Downloads / Hygiene Vending Reports**)
+  - View and open existing sales reports
+
 - **Database & reports**
-  - SQLite DB `vending.db` (automatically created)
-  - Tables:
-    - `products`
-    - `rfid_users`
-    - `transactions`
+  - SQLite DB `vending.db` (auto-created in project folder)
+  - Tables: `products`, `rfid_users`, `transactions`, `admin_settings`
   - Excel export (`.xlsx`) with:
-    - All transactions (with product, amount, method, RFID UID)
+    - All transactions (product, amount, method, RFID UID)
     - Daily sales summary
     - Monthly sales summary
 
 - **Hardware abstraction & UI**
   - Stepper motors per slot (GPIO pins configurable)
   - Coin hopper (for change)
-  - All GPIO access mocked automatically when running on Windows
-  - Light / Dark theme toggle
+  - GPIO mocked on Windows, real on Raspberry Pi
+  - Light / Dark theme toggle; version (v.0.01) in window title and footer
 
 ---
 
 ## Project Structure
 
-Currently, the prototype is **mostly single file**:
+- **`main.py`** – Entry point; GUI, hardware abstraction, RFID/product flows, sidebar, theme. Imports from `database`, `patchNotes`, `admin`, `staff`.
+- **`database.py`** – SQLite connection, schema, seeding, and all DB operations (products, transactions, RFID users, admin credentials, report queries, Excel export).
+- **`patchNotes.py`** – App version (`VERSION`), patch notes content (Added / Improved / Bugs fixed / Future), and `get_patch_notes_text()` for the in-app Patch Notes dialog.
+- **`admin/`**
+  - `admin.py` – `AdminMixin`: admin login, dashboard UI, charts, sales reports screen, change credentials.
+  - `reports.py` – Report paths (`get_reports_dir()` = Downloads/Hygiene Vending Reports), list/open reports.
+- **`staff/`**
+  - `staff.py` – `StaffMixin`: staff RFID login, restock screen, restock dialog.
+- **`images/`** – Icons (hamburger, search, backspace, theme, admin, staff).
 
-- `main.py` – GUI, database, hardware abstraction, RFID wallet logic, product search, sidebar navigation, admin dashboard, restock mode, and Excel export.
-- `admin/` – package reserved for admin‑related helpers (`reports.py` etc.).
-- `images/` – PNG assets for icons (hamburger, search, backspace, staff/admin).
+**Generated / runtime:**
 
-The SQLite database file is created automatically:
-
-- `vending.db` – stores products, users, and transactions.
-
-Generated reports:
-
-- `sales_report_YYYYMMDD_HHMMSS.xlsx` – Excel sales reports.
+- **`vending.db`** – SQLite database (products, transactions, RFID users, admin settings).
+- **Downloads / Hygiene Vending Reports** – Generated Excel sales reports (`sales_report_YYYYMMDD_HHMMSS.xlsx`).
+- **`debug_logs/`** – Debug log files (when debugging is enabled).
 
 ---
 
@@ -77,54 +85,52 @@ Generated reports:
 ### Software (Windows dev OR Raspberry Pi)
 
 - Python **3.10+** (3.11+ OK)
-- System packages:
+- System:
   - Tkinter (for GUI)
-  - SQLite (usually bundled with Python)
-  - `RPi.GPIO` **only on Raspberry Pi**
+  - SQLite (bundled with Python)
+  - **RPi.GPIO** only on Raspberry Pi
 - Python packages:
-  - `openpyxl` (for Excel export)
+  - `openpyxl` (Excel export)
 
-Install Python packages (on both Windows and Raspberry Pi):
+Install dependencies:
 
 ```bash
 pip install openpyxl
 ```
 
-### Extra setup on Raspberry Pi (recommended)
+### Raspberry Pi setup
 
-On Raspberry Pi OS / Debian‑based distros:
+On Raspberry Pi OS / Debian-based:
 
 ```bash
 sudo apt update
-
-# Core Python and Tkinter (if not already installed)
 sudo apt install -y python3 python3-pip python3-tk
-
-# GPIO library used by the prototype
 sudo apt install -y python3-rpi.gpio
 ```
 
-Tkinter is required for the touchscreen GUI; `python3-tk` ensures it is available.  
-`python3-rpi.gpio` enables real stepper motors / coin hopper control. On Windows, GPIO is automatically mocked, so you can still run and test the UI.
+Tkinter is required for the touchscreen GUI. On Windows, GPIO is mocked so you can run and test the UI without hardware.
+
+---
+
+## How to Run
+
+From the project directory:
+
+```bash
+python main.py
+```
+
+On Raspberry Pi with a 7" touchscreen, the app can run fullscreen; on Windows it uses a resizable window (e.g. 800×480).
 
 ---
 
 ## How It Works (Summary)
 
-- At startup, `main.py` creates / migrates `vending.db`, seeds:
-  - 10 hygiene / convenience products (slots 1–10) with approximate Philippine SRP prices.
-  - A default staff RFID card (`rfid_uid="STAFF001"`, marked as staff).
-- Main screen shows:
-  - Product grid (scrollable, responsive layout).
-  - Search bar with magnifying‑glass icon, placeholder **“Search for products”**, and backspace icon to delete characters.
-  - Bottom actions: `Reload (RFID)`, `Buy RFID Card`, **How to use?**, theme toggle, and `SyntaxError™` trademark footer.
-- Hidden admin/staff controls are accessed via a **hamburger icon** that opens a left sidebar:
-  - Staff restock mode (RFID‑based).
-  - Admin dashboard (overview metrics + links to reports and credentials).
-- Flows implemented:
-  - **Cash purchase** (simulated buttons, then hardware GPIO for dispensing).
-  - **RFID purchase**, **Buy RFID Card**, **Reload RFID Card**.
-  - **Staff restock mode** with per‑tray restocking and optional price update.
-  - **Admin dashboard** with total sales, order count, active customers, and low‑stock product count.
-  - **Excel export** with all transactions, daily and monthly sales.
-  - **Light/Dark mode** toggle that changes the whole UI theme.
+- **Startup:** `main.py` calls `init_db()` (in `database.py`), which creates/migrates `vending.db` and seeds:
+  - 10 hygiene products (slots 1–10) with Philippine SRP prices.
+  - Default staff RFID user (`STAFF001`).
+  - Default admin credentials (username/password: `admin` / `admin`; change in admin dashboard).
+- **Main screen:** Scrollable product grid, pill-shaped search bar (“Search for products”) with magnifying glass and backspace icons, navbar (hamburger, theme toggle), footer with **SyntaxError™** and version (v.0.01), live Philippine date/time, and buttons: Reload (RFID), Buy RFID Card, How to use?, Patch Notes.
+- **Hamburger menu:** Opens a sidebar with Staff (restock) and Admin (dashboard). Admin requires login.
+- **Flows:** Select product → quantity → payment (Cash or RFID) → dispense; Buy/Reload RFID; Staff restock; Admin dashboard (charts, generate Excel, view reports, change credentials).
+- **Version:** Shown in the window title, footer on main screens, and Patch Notes dialog. Bump `VERSION` in `patchNotes.py` for new releases.
