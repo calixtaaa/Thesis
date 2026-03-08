@@ -1,6 +1,6 @@
 ## Personal Hygiene Vending Machine (Raspberry Pi Prototype)
 
-**Version:** v.0.01
+**Version:** v.0.02
 
 A Raspberry Pi–based **personal hygiene vending machine** with:
 
@@ -56,7 +56,7 @@ A Raspberry Pi–based **personal hygiene vending machine** with:
   - Stepper motors per slot (GPIO pins configurable)
   - Coin hopper (for change)
   - GPIO mocked on Windows, real on Raspberry Pi
-  - Light / Dark theme toggle; version (v.0.01) in window title and footer
+  - Light / Dark theme toggle; version (v.0.02) in window title and footer
 
 ---
 
@@ -130,7 +130,16 @@ On Raspberry Pi with a 7" touchscreen, the app can run fullscreen; on Windows it
   - 10 hygiene products (slots 1–10) with Philippine SRP prices.
   - Default staff RFID user (`STAFF001`).
   - Default admin credentials (username/password: `admin` / `admin`; change in admin dashboard).
-- **Main screen:** Scrollable product grid, pill-shaped search bar (“Search for products”) with magnifying glass and backspace icons, navbar (hamburger, theme toggle), footer with **SyntaxError™** and version (v.0.01), live Philippine date/time, and buttons: Reload (RFID), Buy RFID Card, How to use?, Patch Notes.
+- **Main screen:** Scrollable product grid, pill-shaped search bar (“Search for products”) with magnifying glass and backspace icons, navbar (hamburger, theme toggle), footer with **SyntaxError™** and version (v.0.02), live Philippine date/time, and buttons: Reload (RFID), Buy RFID Card, How to use?, Patch Notes.
 - **Hamburger menu:** Opens a sidebar with Staff (restock) and Admin (dashboard). Admin requires login.
 - **Flows:** Select product → quantity → payment (Cash or RFID) → dispense; Buy/Reload RFID; Staff restock; Admin dashboard (charts, generate Excel, view reports, change credentials).
 - **Version:** Shown in the window title, footer on main screens, and Patch Notes dialog. Bump `VERSION` in `patchNotes.py` for new releases.
+
+---
+
+## Changelog (v.0.02)
+
+- **Color palette:** Unified teal (#1A948E) for Buy RFID, product add (+), and primary buttons.
+- **Admin dashboard:** KPI values retain teal accent when switching light/dark theme.
+- **Theme toggle:** Fixed content removal after 3+ toggles; fixed freeze and force close with deferred apply and throttling.
+- **Theme slider:** Removed icon from knob to fix black line artifacts; clean white knob design.

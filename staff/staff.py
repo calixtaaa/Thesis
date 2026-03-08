@@ -14,19 +14,25 @@ LOGIN_PAGE_BG = "#1e293b"
 
 
 def _hover_btn(btn, normal, hover):
+    """Hover effect; stores colors on btn so Leave always restores correctly (fixes stuck hover)."""
+    btn._hover_normal = normal
+    btn._hover_hover = hover
+
     def on_enter(_e):
         if btn.winfo_exists():
-            btn.configure(bg=hover)
+            btn.configure(bg=btn._hover_hover)
+
     def on_leave(_e):
         if btn.winfo_exists():
-            btn.configure(bg=normal)
+            btn.configure(bg=btn._hover_normal)
+
     btn.bind("<Enter>", on_enter)
     btn.bind("<Leave>", on_leave)
 
 
 class StaffMixin:
     def enter_restock_mode(self):
-        """Show in-app Staff Login (mint panel, no system dialog)."""
+        """Show in-app Staff Login (mint panel, RFID card ID)."""
         if hasattr(self, "_apply_lcd_fit"):
             try:
                 self._apply_lcd_fit(profile="admin_staff")
@@ -147,6 +153,7 @@ class StaffMixin:
 
     def show_restock_screen(self, staff_user):
         self.clear_screen()
+        self._current_staff_user = staff_user
 
         frame = tk.Frame(self.content_holder, bg=self.current_theme["bg"])
         frame.place(relx=0, rely=0, relwidth=1, relheight=1, anchor="nw")
@@ -241,23 +248,44 @@ class StaffMixin:
                 pady=6,
                 cursor="hand2",
             )
+            restock_btn._restock_btn = True
             restock_btn.pack(side=tk.RIGHT, padx=10, pady=8)
             _hover_btn(restock_btn, accent, LOGIN_BTN_HOVER)
 
+            # Row-level Leave fallback: when mouse leaves row, reset button (fixes stuck hover in scrollable canvas)
+            def _row_leave(_e):
+                if restock_btn.winfo_exists():
+                    restock_btn.configure(bg=getattr(restock_btn, "_hover_normal", accent))
+            row.bind("<Leave>", _row_leave)
+
+        # Use high-contrast colors so text is visible without hover (matches admin fix)
+        exit_bg = "#e2e8f0" if self.current_theme_name == "light" else "#334155"
+        exit_fg = "#0f172a" if self.current_theme_name == "light" else "#ffffff"
         exit_btn = tk.Button(
             inner,
             text="Exit Restock Mode",
             font=UI_FONT_BODY,
             command=self.build_main_menu,
-            bg=self.current_theme["button_bg"],
-            fg=self.current_theme["button_fg"],
+            bg=exit_bg,
+            fg=exit_fg,
             relief=tk.FLAT,
             padx=16,
             pady=8,
             cursor="hand2",
         )
+        exit_btn._staff_exit_btn = True
+        exit_btn._staff_exit_bg = exit_bg
+        exit_btn._staff_exit_fg = exit_fg
         exit_btn.pack(pady=12)
-        _hover_btn(exit_btn, self.current_theme["button_bg"], self.current_theme.get("accent", "#0d9488"))
+
+        def _on_enter(_e):
+            if exit_btn.winfo_exists():
+                exit_btn.configure(bg=self.current_theme.get("accent", "#0d9488"), fg="#ffffff")
+        def _on_leave(_e):
+            if exit_btn.winfo_exists():
+                exit_btn.configure(bg=exit_btn._staff_exit_bg, fg=exit_btn._staff_exit_fg)
+        exit_btn.bind("<Enter>", _on_enter)
+        exit_btn.bind("<Leave>", _on_leave)
 
         self._slide_in(frame)
         self.add_theme_toggle_footer()
@@ -290,5 +318,5 @@ class StaffMixin:
         except Exception as exc:
             messagebox.showerror("Error", str(exc))
 
-        dummy_staff = {"name": "", "rfid_uid": ""}
-        self.show_restock_screen(dummy_staff)
+        staff_user = getattr(self, "_current_staff_user", {"name": "", "rfid_uid": ""})
+        self.show_restock_screen(staff_user)

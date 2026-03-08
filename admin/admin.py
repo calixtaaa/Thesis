@@ -341,7 +341,7 @@ class AdminMixin:
         center.place(relx=0.5, rely=0.5, anchor="center")
 
         panel_bg = "#99f6e4"
-        btn_bg = "#0d9488"
+        btn_bg = "#1A948E"
         btn_hover = "#2dd4bf"
         panel = tk.Frame(center, bg=panel_bg, padx=40, pady=28)
         panel.pack()
@@ -462,8 +462,11 @@ class AdminMixin:
             fg=self.current_theme["fg"],
         ).pack(pady=(16, 12), padx=12)
 
-        accent = self.current_theme.get("accent", "#0d9488")
+        accent = self.current_theme.get("accent", "#1A948E")
         hover_bg = "#2dd4bf" if self.current_theme_name == "light" else "#5eead4"
+        # High-contrast text so nav items are visible without hover (fixes invisible text)
+        nav_fg = "#0f172a" if self.current_theme_name == "light" else "#ffffff"
+        nav_bg = "#e2e8f0" if self.current_theme_name == "light" else "#334155"
 
         def nav_btn(text, cmd):
             b = tk.Button(
@@ -472,18 +475,21 @@ class AdminMixin:
                 font=(UI_FONT, 11),
                 anchor="w",
                 command=cmd,
-                bg=self.current_theme["button_bg"],
-                fg=self.current_theme["button_fg"],
+                bg=nav_bg,
+                fg=nav_fg,
                 activebackground=hover_bg,
-                activeforeground="#0f766e",
+                activeforeground="#0f172a",
                 relief=tk.FLAT,
                 padx=12,
                 pady=10,
                 cursor="hand2",
             )
+            b._sidebar_nav = True
+            b._sidebar_nav_bg = nav_bg
+            b._sidebar_nav_fg = nav_fg
             b.pack(fill=tk.X, padx=8, pady=4)
-            b.bind("<Enter>", lambda e: b.configure(bg=hover_bg) if b.winfo_exists() else None)
-            b.bind("<Leave>", lambda e: b.configure(bg=self.current_theme["button_bg"]) if b.winfo_exists() else None)
+            b.bind("<Enter>", lambda e: b.configure(bg=hover_bg, fg="#0f172a") if b.winfo_exists() else None)
+            b.bind("<Leave>", lambda e: b.configure(bg=b._sidebar_nav_bg, fg=b._sidebar_nav_fg) if b.winfo_exists() else None)
             return b
 
         nav_btn("Overview", lambda: self.show_admin_dashboard(staff_user))
@@ -528,13 +534,15 @@ class AdminMixin:
                 bg=self.current_theme.get("card_bg", self.current_theme["button_bg"]),
                 fg=self.current_theme.get("muted", self.current_theme["fg"]),
             ).pack(anchor="w", padx=12, pady=(10, 2))
-            tk.Label(
+            val_lbl = tk.Label(
                 card,
                 text=value_text,
                 font=(UI_FONT, 18, "bold"),
                 bg=self.current_theme.get("card_bg", self.current_theme["button_bg"]),
-                fg=self.current_theme.get("accent", "#0d9488"),
-            ).pack(anchor="w", padx=12, pady=(0, 12))
+                fg=self.current_theme.get("accent", "#1A948E"),
+            )
+            val_lbl._admin_metric_value = True
+            val_lbl.pack(anchor="w", padx=12, pady=(0, 12))
 
         metric_card(metrics_frame, "Total Sales", f"₱{stats['total_sales']:.2f}")
         metric_card(metrics_frame, "Orders", str(stats["orders"]))
@@ -583,7 +591,7 @@ class AdminMixin:
             text="Generate Excel Report",
             font=(UI_FONT, 12, "bold"),
             command=self.export_sales_report_ui,
-            bg=self.current_theme.get("accent", "#0d9488"),
+            bg=self.current_theme.get("accent", "#1A948E"),
             fg="#ffffff",
             relief=tk.FLAT,
             padx=20,
@@ -648,7 +656,7 @@ class AdminMixin:
                     text="Open",
                     font=UI_FONT_BODY,
                     command=make_open_cmd(),
-                    bg=self.current_theme.get("accent", "#0d9488"),
+                    bg=self.current_theme.get("accent", "#1A948E"),
                     fg="#ffffff",
                     relief=tk.FLAT,
                     padx=14,
@@ -675,7 +683,7 @@ class AdminMixin:
 
         user = getattr(self, "_current_admin_user", {"name": "admin", "rfid_uid": ""})
         panel_bg = "#99f6e4"
-        accent = self.current_theme.get("accent", "#0d9488")
+        accent = self.current_theme.get("accent", "#1A948E")
         accent_hover = "#2dd4bf" if self.current_theme_name == "light" else "#5eead4"
 
         container = tk.Frame(self.content_holder, bg=self.current_theme["bg"])

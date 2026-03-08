@@ -78,15 +78,15 @@ DEBUG_LOGS_DIR = BASE_DIR / "debug_logs"
 BASE_APP_W = 800
 BASE_APP_H = 480
 
-# Simple theming (light / dark) – expanded for a more polished UI
+# Simple theming (light / dark) – palette: teal #1A948E (Buy RFID), white plus on teal for product add
 THEMES = {
     "light": {
         "bg": "#f8fafc",
         "fg": "#1e293b",
         "button_bg": "#f1f5f9",
         "button_fg": "#1e293b",
-        "accent": "#0d9488",
-        "accent_hover": "#0f766e",
+        "accent": "#1A948E",
+        "accent_hover": "#15857B",
         "card_bg": "#ffffff",
         "card_border": "#e2e8f0",
         "search_bg": "#f1f5f9",
@@ -156,11 +156,14 @@ def gpio_init():
 
 def dispense_from_slot(slot_number: int, quantity: int = 1):
     pins = PRODUCT_STEPPER_PINS.get(slot_number)
+    print(f"[HW] Dispensing from slot {slot_number} x{quantity}")
     if not pins:
-        print(f"[HW] No stepper pins configured for slot {slot_number}")
+        if not ON_RPI:
+            print(f"[HW] (Simulated – no pins for slot {slot_number})")
+        else:
+            print(f"[HW] WARNING: No stepper pins for slot {slot_number}, skipping")
         return
 
-    print(f"[HW] Dispensing from slot {slot_number} x{quantity}")
     steps = STEPS_PER_PRODUCT * quantity
     delay = 0.001  # 1ms
 
@@ -269,14 +272,12 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
         except Exception:
             self.admin_icon = None
 
-        # Hamburger / menu icon
+        # Hamburger / menu icon (subsample 4x for compact size, matches dark mode text size)
         try:
             menu_path = BASE_DIR / "images" / "hamburger.png"
             if menu_path.exists():
-                # Load and downscale so it appears as a navbar icon
                 img = tk.PhotoImage(file=str(menu_path))
-                # Slightly larger icon for touch LCD (3x instead of 4x)
-                self.menu_icon = img.subsample(3, 3)
+                self.menu_icon = img.subsample(4, 4)
         except Exception:
             self.menu_icon = None
 
@@ -338,6 +339,7 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
 
         self.search_var = tk.StringVar()
         self.theme_animating = False
+        self._pending_theme_apply_id = None
 
         # Main content lives here; sidebar (when shown) is a sibling on the right
         self.content_holder = tk.Frame(self, bg=self.current_theme["bg"])
@@ -375,14 +377,6 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
     # ---------- Screen helpers ----------
 
     def clear_screen(self):
-        # region agent log
-        self._debug_log(
-            "H5",
-            "main.py:clear_screen",
-            "clear_screen called",
-            {"child_count": len(self.content_holder.winfo_children())},
-        )
-        # endregion
         try:
             self.unbind_all("<MouseWheel>")
         except Exception:
@@ -438,36 +432,93 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
     def get_low_stock_chart_data_points(self, limit: int = 5):
         return get_low_stock_chart_data(limit)
 
-    def apply_theme_to_widget(self, widget):
-        """Apply current theme colors to a widget and its children."""
+    def apply_theme_to_widget(self, widget, _depth=0):
+        """Apply current theme colors to a widget and its children (recursive)."""
+        if _depth > 80:
+            return
         try:
+            if not widget.winfo_exists():
+                return
             widget.configure(bg=self.current_theme["bg"])
         except tk.TclError:
             pass
-        for child in widget.winfo_children():
-            if isinstance(child, (tk.Button, tk.Label, tk.Frame)):
-                try:
-                    if isinstance(child, tk.Button):
+        for child in list(widget.winfo_children()):
+            try:
+                if isinstance(child, tk.Button):
+                    if getattr(child, "_sidebar_nav", False):
+                        nav_bg = "#e2e8f0" if self.current_theme_name == "light" else "#334155"
+                        nav_fg = "#0f172a" if self.current_theme_name == "light" else "#ffffff"
+                        child.configure(bg=nav_bg, fg=nav_fg, activebackground="#2dd4bf" if self.current_theme_name == "light" else "#5eead4", activeforeground="#0f172a")
+                        child._sidebar_nav_bg = nav_bg
+                        child._sidebar_nav_fg = nav_fg
+                    elif getattr(child, "_staff_exit_btn", False):
+                        exit_bg = "#e2e8f0" if self.current_theme_name == "light" else "#334155"
+                        exit_fg = "#0f172a" if self.current_theme_name == "light" else "#ffffff"
+                        child.configure(bg=exit_bg, fg=exit_fg)
+                        child._staff_exit_bg = exit_bg
+                        child._staff_exit_fg = exit_fg
+                    elif getattr(child, "_hamburger_btn", False):
+                        child.configure(text="☰", image="", font=(UI_FONT, 16, "bold"), bg=self.current_theme["bg"], fg=self.current_theme["fg"])
+                        if hasattr(child, "image"):
+                            child.image = None
+                    elif getattr(child, "_restock_btn", False):
+                        acc = self.current_theme.get("accent", "#1A948E")
+                        child.configure(bg=acc, fg="#ffffff")
+                        child._hover_normal = acc
+                        child._hover_hover = "#2dd4bf" if self.current_theme_name == "light" else "#5eead4"
+                    elif getattr(child, "_product_add_btn", False):
+                        acc = self.current_theme.get("accent", "#1A948E")
+                        child.configure(
+                            fg="#ffffff",
+                            bg=acc,
+                            activeforeground="#ffffff",
+                            activebackground=self.current_theme.get("accent_hover", "#15857B"),
+                        )
+                    else:
                         child.configure(
                             bg=self.current_theme["button_bg"],
                             fg=self.current_theme["button_fg"],
                             activebackground=self.current_theme["button_bg"],
                             activeforeground=self.current_theme["button_fg"],
                         )
-                    elif isinstance(child, tk.Label) or isinstance(child, tk.Frame):
-                        child.configure(
-                            bg=self.current_theme["bg"],
-                            fg=self.current_theme["fg"] if isinstance(child, tk.Label) else None,
-                        )
-                except tk.TclError:
-                    pass
+                    if getattr(child, "_is_theme_toggle", False):
+                        child.configure(text=f"Theme: {self.current_theme_name.capitalize()}")
+                elif isinstance(child, tk.Label):
+                    if getattr(child, "_datetime_label", False):
+                        fg = self.current_theme["fg"] if self.current_theme_name == "dark" else self.current_theme.get("muted", self.current_theme["fg"])
+                        child.configure(bg=self.current_theme["bg"], fg=fg)
+                    elif getattr(child, "_admin_metric_value", False):
+                        acc = self.current_theme.get("accent", "#1A948E")
+                        child.configure(bg=self.current_theme.get("card_bg", "#ffffff"), fg=acc)
+                    else:
+                        child.configure(bg=self.current_theme["bg"], fg=self.current_theme["fg"])
+                elif isinstance(child, tk.Frame):
+                    child.configure(bg=self.current_theme["bg"])
+                    self.apply_theme_to_widget(child, _depth + 1)
+                elif isinstance(child, tk.Canvas):
+                    try:
+                        child.configure(bg="#ffffff" if self.current_theme_name == "light" else "#253041")
+                    except tk.TclError:
+                        pass
+                    self.apply_theme_to_widget(child, _depth + 1)
+            except tk.TclError:
+                pass
+
+    def _do_deferred_theme_apply(self):
+        self._pending_theme_apply_id = None
+        try:
+            self.apply_theme_to_widget(self)
+        except Exception:
+            pass
 
     def toggle_theme(self):
         """Switch between light and dark modes and refresh current screen."""
         self.current_theme_name = "dark" if self.current_theme_name == "light" else "light"
         self.current_theme = THEMES[self.current_theme_name]
         self.configure(bg=self.current_theme["bg"])
-        self.apply_theme_to_widget(self)
+        if self._pending_theme_apply_id:
+            self.after_cancel(self._pending_theme_apply_id)
+        self._pending_theme_apply_id = self.after(50, self._do_deferred_theme_apply)
 
     def animate_button_press(self, button, callback):
         """Play a quick press animation before running a button action."""
@@ -475,7 +526,7 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
         normal_relief = button.cget("relief")
         normal_bd = button.cget("bd")
 
-        pressed_bg = self.current_theme.get("accent_hover", self.current_theme.get("accent", "#0d9488"))
+        pressed_bg = self.current_theme.get("accent_hover", self.current_theme.get("accent", "#1A948E"))
 
         try:
             button.configure(bg=pressed_bg, relief=tk.SUNKEN, bd=3)
@@ -508,7 +559,6 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
 
         is_dark = self.current_theme_name == "dark"
         start_x = width - padding - knob_size if is_dark else padding
-        icon_image = self.dark_theme_icon if is_dark else self.light_theme_icon
 
         canvas = tk.Canvas(
             parent,
@@ -536,13 +586,7 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
             outline="",
         )
 
-        knob_icon = None
-        if icon_image is not None:
-            knob_icon = canvas.create_image(
-                start_x + (knob_size / 2),
-                padding + (knob_size / 2),
-                image=icon_image,
-            )
+        # No icon inside knob – avoids black line artifacts (reference: clean white knob)
 
         def animate_toggle(_event=None):
             if self.theme_animating:
@@ -562,12 +606,18 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
                     self.current_theme = THEMES[self.current_theme_name]
                     self.configure(bg=self.current_theme["bg"])
                     self.theme_animating = False
-                    self.build_main_menu()
+                    # Update slider visuals (track/knob) to match new theme
+                    canvas.itemconfigure(
+                        track,
+                        fill=track_dark if target_dark else track_light,
+                        outline=border_dark if target_dark else border_light,
+                    )
+                    if self._pending_theme_apply_id:
+                        self.after_cancel(self._pending_theme_apply_id)
+                    self._pending_theme_apply_id = self.after(50, self._do_deferred_theme_apply)
                     return
 
                 canvas.move(knob, delta, 0)
-                if knob_icon is not None:
-                    canvas.move(knob_icon, delta, 0)
                 progress = (index + 1) / step_count
                 if progress > 0.5:
                     canvas.itemconfigure(
@@ -594,24 +644,29 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
             fg=self.current_theme.get("muted", self.current_theme["fg"]),
         ).pack(side=tk.LEFT, padx=10)
         self.add_ph_datetime_label(bottom)
-        tk.Button(
+        theme_btn = tk.Button(
             bottom,
             text=f"Theme: {self.current_theme_name.capitalize()}",
             command=self.toggle_theme,
             font=UI_FONT_BODY,
             bg=self.current_theme["button_bg"],
             fg=self.current_theme["button_fg"],
-        ).pack(side=tk.RIGHT, padx=10)
+        )
+        theme_btn._is_theme_toggle = True
+        theme_btn.pack(side=tk.RIGHT, padx=10)
         self.apply_theme_to_widget(self.content_holder)
 
     def add_ph_datetime_label(self, parent):
         """Show a live Philippine date/time label inside the given parent."""
+        # Use fg (not muted) in dark mode for better visibility
+        dt_fg = self.current_theme["fg"] if self.current_theme_name == "dark" else self.current_theme.get("muted", self.current_theme["fg"])
         label = tk.Label(
             parent,
             font=UI_FONT_SMALL,
             bg=self.current_theme["bg"],
-            fg=self.current_theme.get("muted", self.current_theme["fg"]),
+            fg=dt_fg,
         )
+        label._datetime_label = True
         label.pack(side=tk.RIGHT, padx=10)
 
         ph_tz = datetime.timezone(datetime.timedelta(hours=8))
@@ -620,7 +675,7 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
             if not label.winfo_exists():
                 return
             now = datetime.datetime.now(ph_tz)
-            label.config(text=now.strftime("PH Time: %b %d, %Y %I:%M:%S %p"))
+            label.config(text=now.strftime("PH Time: %b %d, %Y %I:%M %p"))
             label.after(1000, _refresh)
 
         _refresh()
@@ -747,7 +802,7 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
             text="Back to Dashboard",
             font=UI_FONT_BUTTON,
             command=self.build_main_menu,
-            bg=self.current_theme.get("accent", "#0d9488"),
+            bg=self.current_theme.get("accent", "#1A948E"),
             fg="#ffffff",
             relief=tk.FLAT,
             padx=24,
@@ -778,7 +833,7 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
 
         # Teal-green sidebar on the right (fixed width, anchored right)
         sidebar_width = 220
-        sidebar_bg = self.current_theme.get("accent", "#0d9488")
+        sidebar_bg = self.current_theme.get("accent", "#1A948E")
         strip_bg = "#14b8a6" if self.current_theme_name == "light" else "#2dd4bf"  # Slightly lighter strip per button
         sidebar = tk.Frame(self, bg=sidebar_bg, width=sidebar_width)
         sidebar.place(relx=1.0, x=0, y=0, anchor="ne", relheight=1.0)
@@ -893,7 +948,7 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
         ).pack(pady=(0, 28))
 
         # Start Order button – accent, rounded look via padding
-        accent = self.current_theme.get("accent", "#0d9488")
+        accent = self.current_theme.get("accent", "#1A948E")
         start_btn = tk.Button(
             center,
             text="Start Order",
@@ -950,7 +1005,7 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
             text="OK",
             font=(UI_FONT, 12, "bold"),
             command=go_welcome,
-            bg=self.current_theme.get("accent", "#0d9488"),
+            bg=self.current_theme.get("accent", "#1A948E"),
             fg="#ffffff",
             relief=tk.FLAT,
             padx=24,
@@ -978,7 +1033,7 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
         # Right teal sidebar – IPINAPAKITA LAMANG kapag WALANG cart (hindi sa quantity/order section)
         if not self.cart:
             sidebar_width = 220
-            sidebar_bg = "#0d9488"
+            sidebar_bg = "#1A948E"
             strip_bg = "#14b8a6"
             self.sidebar_holder = tk.Frame(self, bg=sidebar_bg, width=sidebar_width)
             self.sidebar_holder.pack_propagate(False)
@@ -1059,33 +1114,21 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
         icons_frame = tk.Frame(header, bg=self.current_theme["bg"])
         icons_frame.pack(side=tk.RIGHT)
 
-        # Hamburger / role menu button
-        if self.menu_icon is not None:
-            menu_btn = tk.Button(
-                icons_frame,
-                image=self.menu_icon,
-                command=self.show_role_menu,
-                bg=self.current_theme["bg"],
-                activebackground=self.current_theme["button_bg"],
-                relief=tk.FLAT,
-                bd=0,
-                cursor="hand2",
-            )
-            menu_btn.image = self.menu_icon
-        else:
-            menu_btn = tk.Button(
-                icons_frame,
-                text="☰",
-                command=self.show_role_menu,
-                font=(UI_FONT, 18, "bold"),
-                bg=self.current_theme["bg"],
-                fg=self.current_theme["fg"],
-                activebackground=self.current_theme["button_bg"],
-                activeforeground=self.current_theme["fg"],
-                relief=tk.FLAT,
-                bd=0,
-                cursor="hand2",
-            )
+        # Hamburger / role menu button (text in both themes for identical size)
+        menu_btn = tk.Button(
+            icons_frame,
+            text="☰",
+            command=self.show_role_menu,
+            font=(UI_FONT, 16, "bold"),
+            bg=self.current_theme["bg"],
+            fg=self.current_theme["fg"],
+            activebackground=self.current_theme["button_bg"],
+            activeforeground=self.current_theme["fg"],
+            relief=tk.FLAT,
+            bd=0,
+            cursor="hand2",
+        )
+        menu_btn._hamburger_btn = True
         menu_btn.pack(side=tk.RIGHT, padx=(0, 6), pady=0)
 
         self.create_theme_slider(icons_frame).pack(side=tk.RIGHT, padx=6, pady=0)
@@ -1117,7 +1160,7 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
         card_bg = self.current_theme.get("card_bg", self.current_theme["button_bg"])
         card_border = self.current_theme.get("card_border", "#e2e8f0")
         selected_bg = "#bbf7d0" if self.current_theme_name == "light" else "#14532d"
-        selected_border = self.current_theme.get("accent", "#0d9488")
+        selected_border = self.current_theme.get("accent", "#1A948E")
         placeholder_bg = "#cbd5e1" if self.current_theme_name == "light" else "#475569"
         # Larger placeholder so products are easier to tap on touch screen
         placeholder_size = 160
@@ -1187,7 +1230,7 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
                     text="✕",
                     font=(UI_FONT, 18, "bold"),
                     fg="#ffffff",
-                    bg=self.current_theme.get("accent", "#0d9488"),
+                    bg=self.current_theme.get("accent", "#1A948E"),
                     activeforeground="#ffffff",
                     activebackground=self.current_theme.get("accent_hover", "#0f766e"),
                     relief=tk.FLAT,
@@ -1200,14 +1243,15 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
                     text="+",
                     font=(UI_FONT, 20, "bold"),
                     fg="#ffffff",
-                    bg=self.current_theme.get("accent", "#0d9488"),
+                    bg=self.current_theme.get("accent", "#1A948E"),
                     activeforeground="#ffffff",
-                    activebackground=self.current_theme.get("accent_hover", "#0f766e"),
+                    activebackground=self.current_theme.get("accent_hover", "#15857B"),
                     relief=tk.FLAT,
                     width=4,
                     state=tk.NORMAL if p["current_stock"] > 0 else tk.DISABLED,
                     command=lambda prod=p: add_to_cart(prod),
                 )
+                action_btn._product_add_btn = True
             action_btn.pack(pady=(2, 12))
 
         def _set_scroll_region():
@@ -1313,7 +1357,7 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
                 text="Confirm Order",
                 font=(UI_FONT, 12, "bold"),
                 fg="#ffffff",
-                bg=self.current_theme.get("accent", "#0d9488"),
+                bg=self.current_theme.get("accent", "#1A948E"),
                 activeforeground="#ffffff",
                 activebackground=self.current_theme.get("accent_hover", "#0f766e"),
                 relief=tk.FLAT,
@@ -1326,8 +1370,8 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
         bottom = tk.Frame(self.content_holder, bg=self.current_theme["bg"])
         bottom.pack(side=tk.BOTTOM, fill=tk.X, pady=(6, 8))
 
-        accent = self.current_theme.get("accent", "#4CAF50")
-        accent_hover = self.current_theme.get("accent_hover", "#2dd4bf")
+        accent = self.current_theme.get("accent", "#1A948E")
+        accent_hover = self.current_theme.get("accent_hover", "#0f766e")
         reload_btn = tk.Button(
             bottom,
             text="Reload (RFID)",
@@ -1396,7 +1440,8 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
             cursor="hand2",
         ).pack(side=tk.LEFT, padx=6)
 
-        # Isang version label lang (LEFT), datetime sa RIGHT – iwas duplicate sa gilid
+        # Pack datetime first (side=RIGHT) so it reserves space and is not truncated
+        self.add_ph_datetime_label(bottom)
         tk.Label(
             bottom,
             text=f"SyntaxError™  ·  {VERSION}",
@@ -1405,16 +1450,14 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
             fg=self.current_theme.get("muted", self.current_theme["fg"]),
         ).pack(side=tk.LEFT, padx=(12, 8))
 
-        self.add_ph_datetime_label(bottom)
-
         self.apply_theme_to_widget(self.content_holder)
         for b in (reload_btn, buy_btn):
             if b.winfo_exists():
                 try:
                     b.configure(
-                        bg=self.current_theme.get("accent", "#4CAF50"),
+                        bg=self.current_theme.get("accent", "#1A948E"),
                         fg="#ffffff",
-                        activebackground=self.current_theme.get("accent_hover"),
+                        activebackground=self.current_theme.get("accent_hover", "#0f766e"),
                         activeforeground="#ffffff",
                     )
                 except tk.TclError:
@@ -1476,7 +1519,7 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
             self.build_main_menu()
             return
 
-        accent = self.current_theme.get("accent", "#0d9488")
+        accent = self.current_theme.get("accent", "#1A948E")
         accent_hover = self.current_theme.get("accent_hover", "#0f766e")
         total = self._get_checkout_total(items)
 
@@ -1599,7 +1642,7 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
             self.sidebar_holder = None
         self.clear_screen()
         p = self.current_product
-        accent = self.current_theme.get("accent", "#0d9488")
+        accent = self.current_theme.get("accent", "#1A948E")
         accent_hover = self.current_theme.get("accent_hover", "#0f766e")
 
         frame = tk.Frame(self.content_holder, bg=self.current_theme["bg"])
@@ -1747,7 +1790,7 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
         )
         back_btn.pack(pady=10)
         _hover_scale_btn(back_btn, normal_padx=18, normal_pady=8, hover_padx=22, hover_pady=12)
-        back_btn.bind("<Enter>", lambda e: back_btn.configure(bg=self.current_theme.get("accent", "#0d9488"), fg="#ffffff") if back_btn.winfo_exists() else None)
+        back_btn.bind("<Enter>", lambda e: back_btn.configure(bg=self.current_theme.get("accent", "#1A948E"), fg="#ffffff") if back_btn.winfo_exists() else None)
         back_btn.bind("<Leave>", lambda e: back_btn.configure(bg=self.current_theme["button_bg"], fg=self.current_theme["button_fg"]) if back_btn.winfo_exists() else None)
 
         self.add_theme_toggle_footer()
@@ -2042,7 +2085,7 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
             frame,
             bg=self.current_theme.get("card_bg", "#ffffff"),
             highlightthickness=1,
-            highlightbackground=self.current_theme.get("accent", "#0d9488"),
+            highlightbackground=self.current_theme.get("accent", "#1A948E"),
         )
         card.place(relx=0.5, rely=0.5, anchor="center")
         tk.Label(
@@ -2050,7 +2093,7 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
             text=title,
             font=(UI_FONT, 18, "bold"),
             bg=self.current_theme.get("card_bg", "#ffffff"),
-            fg=self.current_theme.get("accent", "#0d9488"),
+            fg=self.current_theme.get("accent", "#1A948E"),
         ).pack(pady=(20, 8))
         tk.Label(
             card,
@@ -2065,7 +2108,7 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
             text="OK",
             font=(UI_FONT, 12, "bold"),
             command=on_ok or self.build_main_menu,
-            bg=self.current_theme.get("accent", "#0d9488"),
+            bg=self.current_theme.get("accent", "#1A948E"),
             fg="#ffffff",
             relief=tk.FLAT,
             padx=28,
@@ -2556,6 +2599,7 @@ def main():
         app.mainloop()
     finally:
         GPIO.cleanup()
+
 
 if __name__ == "__main__":
     main()
