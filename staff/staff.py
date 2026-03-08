@@ -73,17 +73,29 @@ class StaffMixin:
         entry.pack(pady=(0, 20), ipady=8, ipadx=10)
         entry.focus_set()
 
+        error_var = tk.StringVar(value="")
+        error_lbl = tk.Label(
+            panel,
+            textvariable=error_var,
+            font=UI_FONT_SMALL,
+            bg=LOGIN_PANEL_BG,
+            fg="#b91c1c",
+        )
+        error_lbl.pack(fill=tk.X, pady=(0, 6))
+
         btn_frame = tk.Frame(panel, bg=LOGIN_PANEL_BG)
-        btn_frame.pack(fill=tk.X)
+        btn_frame.pack(fill=tk.X, pady=(4, 0))
 
         def submit():
             uid = uid_var.get().strip()
             if not uid:
+                error_var.set("Please enter a staff RFID card ID.")
                 return
             user = self.get_user_by_uid_data(uid)
             if not user or not user["is_staff"]:
-                messagebox.showerror("Access Denied", "Invalid staff card.")
+                error_var.set("Invalid staff card.")
                 return
+            error_var.set("")
             self.show_restock_screen(user)
 
         ok_btn = tk.Button(
@@ -167,8 +179,32 @@ class StaffMixin:
         ).pack(pady=(0, 12))
 
         products = self.get_all_products_data()
-        list_frame = tk.Frame(inner, bg=self.current_theme["bg"])
-        list_frame.pack(expand=True, fill=tk.BOTH)
+
+        # Scrollable list container so all slots can be restocked even on small LCD
+        list_container = tk.Frame(inner, bg=self.current_theme["bg"])
+        list_container.pack(expand=True, fill=tk.BOTH)
+
+        canvas = tk.Canvas(
+            list_container,
+            bg=self.current_theme["bg"],
+            highlightthickness=0,
+            bd=0,
+        )
+        scrollbar = tk.Scrollbar(list_container, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        list_frame = tk.Frame(canvas, bg=self.current_theme["bg"])
+        canvas.create_window((0, 0), window=list_frame, anchor="nw")
+
+        def _on_configure(_event=None):
+            try:
+                canvas.configure(scrollregion=canvas.bbox("all"))
+            except Exception:
+                pass
+
+        list_frame.bind("<Configure>", _on_configure)
 
         accent = self.current_theme.get("accent", "#0d9488")
         card_bg = self.current_theme.get("card_bg", self.current_theme["button_bg"])

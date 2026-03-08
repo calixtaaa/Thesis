@@ -330,11 +330,6 @@ class AdminMixin:
                 self._apply_lcd_fit(profile="admin_staff")
             except Exception:
                 pass
-        stored_username, stored_hash = self.get_admin_credentials_data()
-        if not stored_username or not stored_hash:
-            messagebox.showerror("Error", "Admin credentials not configured.")
-            return
-
         if self.sidebar_holder is not None and self.sidebar_holder.winfo_exists():
             self.sidebar_holder.destroy()
             self.sidebar_holder = None
@@ -350,6 +345,19 @@ class AdminMixin:
         btn_hover = "#2dd4bf"
         panel = tk.Frame(center, bg=panel_bg, padx=40, pady=28)
         panel.pack()
+
+        stored_username, stored_hash = self.get_admin_credentials_data()
+        if not stored_username or not stored_hash:
+            tk.Label(
+                panel,
+                text="Admin credentials are not configured.\nPlease contact the system owner.",
+                font=UI_FONT_BODY,
+                bg=panel_bg,
+                fg="#b91c1c",
+                justify="center",
+                wraplength=360,
+            ).pack(pady=(8, 0))
+            return
 
         def hover_btn(w, n, h):
             w.bind("<Enter>", lambda _: w.configure(bg=h) if w.winfo_exists() else None)
@@ -372,17 +380,29 @@ class AdminMixin:
         tk.Label(panel, text="Password:", font=UI_FONT_SMALL, bg=panel_bg, fg="#134e4a").pack(anchor="w", pady=(0, 4))
         password_var = tk.StringVar()
         pw_entry = tk.Entry(panel, textvariable=password_var, font=UI_FONT_BODY, width=26, relief=tk.FLAT, bg="#ffffff", fg="#1e293b", show="*")
-        pw_entry.pack(pady=(0, 22), ipady=8, ipadx=10)
+        pw_entry.pack(pady=(0, 14), ipady=8, ipadx=10)
+
+        status_var = tk.StringVar(value="")
+        status_lbl = tk.Label(
+            panel,
+            textvariable=status_var,
+            font=UI_FONT_SMALL,
+            bg=panel_bg,
+            fg="#b91c1c",
+        )
+        status_lbl.pack(fill=tk.X, pady=(0, 8))
 
         def submit():
             username = username_var.get().strip()
             password = password_var.get()
             if not username or not password:
+                status_var.set("Please enter both username and password.")
                 return
             pwd_hash = hashlib.sha256(password.encode("utf-8")).hexdigest()
             if username != stored_username or pwd_hash != stored_hash:
-                messagebox.showerror("Access Denied", "Invalid admin credentials.")
+                status_var.set("Invalid admin credentials.")
                 return
+            status_var.set("")
             self.show_admin_dashboard({"name": username, "rfid_uid": ""})
 
         btn_frame = tk.Frame(panel, bg=panel_bg)

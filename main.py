@@ -10,7 +10,13 @@ from tkinter import messagebox, simpledialog
 
 from admin.admin import AdminMixin
 from admin.reports import get_reports_dir
-from staff.staff import StaffMixin
+from staff.staff import (
+    StaffMixin,
+    LOGIN_PANEL_BG,
+    LOGIN_BTN_BG,
+    LOGIN_BTN_HOVER,
+    LOGIN_PAGE_BG,
+)
 from database import (
     init_db,
     get_admin_credentials,
@@ -267,10 +273,10 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
         try:
             menu_path = BASE_DIR / "images" / "hamburger.png"
             if menu_path.exists():
-                # Load and aggressively downscale so it appears as a small navbar icon
+                # Load and downscale so it appears as a navbar icon
                 img = tk.PhotoImage(file=str(menu_path))
-                # Adjust subsample factors if you later change the SVG export size
-                self.menu_icon = img.subsample(4, 4)
+                # Slightly larger icon for touch LCD (3x instead of 4x)
+                self.menu_icon = img.subsample(3, 3)
         except Exception:
             self.menu_icon = None
 
@@ -352,12 +358,9 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
         except Exception:
             sw, sh = BASE_APP_W, BASE_APP_H
 
-        # two profiles: customer = base; admin_staff = slightly larger if screen allows
+        # Keep a single fixed base layout size for all profiles
+        # so that Staff/Admin screens do NOT change window scale.
         target_w, target_h = BASE_APP_W, BASE_APP_H
-        if profile == "admin_staff":
-            # prefer 1024x600 if available (common 7" LCD); else fallback to base
-            if sw >= 1024 and sh >= 600:
-                target_w, target_h = 1024, 600
 
         # If the screen is smaller, clamp to screen size (minus a small margin for window borders)
         margin_w, margin_h = 16, 72
@@ -624,19 +627,135 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
         return label
 
     def show_patch_notes_dialog(self):
-        """Show recent UI and feature updates from patchNotes.py."""
-        messagebox.showinfo(f"Patch Notes  ·  {VERSION}", get_patch_notes_text())
+        """In-app Patch Notes screen (no external pop-up)."""
+        if self.sidebar_holder is not None and self.sidebar_holder.winfo_exists():
+            self.sidebar_holder.destroy()
+            self.sidebar_holder = None
+        self.clear_screen()
+        self.content_holder.configure(bg=self.current_theme["bg"])
+
+        frame = tk.Frame(self.content_holder, bg=self.current_theme["bg"])
+        frame.pack(expand=True, fill=tk.BOTH)
+
+        # Top bar with back button for easier navigation
+        top_bar = tk.Frame(frame, bg=self.current_theme["bg"])
+        top_bar.pack(side=tk.TOP, fill=tk.X, pady=(8, 0), padx=10)
+        back_btn = tk.Button(
+            top_bar,
+            text="← Back to Dashboard",
+            font=UI_FONT_BODY,
+            command=self.build_main_menu,
+            bg=self.current_theme.get("button_bg", "#e5e7eb"),
+            fg=self.current_theme["button_fg"],
+            relief=tk.FLAT,
+            padx=14,
+            pady=6,
+            cursor="hand2",
+        )
+        back_btn.pack(side=tk.LEFT)
+        _hover_scale_btn(back_btn, normal_padx=14, normal_pady=6, hover_padx=18, hover_pady=10)
+
+        card = tk.Frame(
+            frame,
+            bg=self.current_theme.get("card_bg", "#ffffff"),
+            highlightthickness=1,
+            highlightbackground=self.current_theme.get("card_border", "#e2e8f0"),
+            padx=24,
+            pady=20,
+        )
+        card.place(relx=0.5, rely=0.55, anchor="center", relwidth=0.9, relheight=0.72)
+
+        tk.Label(
+            card,
+            text=f"Patch Notes  ·  {VERSION}",
+            font=(UI_FONT, 18, "bold"),
+            bg=card["bg"],
+            fg=self.current_theme["fg"],
+        ).pack(anchor="w", pady=(0, 8))
+
+        text_container = tk.Frame(card, bg=card["bg"])
+        text_container.pack(expand=True, fill=tk.BOTH, pady=(4, 12))
+
+        scrollbar = tk.Scrollbar(text_container, orient="vertical")
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        txt = tk.Text(
+            text_container,
+            wrap="word",
+            font=UI_FONT_SMALL,
+            bg=card["bg"],
+            fg=self.current_theme["fg"],
+            bd=0,
+            highlightthickness=0,
+        )
+        txt.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        txt.insert("1.0", get_patch_notes_text())
+        txt.configure(state="disabled", yscrollcommand=scrollbar.set)
+        scrollbar.configure(command=txt.yview)
+
+        self.add_theme_toggle_footer()
 
     def show_help_dialog(self):
-        """Explain the basic usage steps to the user."""
-        message = (
-            "How to use the vending machine:\n\n"
-            "1. Select Product – Tap the item you want.\n"
-            "2. Quantity – Choose how many pieces you need.\n"
-            "3. Payment – Pay with Cash or RFID Card, then wait for the product to be dispensed.\n\n"
-            "You can also buy a new RFID card or reload an existing card using the buttons below."
+        """In-app 'How to use' page (no external pop-up)."""
+        if self.sidebar_holder is not None and self.sidebar_holder.winfo_exists():
+            self.sidebar_holder.destroy()
+            self.sidebar_holder = None
+        self.clear_screen()
+        self.content_holder.configure(bg=self.current_theme["bg"])
+
+        frame = tk.Frame(self.content_holder, bg=self.current_theme["bg"])
+        frame.pack(expand=True, fill=tk.BOTH)
+
+        card = tk.Frame(
+            frame,
+            bg=self.current_theme.get("card_bg", "#ffffff"),
+            highlightthickness=1,
+            highlightbackground=self.current_theme.get("card_border", "#e2e8f0"),
+            padx=32,
+            pady=28,
         )
-        messagebox.showinfo("How to use", message)
+        card.place(relx=0.5, rely=0.5, anchor="center")
+
+        tk.Label(
+            card,
+            text="How to Use the Vending Machine",
+            font=(UI_FONT, 18, "bold"),
+            bg=card["bg"],
+            fg=self.current_theme["fg"],
+        ).pack(pady=(0, 10))
+
+        steps = (
+            "1. Select Product – Tap the item you want on the main menu.\n"
+            "2. Set Quantity – Use the + and − buttons to choose how many pieces you need.\n"
+            "3. Choose Payment – Pay with Cash or RFID Card.\n"
+            "4. Take Products – Wait for the machine to dispense your items.\n\n"
+            "You can also use the buttons at the bottom of the main menu to reload an existing RFID card "
+            "or buy a new RFID card."
+        )
+        tk.Label(
+            card,
+            text=steps,
+            font=UI_FONT_BODY,
+            bg=card["bg"],
+            fg=self.current_theme["fg"],
+            justify="left",
+            wraplength=480,
+        ).pack(pady=(4, 18))
+
+        tk.Button(
+            card,
+            text="Back to Dashboard",
+            font=UI_FONT_BUTTON,
+            command=self.build_main_menu,
+            bg=self.current_theme.get("accent", "#0d9488"),
+            fg="#ffffff",
+            relief=tk.FLAT,
+            padx=24,
+            pady=8,
+            cursor="hand2",
+        ).pack(pady=(0, 4))
+
+        self.add_theme_toggle_footer()
 
     def show_role_menu(self):
         """Toggle a right-side teal sidebar for Dashboard / Staff / Admin (hamburger menu)."""
@@ -936,9 +1055,39 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
             fg=self.current_theme.get("muted", self.current_theme["fg"]),
         ).pack(anchor="w")
 
-        # Theme toggle only
+        # Menu + theme toggle (right side)
         icons_frame = tk.Frame(header, bg=self.current_theme["bg"])
         icons_frame.pack(side=tk.RIGHT)
+
+        # Hamburger / role menu button
+        if self.menu_icon is not None:
+            menu_btn = tk.Button(
+                icons_frame,
+                image=self.menu_icon,
+                command=self.show_role_menu,
+                bg=self.current_theme["bg"],
+                activebackground=self.current_theme["button_bg"],
+                relief=tk.FLAT,
+                bd=0,
+                cursor="hand2",
+            )
+            menu_btn.image = self.menu_icon
+        else:
+            menu_btn = tk.Button(
+                icons_frame,
+                text="☰",
+                command=self.show_role_menu,
+                font=(UI_FONT, 18, "bold"),
+                bg=self.current_theme["bg"],
+                fg=self.current_theme["fg"],
+                activebackground=self.current_theme["button_bg"],
+                activeforeground=self.current_theme["fg"],
+                relief=tk.FLAT,
+                bd=0,
+                cursor="hand2",
+            )
+        menu_btn.pack(side=tk.RIGHT, padx=(0, 6), pady=0)
+
         self.create_theme_slider(icons_frame).pack(side=tk.RIGHT, padx=6, pady=0)
 
         products = all_products
@@ -970,8 +1119,8 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
         selected_bg = "#bbf7d0" if self.current_theme_name == "light" else "#14532d"
         selected_border = self.current_theme.get("accent", "#0d9488")
         placeholder_bg = "#cbd5e1" if self.current_theme_name == "light" else "#475569"
-        # Mas compact – bawasan empty space, mas maraming products visible
-        placeholder_size = 110
+        # Larger placeholder so products are easier to tap on touch screen
+        placeholder_size = 160
 
         def cart_has(p):
             return any(e["product"]["id"] == p["id"] for e in self.cart)
@@ -995,44 +1144,71 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
                 bg=selected_bg if in_cart else card_bg,
                 highlightthickness=2,
                 highlightbackground=selected_border if in_cart else card_border,
+                bd=0,
             )
-            card.grid(row=r, column=c, padx=6, pady=6, sticky="nsew")
+            card.grid(row=r, column=c, padx=10, pady=8, sticky="nsew")
             grid.grid_rowconfigure(r, weight=1)
 
-            # Placeholder (gray square for product image) – compact
-            placeholder = tk.Frame(card, bg=placeholder_bg, width=placeholder_size, height=placeholder_size)
-            placeholder.pack(pady=(8, 6), padx=8, fill=tk.NONE)
+            # Placeholder (gray square for product image)
+            placeholder = tk.Frame(
+                card,
+                bg=placeholder_bg,
+                width=placeholder_size,
+                height=placeholder_size,
+            )
+            placeholder.pack(pady=(10, 8), padx=10, fill=tk.NONE)
             placeholder.pack_propagate(False)
+
+            # Product name and price inside the card
+            name_text = p["name"]
+            if len(name_text) > 18:
+                name_text = name_text[:18] + "…"
+            tk.Label(
+                card,
+                text=name_text,
+                font=UI_FONT_BODY,
+                bg=card_bg,
+                fg=self.current_theme["fg"],
+                wraplength=placeholder_size + 40,
+                justify="center",
+            ).pack(padx=8, pady=(0, 2))
+            tk.Label(
+                card,
+                text=f"₱{p['price']:.2f}",
+                font=UI_FONT_SMALL,
+                bg=card_bg,
+                fg=self.current_theme.get("muted", self.current_theme["fg"]),
+            ).pack(pady=(0, 6))
 
             # Add (+) or Remove (X) button
             if in_cart:
                 action_btn = tk.Button(
                     card,
                     text="✕",
-                    font=(UI_FONT, 14, "bold"),
-                    fg="#ffffff",
-                    bg=self.current_theme.get("accent", "#0d9488"),
-                    activeforeground="#ffffff",
-                    activebackground=self.current_theme.get("accent_hover", "#0f766e"),
-                    relief=tk.FLAT,
-                    width=3,
-                    command=lambda prod=p: remove_from_cart(prod),
-                )
-            else:
-                action_btn = tk.Button(
-                    card,
-                    text="+",
                     font=(UI_FONT, 18, "bold"),
                     fg="#ffffff",
                     bg=self.current_theme.get("accent", "#0d9488"),
                     activeforeground="#ffffff",
                     activebackground=self.current_theme.get("accent_hover", "#0f766e"),
                     relief=tk.FLAT,
-                    width=3,
+                    width=4,
+                    command=lambda prod=p: remove_from_cart(prod),
+                )
+            else:
+                action_btn = tk.Button(
+                    card,
+                    text="+",
+                    font=(UI_FONT, 20, "bold"),
+                    fg="#ffffff",
+                    bg=self.current_theme.get("accent", "#0d9488"),
+                    activeforeground="#ffffff",
+                    activebackground=self.current_theme.get("accent_hover", "#0f766e"),
+                    relief=tk.FLAT,
+                    width=4,
                     state=tk.NORMAL if p["current_stock"] > 0 else tk.DISABLED,
                     command=lambda prod=p: add_to_cart(prod),
                 )
-            action_btn.pack(pady=(0, 8))
+            action_btn.pack(pady=(2, 12))
 
         def _set_scroll_region():
             try:
@@ -1908,54 +2084,61 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
         self.clear_screen()
         cash_session.reset()
 
-        frame = tk.Frame(self.content_holder, bg=self.current_theme["bg"])
+        # Use the same mint login style as Staff Login
+        self.content_holder.configure(bg=LOGIN_PAGE_BG)
+        frame = tk.Frame(self.content_holder, bg=LOGIN_PAGE_BG)
         frame.pack(expand=True, fill=tk.BOTH)
 
+        panel = tk.Frame(frame, bg=LOGIN_PANEL_BG, padx=40, pady=28)
+        panel.place(relx=0.5, rely=0.5, anchor="center")
+
         tk.Label(
-            frame,
+            panel,
             text="Buy a New RFID Card",
-            font=UI_FONT_TITLE,
-            bg=self.current_theme["bg"],
-            fg=self.current_theme["fg"],
-        ).pack(pady=12)
+            font=(UI_FONT, 18, "bold"),
+            bg=LOGIN_PANEL_BG,
+            fg="#0f766e",
+        ).pack(pady=(0, 10))
         tk.Label(
-            frame,
-            text=f"Please pay ₱{CARD_PRICE:.2f}",
+            panel,
+            text=f"Please pay ₱{CARD_PRICE:.2f} using the cash buttons below.",
             font=UI_FONT_BODY,
-            bg=self.current_theme["bg"],
-            fg=self.current_theme["fg"],
-        ).pack(pady=4)
+            bg=LOGIN_PANEL_BG,
+            fg="#134e4a",
+            wraplength=360,
+            justify="left",
+        ).pack(pady=(0, 10))
 
         amount_var = tk.DoubleVar(value=0.0)
         remaining_var = tk.DoubleVar(value=CARD_PRICE)
 
         tk.Label(
-            frame,
+            panel,
             text="Amount Inserted:",
             font=UI_FONT_BODY,
-            bg=self.current_theme["bg"],
-            fg=self.current_theme["fg"],
+            bg=LOGIN_PANEL_BG,
+            fg="#134e4a",
         ).pack(pady=4)
         tk.Label(
-            frame,
+            panel,
             textvariable=amount_var,
             font=(UI_FONT, 20, "bold"),
-            bg=self.current_theme["bg"],
-            fg=self.current_theme["fg"],
+            bg=LOGIN_PANEL_BG,
+            fg="#0f172a",
         ).pack()
         tk.Label(
-            frame,
+            panel,
             text="Remaining:",
             font=UI_FONT_BODY,
-            bg=self.current_theme["bg"],
-            fg=self.current_theme["fg"],
+            bg=LOGIN_PANEL_BG,
+            fg="#134e4a",
         ).pack(pady=4)
         tk.Label(
-            frame,
+            panel,
             textvariable=remaining_var,
             font=(UI_FONT, 20, "bold"),
-            bg=self.current_theme["bg"],
-            fg=self.current_theme["fg"],
+            bg=LOGIN_PANEL_BG,
+            fg="#0f172a",
         ).pack()
 
         def add_money(val):
@@ -1964,7 +2147,7 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
             amount_var.set(current)
             remaining_var.set(max(0.0, CARD_PRICE - current))
 
-        btn_frame = tk.Frame(frame, bg=self.current_theme["bg"])
+        btn_frame = tk.Frame(panel, bg=LOGIN_PANEL_BG)
         btn_frame.pack(pady=12)
         tk.Button(
             btn_frame,
@@ -1972,8 +2155,8 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
             width=8,
             font=UI_FONT_BODY,
             command=lambda: add_money(1),
-            bg=self.current_theme["button_bg"],
-            fg=self.current_theme["button_fg"],
+            bg=LOGIN_BTN_BG,
+            fg="#ffffff",
         ).pack(side=tk.LEFT, padx=10)
         tk.Button(
             btn_frame,
@@ -1981,8 +2164,8 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
             width=8,
             font=UI_FONT_BODY,
             command=lambda: add_money(5),
-            bg=self.current_theme["button_bg"],
-            fg=self.current_theme["button_fg"],
+            bg=LOGIN_BTN_BG,
+            fg="#ffffff",
         ).pack(side=tk.LEFT, padx=10)
         tk.Button(
             btn_frame,
@@ -1990,8 +2173,8 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
             width=8,
             font=UI_FONT_BODY,
             command=lambda: add_money(10),
-            bg=self.current_theme["button_bg"],
-            fg=self.current_theme["button_fg"],
+            bg=LOGIN_BTN_BG,
+            fg="#ffffff",
         ).pack(side=tk.LEFT, padx=10)
         tk.Button(
             btn_frame,
@@ -1999,8 +2182,8 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
             width=8,
             font=UI_FONT_BODY,
             command=lambda: add_money(20),
-            bg=self.current_theme["button_bg"],
-            fg=self.current_theme["button_fg"],
+            bg=LOGIN_BTN_BG,
+            fg="#ffffff",
         ).pack(side=tk.LEFT, padx=10)
 
         def confirm_purchase():
@@ -2008,8 +2191,6 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
             if inserted < CARD_PRICE:
                 messagebox.showwarning("Not enough", "Please insert full card price.")
                 return
-
-            self.show_wait_screen("Issuing RFID card...")
 
             uid = uuid.uuid4().hex[:8].upper()
             user_id = create_user(uid, name=None, is_staff=0, initial_balance=0.0)
@@ -2022,35 +2203,44 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
                 rfid_user_id=user_id,
             )
 
-            messagebox.showinfo(
+            self.show_success_screen(
                 "Card Issued",
-                f"New RFID card created.\nCard ID (simulate UID): {uid}"
+                f"New RFID card created.\nCard ID (simulate UID): {uid}",
+                on_ok=self.build_main_menu,
             )
-            self.build_main_menu()
 
-        tk.Button(
-            frame,
+        action_frame = tk.Frame(panel, bg=LOGIN_PANEL_BG)
+        action_frame.pack(pady=(8, 0), fill=tk.X)
+
+        confirm_btn = tk.Button(
+            action_frame,
             text="Confirm and issue card",
             font=UI_FONT_BUTTON,
             command=confirm_purchase,
-            bg=self.current_theme.get("accent", "#4CAF50"),
+            bg=LOGIN_BTN_BG,
             fg="#ffffff",
             relief=tk.FLAT,
             padx=20,
             pady=10,
-        ).pack(pady=12)
+            cursor="hand2",
+        )
+        confirm_btn.pack(side=tk.LEFT, padx=(0, 10))
+        _hover_scale_btn(confirm_btn, normal_padx=20, normal_pady=10, hover_padx=24, hover_pady=14)
 
-        tk.Button(
-            frame,
+        cancel_btn = tk.Button(
+            action_frame,
             text="Cancel and go back",
             font=UI_FONT_BODY,
             command=self.build_main_menu,
-            bg="#E53935",
+            bg=LOGIN_BTN_BG,
             fg="#ffffff",
             relief=tk.FLAT,
             padx=16,
             pady=6,
-        ).pack(pady=6)
+            cursor="hand2",
+        )
+        cancel_btn.pack(side=tk.LEFT)
+        _hover_scale_btn(cancel_btn, normal_padx=16, normal_pady=6, hover_padx=20, hover_pady=10)
 
         self.add_theme_toggle_footer()
 
@@ -2058,28 +2248,116 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
 
     def reload_card_flow(self):
         """Customer reloads an existing RFID card balance."""
-        # Simulate RFID scan by asking for card ID
-        uid = simpledialog.askstring(
-            "RFID Reload",
-            "Enter RFID Card ID (simulate tap):",
-            parent=self,
+        # Step 1: in-app mint-style card ID entry (no system dialog)
+        if self.sidebar_holder is not None and self.sidebar_holder.winfo_exists():
+            self.sidebar_holder.destroy()
+            self.sidebar_holder = None
+        self.clear_screen()
+        self.content_holder.configure(bg=LOGIN_PAGE_BG)
+
+        frame = tk.Frame(self.content_holder, bg=LOGIN_PAGE_BG)
+        frame.pack(expand=True, fill=tk.BOTH)
+
+        panel = tk.Frame(frame, bg=LOGIN_PANEL_BG, padx=40, pady=28)
+        panel.place(relx=0.5, rely=0.5, anchor="center")
+
+        tk.Label(
+            panel,
+            text="Reload RFID Card",
+            font=(UI_FONT, 18, "bold"),
+            bg=LOGIN_PANEL_BG,
+            fg="#0f766e",
+        ).pack(pady=(0, 10))
+
+        tk.Label(
+            panel,
+            text="Enter RFID Card ID (simulate tap):",
+            font=UI_FONT_SMALL,
+            bg=LOGIN_PANEL_BG,
+            fg="#134e4a",
+        ).pack(anchor="w", pady=(0, 6))
+
+        uid_var = tk.StringVar()
+        entry = tk.Entry(
+            panel,
+            textvariable=uid_var,
+            font=UI_FONT_BODY,
+            width=28,
+            relief=tk.FLAT,
+            bg="#ffffff",
+            fg="#1e293b",
         )
-        if not uid:
-            self.build_main_menu()
-            return
+        entry.pack(pady=(0, 8), ipady=8, ipadx=10)
+        entry.focus_set()
 
-        user = get_user_by_uid(uid)
-        if not user:
-            messagebox.showerror("Error", "Card not found. Please buy a new card first.")
-            self.build_main_menu()
-            return
+        error_var = tk.StringVar(value="")
+        error_lbl = tk.Label(
+            panel,
+            textvariable=error_var,
+            font=UI_FONT_SMALL,
+            bg=LOGIN_PANEL_BG,
+            fg="#b91c1c",
+        )
+        error_lbl.pack(pady=(0, 4))
 
+        def proceed_to_amount():
+            uid = uid_var.get().strip()
+            if not uid:
+                error_var.set("Please enter a card ID.")
+                return
+
+            user = get_user_by_uid(uid)
+            if not user:
+                error_var.set("Card not found. Please buy a new card first.")
+                return
+
+            self._reload_amount_screen(uid, user)
+
+        btn_row = tk.Frame(panel, bg=LOGIN_PANEL_BG)
+        btn_row.pack(fill=tk.X, pady=(8, 0))
+
+        ok_btn = tk.Button(
+            btn_row,
+            text="OK",
+            font=(UI_FONT, 11, "bold"),
+            command=proceed_to_amount,
+            bg=LOGIN_BTN_BG,
+            fg="#ffffff",
+            relief=tk.FLAT,
+            padx=24,
+            pady=8,
+            cursor="hand2",
+        )
+        ok_btn.pack(side=tk.LEFT, padx=(0, 10))
+        _hover_scale_btn(ok_btn, normal_padx=24, normal_pady=8, hover_padx=28, hover_pady=12)
+
+        cancel_btn = tk.Button(
+            btn_row,
+            text="Cancel",
+            font=(UI_FONT, 11, "bold"),
+            command=self.build_main_menu,
+            bg=LOGIN_BTN_BG,
+            fg="#ffffff",
+            relief=tk.FLAT,
+            padx=20,
+            pady=8,
+            cursor="hand2",
+        )
+        cancel_btn.pack(side=tk.LEFT)
+        _hover_scale_btn(cancel_btn, normal_padx=20, normal_pady=8, hover_padx=24, hover_pady=12)
+
+        entry.bind("<Return>", lambda _e: proceed_to_amount())
+        self.add_theme_toggle_footer()
+
+    def _reload_amount_screen(self, uid, user):
+        """Second step for reload – choose amount, still in-app."""
         if self.sidebar_holder is not None and self.sidebar_holder.winfo_exists():
             self.sidebar_holder.destroy()
             self.sidebar_holder = None
         self.clear_screen()
         cash_session.reset()
 
+        self.content_holder.configure(bg=self.current_theme["bg"])
         frame = tk.Frame(self.content_holder, bg=self.current_theme["bg"])
         frame.pack(expand=True, fill=tk.BOTH)
 
@@ -2162,11 +2440,11 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
                 rfid_user_id=user["id"],
             )
 
-            messagebox.showinfo(
+            self.show_success_screen(
                 "Reload Successful",
-                f"New balance: ₱{new_balance:.2f}"
+                f"New balance: ₱{new_balance:.2f}",
+                on_ok=self.build_main_menu,
             )
-            self.build_main_menu()
 
         tk.Button(
             card,
