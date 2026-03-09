@@ -1,6 +1,7 @@
 import hashlib
 import tkinter as tk
 from tkinter import messagebox, simpledialog
+import customtkinter as ctk
 
 from admin.reports import list_sales_reports, open_sales_report
 
@@ -13,33 +14,32 @@ UI_FONT_BODY = (UI_FONT, 12)
 class AdminMixin:
     def create_sales_chart(self, parent, title: str, subtitle: str, points):
         """Create a responsive sales line chart similar to a dashboard card."""
-        chart_card = tk.Frame(
+        chart_card = ctk.CTkFrame(
             parent,
-            bg=self.current_theme["button_bg"],
-            bd=1,
-            relief="solid",
-            padx=12,
-            pady=12,
+            fg_color=self.current_theme["button_bg"],
+            corner_radius=10,
+            border_width=1,
+            border_color="#94a3b8",
         )
         chart_card.pack(fill=tk.BOTH, expand=True, pady=(6, 0))
+        chart_inner = ctk.CTkFrame(chart_card, fg_color=self.current_theme["button_bg"])
+        chart_inner.pack(fill=tk.BOTH, expand=True, padx=12, pady=12)
 
-        tk.Label(
-            chart_card,
+        ctk.CTkLabel(
+            chart_inner,
             text=title,
             font=(UI_FONT, 14, "bold"),
-            bg=self.current_theme["button_bg"],
-            fg=self.current_theme["button_fg"],
+            text_color=self.current_theme["button_fg"],
         ).pack(anchor="w")
-        tk.Label(
-            chart_card,
+        ctk.CTkLabel(
+            chart_inner,
             text=subtitle,
             font=UI_FONT_SMALL,
-            bg=self.current_theme["button_bg"],
-            fg=self.current_theme["button_fg"],
+            text_color=self.current_theme["button_fg"],
         ).pack(anchor="w", pady=(0, 8))
 
         canvas = tk.Canvas(
-            chart_card,
+            chart_inner,
             height=240,
             bg="#ffffff" if self.current_theme_name == "light" else "#253041",
             highlightthickness=0,
@@ -122,33 +122,32 @@ class AdminMixin:
 
     def create_bar_chart(self, parent, title: str, subtitle: str, points, color="#5C6BC0"):
         """Create a responsive vertical bar chart card."""
-        chart_card = tk.Frame(
+        chart_card = ctk.CTkFrame(
             parent,
-            bg=self.current_theme["button_bg"],
-            bd=1,
-            relief="solid",
-            padx=12,
-            pady=12,
+            fg_color=self.current_theme["button_bg"],
+            corner_radius=10,
+            border_width=1,
+            border_color="#94a3b8",
         )
         chart_card.pack(fill=tk.BOTH, expand=True, pady=(6, 0))
+        chart_inner = ctk.CTkFrame(chart_card, fg_color=self.current_theme["button_bg"])
+        chart_inner.pack(fill=tk.BOTH, expand=True, padx=12, pady=12)
 
-        tk.Label(
-            chart_card,
+        ctk.CTkLabel(
+            chart_inner,
             text=title,
             font=(UI_FONT, 14, "bold"),
-            bg=self.current_theme["button_bg"],
-            fg=self.current_theme["button_fg"],
+            text_color=self.current_theme["button_fg"],
         ).pack(anchor="w")
-        tk.Label(
-            chart_card,
+        ctk.CTkLabel(
+            chart_inner,
             text=subtitle,
             font=UI_FONT_SMALL,
-            bg=self.current_theme["button_bg"],
-            fg=self.current_theme["button_fg"],
+            text_color=self.current_theme["button_fg"],
         ).pack(anchor="w", pady=(0, 8))
 
         canvas = tk.Canvas(
-            chart_card,
+            chart_inner,
             height=240,
             bg="#ffffff" if self.current_theme_name == "light" else "#253041",
             highlightthickness=0,
@@ -226,33 +225,32 @@ class AdminMixin:
 
     def create_low_stock_chart(self, parent, title: str, subtitle: str, points):
         """Create a low-stock comparison chart using current stock vs capacity."""
-        chart_card = tk.Frame(
+        chart_card = ctk.CTkFrame(
             parent,
-            bg=self.current_theme["button_bg"],
-            bd=1,
-            relief="solid",
-            padx=12,
-            pady=12,
+            fg_color=self.current_theme["button_bg"],
+            corner_radius=10,
+            border_width=1,
+            border_color="#94a3b8",
         )
         chart_card.pack(fill=tk.BOTH, expand=True, pady=(6, 0))
+        chart_inner = ctk.CTkFrame(chart_card, fg_color=self.current_theme["button_bg"])
+        chart_inner.pack(fill=tk.BOTH, expand=True, padx=12, pady=12)
 
-        tk.Label(
-            chart_card,
+        ctk.CTkLabel(
+            chart_inner,
             text=title,
             font=(UI_FONT, 14, "bold"),
-            bg=self.current_theme["button_bg"],
-            fg=self.current_theme["button_fg"],
+            text_color=self.current_theme["button_fg"],
         ).pack(anchor="w")
-        tk.Label(
-            chart_card,
+        ctk.CTkLabel(
+            chart_inner,
             text=subtitle,
             font=UI_FONT_SMALL,
-            bg=self.current_theme["button_bg"],
-            fg=self.current_theme["button_fg"],
+            text_color=self.current_theme["button_fg"],
         ).pack(anchor="w", pady=(0, 8))
 
         canvas = tk.Canvas(
-            chart_card,
+            chart_inner,
             height=240,
             bg="#ffffff" if self.current_theme_name == "light" else "#253041",
             highlightthickness=0,
@@ -325,6 +323,7 @@ class AdminMixin:
 
     def enter_admin_dashboard(self):
         """Show in-app Admin Login (mint panel, username + password)."""
+        self._current_screen_builder = self.enter_admin_dashboard
         if hasattr(self, "_apply_lcd_fit"):
             try:
                 self._apply_lcd_fit(profile="admin_staff")
@@ -335,88 +334,76 @@ class AdminMixin:
             self.sidebar_holder = None
         self.clear_screen()
         page_bg = "#1e293b"
-        self.content_holder.configure(bg=page_bg)
+        self.content_holder.configure(fg_color=page_bg)
 
-        center = tk.Frame(self.content_holder, bg=page_bg)
+        center = ctk.CTkFrame(self.content_holder, fg_color=page_bg)
         center.place(relx=0.5, rely=0.5, anchor="center")
 
         panel_bg = "#99f6e4"
         btn_bg = "#1A948E"
         btn_hover = "#2dd4bf"
-        panel = tk.Frame(center, bg=panel_bg, padx=40, pady=28)
+        panel = ctk.CTkFrame(center, fg_color=panel_bg, corner_radius=16)
         panel.pack()
+        inner = ctk.CTkFrame(panel, fg_color=panel_bg)
+        inner.pack(padx=40, pady=28)
 
         stored_username, stored_hash = self.get_admin_credentials_data()
         if not stored_username or not stored_hash:
-            tk.Label(
-                panel,
+            ctk.CTkLabel(
+                inner,
                 text="Admin credentials are not configured.\nPlease contact the system owner.",
                 font=UI_FONT_BODY,
-                bg=panel_bg,
-                fg="#b91c1c",
+                text_color="#b91c1c",
                 justify="center",
                 wraplength=360,
             ).pack(pady=(8, 0))
             return
 
-        def hover_btn(w, n, h):
-            w.bind("<Enter>", lambda _: w.configure(bg=h) if w.winfo_exists() else None)
-            w.bind("<Leave>", lambda _: w.configure(bg=n) if w.winfo_exists() else None)
-
-        tk.Label(
-            panel,
+        ctk.CTkLabel(
+            inner,
             text="Admin Login",
             font=(UI_FONT, 18, "bold"),
-            bg=panel_bg,
-            fg="#0f766e",
+            text_color="#0f766e",
         ).pack(pady=(0, 20))
 
-        tk.Label(panel, text="Username:", font=UI_FONT_SMALL, bg=panel_bg, fg="#134e4a").pack(anchor="w", pady=(0, 4))
-        username_var = tk.StringVar()
-        un_entry = tk.Entry(panel, textvariable=username_var, font=UI_FONT_BODY, width=26, relief=tk.FLAT, bg="#ffffff", fg="#1e293b")
-        un_entry.pack(pady=(0, 14), ipady=8, ipadx=10)
+        ctk.CTkLabel(inner, text="Username:", font=UI_FONT_SMALL, text_color="#134e4a").pack(anchor="w", pady=(0, 4))
+        un_entry = ctk.CTkEntry(inner, font=UI_FONT_BODY, width=280, fg_color="#ffffff", text_color="#1e293b", border_color="#94a3b8", corner_radius=8, height=40)
+        un_entry.pack(pady=(0, 14))
         un_entry.focus_set()
 
-        tk.Label(panel, text="Password:", font=UI_FONT_SMALL, bg=panel_bg, fg="#134e4a").pack(anchor="w", pady=(0, 4))
-        password_var = tk.StringVar()
-        pw_entry = tk.Entry(panel, textvariable=password_var, font=UI_FONT_BODY, width=26, relief=tk.FLAT, bg="#ffffff", fg="#1e293b", show="*")
-        pw_entry.pack(pady=(0, 14), ipady=8, ipadx=10)
+        ctk.CTkLabel(inner, text="Password:", font=UI_FONT_SMALL, text_color="#134e4a").pack(anchor="w", pady=(0, 4))
+        pw_entry = ctk.CTkEntry(inner, font=UI_FONT_BODY, width=280, fg_color="#ffffff", text_color="#1e293b", border_color="#94a3b8", corner_radius=8, height=40, show="*")
+        pw_entry.pack(pady=(0, 14))
 
-        status_var = tk.StringVar(value="")
-        status_lbl = tk.Label(
-            panel,
-            textvariable=status_var,
+        status_lbl = ctk.CTkLabel(
+            inner,
+            text="",
             font=UI_FONT_SMALL,
-            bg=panel_bg,
-            fg="#b91c1c",
+            text_color="#b91c1c",
         )
         status_lbl.pack(fill=tk.X, pady=(0, 8))
 
         def submit():
-            username = username_var.get().strip()
-            password = password_var.get()
+            username = un_entry.get().strip()
+            password = pw_entry.get()
             if not username or not password:
-                status_var.set("Please enter both username and password.")
+                status_lbl.configure(text="Please enter both username and password.")
                 return
             pwd_hash = hashlib.sha256(password.encode("utf-8")).hexdigest()
             if username != stored_username or pwd_hash != stored_hash:
-                status_var.set("Invalid admin credentials.")
+                status_lbl.configure(text="Invalid admin credentials.")
                 return
-            status_var.set("")
+            status_lbl.configure(text="")
             self.show_admin_dashboard({"name": username, "rfid_uid": ""})
 
-        btn_frame = tk.Frame(panel, bg=panel_bg)
+        btn_frame = ctk.CTkFrame(inner, fg_color=panel_bg)
         btn_frame.pack(fill=tk.X)
-        ok_btn = tk.Button(btn_frame, text="OK", font=(UI_FONT, 11, "bold"), command=submit, bg=btn_bg, fg="#ffffff", relief=tk.FLAT, padx=24, pady=8, cursor="hand2")
-        ok_btn.pack(side=tk.LEFT, padx=(0, 10))
-        hover_btn(ok_btn, btn_bg, btn_hover)
-        cancel_btn = tk.Button(btn_frame, text="Cancel", font=(UI_FONT, 11, "bold"), command=self.build_main_menu, bg=btn_bg, fg="#ffffff", relief=tk.FLAT, padx=20, pady=8, cursor="hand2")
-        cancel_btn.pack(side=tk.LEFT)
-        hover_btn(cancel_btn, btn_bg, btn_hover)
+        ctk.CTkButton(btn_frame, text="OK", font=(UI_FONT, 11, "bold"), command=submit, fg_color=btn_bg, hover_color=btn_hover, text_color="#ffffff", corner_radius=8, height=38).pack(side=tk.LEFT, padx=(0, 10))
+        ctk.CTkButton(btn_frame, text="Cancel", font=(UI_FONT, 11, "bold"), command=self.build_main_menu, fg_color=btn_bg, hover_color=btn_hover, text_color="#ffffff", corner_radius=8, height=38).pack(side=tk.LEFT)
 
         def on_return(_):
             submit()
-        un_entry.bind("<Return>", lambda e: pw_entry.focus_set())
+        un_entry.bind("<Return>", lambda e: pw_entry.focus())
         pw_entry.bind("<Return>", on_return)
         self.add_theme_toggle_footer()
 
@@ -435,6 +422,7 @@ class AdminMixin:
         frame.after(step_ms, lambda: step(0))
 
     def show_admin_dashboard(self, staff_user):
+        self._current_screen_builder = lambda: self.show_admin_dashboard(staff_user)
         self.clear_screen()
         self._current_admin_user = staff_user
 
@@ -444,52 +432,41 @@ class AdminMixin:
         top_products = self.get_top_selling_products_data(5)
         low_stock_points = self.get_low_stock_chart_data_points(5)
 
-        container = tk.Frame(self.content_holder, bg=self.current_theme["bg"])
+        container = ctk.CTkFrame(self.content_holder, fg_color=self.current_theme["bg"])
 
         sidebar_bg = self.current_theme.get("search_bg", "#f1f5f9")
-        sidebar = tk.Frame(container, bg=sidebar_bg, width=200)
+        sidebar = ctk.CTkFrame(container, fg_color=sidebar_bg, width=200, corner_radius=0)
         sidebar.pack_propagate(False)
         sidebar.pack(side=tk.LEFT, fill=tk.Y, padx=0, pady=0)
 
-        main = tk.Frame(container, bg=self.current_theme["bg"])
+        main = ctk.CTkFrame(container, fg_color=self.current_theme["bg"])
         main.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=16, pady=12)
 
-        tk.Label(
+        ctk.CTkLabel(
             sidebar,
             text="Admin",
             font=(UI_FONT, 16, "bold"),
-            bg=sidebar_bg,
-            fg=self.current_theme["fg"],
+            text_color=self.current_theme["fg"],
         ).pack(pady=(16, 12), padx=12)
 
         accent = self.current_theme.get("accent", "#1A948E")
         hover_bg = "#2dd4bf" if self.current_theme_name == "light" else "#5eead4"
-        # High-contrast text so nav items are visible without hover (fixes invisible text)
-        nav_fg = "#0f172a" if self.current_theme_name == "light" else "#ffffff"
-        nav_bg = "#e2e8f0" if self.current_theme_name == "light" else "#334155"
+        nav_fg = "#ffffff"
 
         def nav_btn(text, cmd):
-            b = tk.Button(
+            b = ctk.CTkButton(
                 sidebar,
                 text=text,
                 font=(UI_FONT, 11),
                 anchor="w",
                 command=cmd,
-                bg=nav_bg,
-                fg=nav_fg,
-                activebackground=hover_bg,
-                activeforeground="#0f172a",
-                relief=tk.FLAT,
-                padx=12,
-                pady=10,
-                cursor="hand2",
+                fg_color=accent,
+                hover_color=hover_bg,
+                text_color=nav_fg,
+                corner_radius=8,
+                height=38,
             )
-            b._sidebar_nav = True
-            b._sidebar_nav_bg = nav_bg
-            b._sidebar_nav_fg = nav_fg
             b.pack(fill=tk.X, padx=8, pady=4)
-            b.bind("<Enter>", lambda e: b.configure(bg=hover_bg, fg="#0f172a") if b.winfo_exists() else None)
-            b.bind("<Leave>", lambda e: b.configure(bg=b._sidebar_nav_bg, fg=b._sidebar_nav_fg) if b.winfo_exists() else None)
             return b
 
         nav_btn("Overview", lambda: self.show_admin_dashboard(staff_user))
@@ -498,80 +475,60 @@ class AdminMixin:
         nav_btn("Change Credentials", self.change_admin_credentials_screen)
         nav_btn("Back to Main", self.build_main_menu)
 
-        header = tk.Frame(main, bg=self.current_theme["bg"])
+        header = ctk.CTkFrame(main, fg_color=self.current_theme["bg"])
         header.pack(fill=tk.X, pady=(0, 12))
 
-        tk.Label(
+        ctk.CTkLabel(
             header,
             text="Overview",
             font=(UI_FONT, 20, "bold"),
-            bg=self.current_theme["bg"],
-            fg=self.current_theme["fg"],
+            text_color=self.current_theme["fg"],
         ).pack(side=tk.LEFT)
-        tk.Label(
+        ctk.CTkLabel(
             header,
             text=f"Admin: {staff_user['name'] or staff_user['rfid_uid']}",
             font=UI_FONT_SMALL,
-            bg=self.current_theme["bg"],
-            fg=self.current_theme.get("muted", self.current_theme["fg"]),
+            text_color=self.current_theme.get("muted", self.current_theme["fg"]),
         ).pack(side=tk.RIGHT)
 
-        metrics_frame = tk.Frame(main, bg=self.current_theme["bg"])
+        metrics_frame = ctk.CTkFrame(main, fg_color=self.current_theme["bg"])
         metrics_frame.pack(fill=tk.X, pady=(0, 12))
 
         def metric_card(parent, title, value_text):
-            card = tk.Frame(
+            card = ctk.CTkFrame(
                 parent,
-                bg=self.current_theme.get("card_bg", self.current_theme["button_bg"]),
-                highlightthickness=1,
-                highlightbackground=self.current_theme.get("card_border", "#e2e8f0"),
+                fg_color=self.current_theme.get("card_bg", self.current_theme["button_bg"]),
+                corner_radius=10,
+                border_width=1,
+                border_color=self.current_theme.get("card_border", "#e2e8f0"),
             )
             card.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=6)
-            tk.Label(
+            ctk.CTkLabel(
                 card,
                 text=title,
                 font=UI_FONT_SMALL,
-                bg=self.current_theme.get("card_bg", self.current_theme["button_bg"]),
-                fg=self.current_theme.get("muted", self.current_theme["fg"]),
+                text_color=self.current_theme.get("muted", self.current_theme["fg"]),
             ).pack(anchor="w", padx=12, pady=(10, 2))
-            val_lbl = tk.Label(
+            ctk.CTkLabel(
                 card,
                 text=value_text,
                 font=(UI_FONT, 18, "bold"),
-                bg=self.current_theme.get("card_bg", self.current_theme["button_bg"]),
-                fg=self.current_theme.get("accent", "#1A948E"),
-            )
-            val_lbl._admin_metric_value = True
-            val_lbl.pack(anchor="w", padx=12, pady=(0, 12))
+                text_color=self.current_theme.get("accent", "#1A948E"),
+            ).pack(anchor="w", padx=12, pady=(0, 12))
 
         metric_card(metrics_frame, "Total Sales", f"₱{stats['total_sales']:.2f}")
         metric_card(metrics_frame, "Orders", str(stats["orders"]))
         metric_card(metrics_frame, "Active Customers", str(stats["active_customers"]))
         metric_card(metrics_frame, "Low-stock Products", str(stats["low_stock"]))
 
-        body_container = tk.Frame(main, bg=self.current_theme["bg"])
-        body_container.pack(fill=tk.BOTH, expand=True, padx=20, pady=(5, 20))
+        body = ctk.CTkScrollableFrame(main, fg_color=self.current_theme["bg"])
+        body.pack(fill=tk.BOTH, expand=True, padx=20, pady=(5, 20))
 
-        body_canvas = tk.Canvas(body_container, bg=self.current_theme["bg"], highlightthickness=0)
-        body_scrollbar = tk.Scrollbar(body_container, orient="vertical", command=body_canvas.yview)
-        body_canvas.configure(yscrollcommand=body_scrollbar.set)
-        body_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        body_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-
-        body = tk.Frame(body_canvas, bg=self.current_theme["bg"])
-        body_canvas.create_window((0, 0), window=body, anchor="nw")
-
-        def _resize_admin_body(_event):
-            body_canvas.configure(scrollregion=body_canvas.bbox("all"))
-
-        body.bind("<Configure>", _resize_admin_body)
-
-        tk.Label(
+        ctk.CTkLabel(
             body,
             text="Sales trend by created date",
             font=(UI_FONT, 12, "bold"),
-            bg=self.current_theme["bg"],
-            fg=self.current_theme["fg"],
+            text_color=self.current_theme["fg"],
             justify="left",
         ).pack(anchor="nw", pady=(0, 4))
 
@@ -589,36 +546,34 @@ class AdminMixin:
         # -----------------------------
         # Prediction Analysis (runtime)
         # -----------------------------
-        pred_card = tk.Frame(
+        pred_card = ctk.CTkFrame(
             body,
-            bg=self.current_theme.get("card_bg", self.current_theme["button_bg"]),
-            highlightthickness=1,
-            highlightbackground=self.current_theme.get("card_border", "#e2e8f0"),
-            padx=14,
-            pady=12,
+            fg_color=self.current_theme.get("card_bg", self.current_theme["button_bg"]),
+            corner_radius=10,
+            border_width=1,
+            border_color=self.current_theme.get("card_border", "#e2e8f0"),
         )
         pred_card.pack(anchor="nw", fill=tk.X, pady=(14, 0))
+        pred_inner = ctk.CTkFrame(pred_card, fg_color=self.current_theme.get("card_bg", self.current_theme["button_bg"]))
+        pred_inner.pack(fill=tk.X, padx=14, pady=12)
 
-        tk.Label(
-            pred_card,
+        ctk.CTkLabel(
+            pred_inner,
             text="Prediction Analysis (Demand + Restock)",
             font=(UI_FONT, 12, "bold"),
-            bg=pred_card["bg"],
-            fg=self.current_theme["fg"],
+            text_color=self.current_theme["fg"],
         ).pack(anchor="w")
 
-        sub = tk.Label(
-            pred_card,
+        ctk.CTkLabel(
+            pred_inner,
             text="Predicts sales tomorrow and recommends restock using historical transactions (runs once per session).",
             font=UI_FONT_SMALL,
-            bg=pred_card["bg"],
-            fg=self.current_theme.get("muted", self.current_theme["fg"]),
+            text_color=self.current_theme.get("muted", self.current_theme["fg"]),
             wraplength=520,
             justify="left",
-        )
-        sub.pack(anchor="w", pady=(2, 10))
+        ).pack(anchor="w", pady=(2, 10))
 
-        btn_row = tk.Frame(pred_card, bg=pred_card["bg"])
+        btn_row = ctk.CTkFrame(pred_inner, fg_color=self.current_theme.get("card_bg", self.current_theme["button_bg"]))
         btn_row.pack(anchor="w", fill=tk.X)
 
         def _run_pred():
@@ -626,26 +581,23 @@ class AdminMixin:
             self.show_admin_dashboard(staff_user)
 
         ran = bool(getattr(self, "_prediction_ran", False))
-        run_btn = tk.Button(
+        ctk.CTkButton(
             btn_row,
             text="Run Prediction Analysis" if not ran else "Prediction Ready",
             font=(UI_FONT, 11, "bold"),
             command=_run_pred if not ran else None,
-            state=tk.NORMAL if not ran else tk.DISABLED,
-            bg=self.current_theme.get("accent", "#1A948E"),
-            fg="#ffffff",
-            activebackground=self.current_theme.get("accent_hover", "#15857B"),
-            activeforeground="#ffffff",
-            relief=tk.FLAT,
-            padx=16,
-            pady=8,
-            cursor="hand2",
-        )
-        run_btn.pack(side=tk.LEFT)
+            state="normal" if not ran else "disabled",
+            fg_color=self.current_theme.get("accent", "#1A948E"),
+            hover_color=self.current_theme.get("accent_hover", "#15857B"),
+            text_color="#ffffff",
+            corner_radius=8,
+            height=38,
+        ).pack(side=tk.LEFT)
 
         # Show results table if available
         results = getattr(self, "_prediction_results", None)
         summary = getattr(self, "_prediction_summary", None)
+        card_bg = self.current_theme.get("card_bg", self.current_theme["button_bg"])
         if results:
             info = []
             if summary and getattr(summary, "based_on_last_date", None):
@@ -653,116 +605,106 @@ class AdminMixin:
             if summary and getattr(summary, "generated_at_iso", None):
                 info.append(f"Generated: {summary.generated_at_iso}")
             if info:
-                tk.Label(
-                    pred_card,
+                ctk.CTkLabel(
+                    pred_inner,
                     text="  ·  ".join(info),
                     font=UI_FONT_SMALL,
-                    bg=pred_card["bg"],
-                    fg=self.current_theme.get("muted", self.current_theme["fg"]),
+                    text_color=self.current_theme.get("muted", self.current_theme["fg"]),
                 ).pack(anchor="w", pady=(10, 6))
 
-            table = tk.Frame(pred_card, bg=pred_card["bg"])
+            table = ctk.CTkFrame(pred_inner, fg_color=card_bg)
             table.pack(fill=tk.X, pady=(2, 0))
 
             headers = ["Product", "Predicted Sales Tomorrow", "Restock Needed"]
-            col_widths = [0.52, 0.28, 0.20]
-            head_row = tk.Frame(table, bg=pred_card["bg"])
+            head_row = ctk.CTkFrame(table, fg_color=card_bg)
             head_row.pack(fill=tk.X)
-            for h, w in zip(headers, col_widths):
-                tk.Label(
+            for h in headers:
+                ctk.CTkLabel(
                     head_row,
                     text=h,
                     font=(UI_FONT, 10, "bold"),
-                    bg=pred_card["bg"],
-                    fg=self.current_theme["fg"],
+                    text_color=self.current_theme["fg"],
                     anchor="w",
                 ).pack(side=tk.LEFT, fill=tk.X, expand=True)
 
-            # Show top 6 products (fits dashboard)
             for r in results[:6]:
-                row = tk.Frame(table, bg=pred_card["bg"])
+                row = ctk.CTkFrame(table, fg_color=card_bg)
                 row.pack(fill=tk.X, pady=1)
-                tk.Label(
+                ctk.CTkLabel(
                     row,
                     text=str(getattr(r, "product_name", "")),
                     font=UI_FONT_SMALL,
-                    bg=pred_card["bg"],
-                    fg=self.current_theme["fg"],
+                    text_color=self.current_theme["fg"],
                     anchor="w",
                 ).pack(side=tk.LEFT, fill=tk.X, expand=True)
-                tk.Label(
+                ctk.CTkLabel(
                     row,
                     text=str(getattr(r, "predicted_sales_tomorrow", 0)),
                     font=UI_FONT_SMALL,
-                    bg=pred_card["bg"],
-                    fg=self.current_theme["fg"],
+                    text_color=self.current_theme["fg"],
                     anchor="w",
                 ).pack(side=tk.LEFT, fill=tk.X, expand=True)
                 need = "Yes" if getattr(r, "recommended_restock_qty", 0) > 0 else "No"
-                tk.Label(
+                ctk.CTkLabel(
                     row,
                     text=need,
                     font=UI_FONT_SMALL,
-                    bg=pred_card["bg"],
-                    fg=self.current_theme.get("accent", "#1A948E") if need == "Yes" else self.current_theme.get("muted", self.current_theme["fg"]),
+                    text_color=self.current_theme.get("accent", "#1A948E") if need == "Yes" else self.current_theme.get("muted", self.current_theme["fg"]),
                     anchor="w",
                 ).pack(side=tk.LEFT, fill=tk.X, expand=True)
 
-        tk.Button(
+        ctk.CTkButton(
             body,
             text="Generate Excel Report",
             font=(UI_FONT, 12, "bold"),
             command=self.export_sales_report_ui,
-            bg=self.current_theme.get("accent", "#1A948E"),
-            fg="#ffffff",
-            relief=tk.FLAT,
-            padx=20,
-            pady=10,
+            fg_color=self.current_theme.get("accent", "#1A948E"),
+            hover_color=self.current_theme.get("accent_hover", "#15857B"),
+            text_color="#ffffff",
+            corner_radius=8,
+            height=42,
         ).pack(anchor="nw", pady=(12, 0))
 
         self._slide_in(container)
         self.add_theme_toggle_footer()
-        self.apply_theme_to_widget(self.content_holder)
 
     def show_sales_reports_screen(self):
         """Show a list of generated sales report Excel files for admin to open."""
+        self._current_screen_builder = self.show_sales_reports_screen
         self.clear_screen()
 
-        frame = tk.Frame(self.content_holder, bg=self.current_theme["bg"])
+        frame = ctk.CTkFrame(self.content_holder, fg_color=self.current_theme["bg"])
         frame.pack(expand=True, fill=tk.BOTH, padx=20, pady=16)
 
-        tk.Label(
+        ctk.CTkLabel(
             frame,
             text="Sales Reports",
             font=(UI_FONT, 20, "bold"),
-            bg=self.current_theme["bg"],
-            fg=self.current_theme["fg"],
+            text_color=self.current_theme["fg"],
         ).pack(pady=(0, 12))
 
         reports = list_sales_reports()
-        list_frame = tk.Frame(frame, bg=self.current_theme["bg"])
+        list_frame = ctk.CTkFrame(frame, fg_color=self.current_theme["bg"])
         list_frame.pack(expand=True, fill=tk.BOTH)
 
         if not reports:
-            tk.Label(
+            ctk.CTkLabel(
                 list_frame,
                 text="No sales reports found. Generate one first.",
                 font=UI_FONT_BODY,
-                bg=self.current_theme["bg"],
-                fg=self.current_theme.get("muted", self.current_theme["fg"]),
+                text_color=self.current_theme.get("muted", self.current_theme["fg"]),
             ).pack(pady=16)
         else:
             for report_path in reports:
-                row = tk.Frame(list_frame, bg=self.current_theme["bg"])
+                row = ctk.CTkFrame(list_frame, fg_color=self.current_theme["bg"])
                 row.pack(fill=tk.X, pady=6)
 
-                tk.Label(
+                ctk.CTkLabel(
                     row,
                     text=report_path.name,
                     anchor="w",
                     font=UI_FONT_BODY,
-                    bg=self.current_theme["bg"],
-                    fg=self.current_theme["fg"],
+                    text_color=self.current_theme["fg"],
                 ).pack(side=tk.LEFT, expand=True)
 
                 def make_open_cmd(p=report_path):
@@ -773,34 +715,35 @@ class AdminMixin:
                             messagebox.showerror("Open Failed", str(exc))
                     return _cmd
 
-                tk.Button(
+                ctk.CTkButton(
                     row,
                     text="Open",
                     font=UI_FONT_BODY,
                     command=make_open_cmd(),
-                    bg=self.current_theme.get("accent", "#1A948E"),
-                    fg="#ffffff",
-                    relief=tk.FLAT,
-                    padx=14,
-                    pady=4,
+                    fg_color=self.current_theme.get("accent", "#1A948E"),
+                    hover_color=self.current_theme.get("accent_hover", "#15857B"),
+                    text_color="#ffffff",
+                    corner_radius=8,
+                    width=80,
                 ).pack(side=tk.RIGHT, padx=8)
 
-        tk.Button(
+        ctk.CTkButton(
             frame,
             text="Back to Admin Dashboard",
             font=UI_FONT_BODY,
             command=lambda: self.show_admin_dashboard(getattr(self, "_current_admin_user", {"name": "admin", "rfid_uid": ""})),
-            bg=self.current_theme["button_bg"],
-            fg=self.current_theme["button_fg"],
-            relief=tk.FLAT,
-            padx=16,
-            pady=8,
+            fg_color=self.current_theme["button_bg"],
+            hover_color=self.current_theme.get("accent", "#1A948E"),
+            text_color=self.current_theme["button_fg"],
+            corner_radius=8,
+            height=38,
         ).pack(pady=12)
 
         self.add_theme_toggle_footer()
 
     def change_admin_credentials_screen(self):
         """Allow the logged-in admin to change username and password (in-app, no pop-ups)."""
+        self._current_screen_builder = self.change_admin_credentials_screen
         self.clear_screen()
 
         user = getattr(self, "_current_admin_user", {"name": "admin", "rfid_uid": ""})
@@ -808,56 +751,52 @@ class AdminMixin:
         accent = self.current_theme.get("accent", "#1A948E")
         accent_hover = "#2dd4bf" if self.current_theme_name == "light" else "#5eead4"
 
-        container = tk.Frame(self.content_holder, bg=self.current_theme["bg"])
+        container = ctk.CTkFrame(self.content_holder, fg_color=self.current_theme["bg"])
         container.pack(fill=tk.BOTH, expand=True)
 
-        card = tk.Frame(
+        card = ctk.CTkFrame(
             container,
-            bg=panel_bg,
-            highlightthickness=1,
-            highlightbackground="#5eead4",
-            padx=22,
-            pady=18,
+            fg_color=panel_bg,
+            corner_radius=16,
+            border_width=1,
+            border_color="#5eead4",
         )
         card.place(relx=0.5, rely=0.45, anchor="center")
+        card_inner = ctk.CTkFrame(card, fg_color=panel_bg)
+        card_inner.pack(padx=22, pady=18)
 
-        tk.Label(
-            card,
+        ctk.CTkLabel(
+            card_inner,
             text="Change Credentials",
             font=(UI_FONT, 18, "bold"),
-            bg=panel_bg,
-            fg="#134e4a",
+            text_color="#134e4a",
         ).pack(pady=(0, 6))
-        tk.Label(
-            card,
+        ctk.CTkLabel(
+            card_inner,
             text=f"Admin: {user.get('name') or user.get('rfid_uid') or 'admin'}",
             font=UI_FONT_SMALL,
-            bg=panel_bg,
-            fg="#0f766e",
+            text_color="#0f766e",
         ).pack(pady=(0, 14))
 
-        tk.Label(card, text="New username", font=UI_FONT_SMALL, bg=panel_bg, fg="#134e4a").pack(anchor="w", pady=(0, 4))
-        username_var = tk.StringVar()
-        username_entry = tk.Entry(card, textvariable=username_var, font=UI_FONT_BODY, width=28, relief=tk.FLAT)
-        username_entry.pack(fill=tk.X, ipady=8, ipadx=10, pady=(0, 10))
+        ctk.CTkLabel(card_inner, text="New username", font=UI_FONT_SMALL, text_color="#134e4a").pack(anchor="w", pady=(0, 4))
+        username_entry = ctk.CTkEntry(card_inner, font=UI_FONT_BODY, width=280, fg_color="#ffffff", text_color="#1e293b", border_color="#94a3b8", corner_radius=8, height=40)
+        username_entry.pack(fill=tk.X, pady=(0, 10))
 
-        tk.Label(card, text="New password", font=UI_FONT_SMALL, bg=panel_bg, fg="#134e4a").pack(anchor="w", pady=(0, 4))
-        pw_var = tk.StringVar()
-        pw_entry = tk.Entry(card, textvariable=pw_var, show="*", font=UI_FONT_BODY, width=28, relief=tk.FLAT)
-        pw_entry.pack(fill=tk.X, ipady=8, ipadx=10, pady=(0, 10))
+        ctk.CTkLabel(card_inner, text="New password", font=UI_FONT_SMALL, text_color="#134e4a").pack(anchor="w", pady=(0, 4))
+        pw_entry = ctk.CTkEntry(card_inner, show="*", font=UI_FONT_BODY, width=280, fg_color="#ffffff", text_color="#1e293b", border_color="#94a3b8", corner_radius=8, height=40)
+        pw_entry.pack(fill=tk.X, pady=(0, 10))
 
-        tk.Label(card, text="Confirm password", font=UI_FONT_SMALL, bg=panel_bg, fg="#134e4a").pack(anchor="w", pady=(0, 4))
-        confirm_var = tk.StringVar()
-        confirm_entry = tk.Entry(card, textvariable=confirm_var, show="*", font=UI_FONT_BODY, width=28, relief=tk.FLAT)
-        confirm_entry.pack(fill=tk.X, ipady=8, ipadx=10, pady=(0, 12))
+        ctk.CTkLabel(card_inner, text="Confirm password", font=UI_FONT_SMALL, text_color="#134e4a").pack(anchor="w", pady=(0, 4))
+        confirm_entry = ctk.CTkEntry(card_inner, show="*", font=UI_FONT_BODY, width=280, fg_color="#ffffff", text_color="#1e293b", border_color="#94a3b8", corner_radius=8, height=40)
+        confirm_entry.pack(fill=tk.X, pady=(0, 12))
 
-        status_lbl = tk.Label(card, text="", font=UI_FONT_SMALL, bg=panel_bg, fg="#b91c1c")
+        status_lbl = ctk.CTkLabel(card_inner, text="", font=UI_FONT_SMALL, text_color="#b91c1c")
         status_lbl.pack(pady=(0, 10))
 
         def save():
-            new_username = (username_var.get() or "").strip()
-            new_password = pw_var.get() or ""
-            confirm_password = confirm_var.get() or ""
+            new_username = (username_entry.get() or "").strip()
+            new_password = pw_entry.get() or ""
+            confirm_password = confirm_entry.get() or ""
 
             if not new_username:
                 status_lbl.configure(text="Please enter a username.")
@@ -879,40 +818,32 @@ class AdminMixin:
             except Exception as exc:
                 status_lbl.configure(text=f"Failed to update credentials: {exc}")
 
-        btn_row = tk.Frame(card, bg=panel_bg)
+        btn_row = ctk.CTkFrame(card_inner, fg_color=panel_bg)
         btn_row.pack(fill=tk.X, pady=(4, 0))
 
-        save_btn = tk.Button(
+        ctk.CTkButton(
             btn_row,
             text="Save",
             font=(UI_FONT, 12, "bold"),
             command=save,
-            bg=accent,
-            fg="#ffffff",
-            relief=tk.FLAT,
-            padx=18,
-            pady=8,
-            cursor="hand2",
-        )
-        save_btn.pack(side=tk.LEFT)
-        save_btn.bind("<Enter>", lambda e: save_btn.configure(bg=accent_hover) if save_btn.winfo_exists() else None)
-        save_btn.bind("<Leave>", lambda e: save_btn.configure(bg=accent) if save_btn.winfo_exists() else None)
+            fg_color=accent,
+            hover_color=accent_hover,
+            text_color="#ffffff",
+            corner_radius=8,
+            height=38,
+        ).pack(side=tk.LEFT)
 
-        back_btn = tk.Button(
+        ctk.CTkButton(
             btn_row,
             text="Back",
             font=(UI_FONT, 12, "bold"),
             command=lambda: self.show_admin_dashboard(getattr(self, "_current_admin_user", {"name": "admin", "rfid_uid": ""})),
-            bg=self.current_theme["button_bg"],
-            fg=self.current_theme["button_fg"],
-            relief=tk.FLAT,
-            padx=18,
-            pady=8,
-            cursor="hand2",
-        )
-        back_btn.pack(side=tk.LEFT, padx=(10, 0))
-        back_btn.bind("<Enter>", lambda e: back_btn.configure(bg=accent_hover) if back_btn.winfo_exists() else None)
-        back_btn.bind("<Leave>", lambda e: back_btn.configure(bg=self.current_theme["button_bg"]) if back_btn.winfo_exists() else None)
+            fg_color=self.current_theme["button_bg"],
+            hover_color=accent_hover,
+            text_color=self.current_theme["button_fg"],
+            corner_radius=8,
+            height=38,
+        ).pack(side=tk.LEFT, padx=(10, 0))
 
         username_entry.focus_set()
         container.after(10, lambda: self._slide_in(container) if hasattr(self, "_slide_in") else None)

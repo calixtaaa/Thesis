@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import messagebox, simpledialog
+import customtkinter as ctk
 
 
 UI_FONT = "Segoe UI"
@@ -33,6 +34,7 @@ def _hover_btn(btn, normal, hover):
 class StaffMixin:
     def enter_restock_mode(self):
         """Show in-app Staff Login (mint panel, RFID card ID)."""
+        self._current_screen_builder = self.enter_restock_mode
         if hasattr(self, "_apply_lcd_fit"):
             try:
                 self._apply_lcd_fit(profile="admin_staff")
@@ -42,97 +44,89 @@ class StaffMixin:
             self.sidebar_holder.destroy()
             self.sidebar_holder = None
         self.clear_screen()
-        self.content_holder.configure(bg=LOGIN_PAGE_BG)
+        self.content_holder.configure(fg_color=LOGIN_PAGE_BG)
 
-        center = tk.Frame(self.content_holder, bg=LOGIN_PAGE_BG)
+        center = ctk.CTkFrame(self.content_holder, fg_color=LOGIN_PAGE_BG)
         center.place(relx=0.5, rely=0.5, anchor="center")
 
-        panel = tk.Frame(center, bg=LOGIN_PANEL_BG, padx=40, pady=28)
+        panel = ctk.CTkFrame(center, fg_color=LOGIN_PANEL_BG, corner_radius=16)
         panel.pack()
+        inner = ctk.CTkFrame(panel, fg_color=LOGIN_PANEL_BG)
+        inner.pack(padx=40, pady=28)
 
-        tk.Label(
-            panel,
+        ctk.CTkLabel(
+            inner,
             text="Staff Login",
             font=(UI_FONT, 18, "bold"),
-            bg=LOGIN_PANEL_BG,
-            fg="#0f766e",
+            text_color="#0f766e",
         ).pack(pady=(0, 16))
 
-        tk.Label(
-            panel,
+        ctk.CTkLabel(
+            inner,
             text="Enter Staff RFID Card ID (simulate tap):",
             font=UI_FONT_SMALL,
-            bg=LOGIN_PANEL_BG,
-            fg="#134e4a",
+            text_color="#134e4a",
         ).pack(anchor="w", pady=(0, 6))
 
-        uid_var = tk.StringVar()
-        entry = tk.Entry(
-            panel,
-            textvariable=uid_var,
+        entry = ctk.CTkEntry(
+            inner,
             font=UI_FONT_BODY,
-            width=28,
-            relief=tk.FLAT,
-            bg="#ffffff",
-            fg="#1e293b",
+            width=280,
+            fg_color="#ffffff",
+            text_color="#1e293b",
+            border_color="#94a3b8",
+            corner_radius=8,
+            height=40,
         )
-        entry.pack(pady=(0, 20), ipady=8, ipadx=10)
+        entry.pack(pady=(0, 20))
         entry.focus_set()
 
-        error_var = tk.StringVar(value="")
-        error_lbl = tk.Label(
-            panel,
-            textvariable=error_var,
+        error_lbl = ctk.CTkLabel(
+            inner,
+            text="",
             font=UI_FONT_SMALL,
-            bg=LOGIN_PANEL_BG,
-            fg="#b91c1c",
+            text_color="#b91c1c",
         )
         error_lbl.pack(fill=tk.X, pady=(0, 6))
 
-        btn_frame = tk.Frame(panel, bg=LOGIN_PANEL_BG)
+        btn_frame = ctk.CTkFrame(inner, fg_color=LOGIN_PANEL_BG)
         btn_frame.pack(fill=tk.X, pady=(4, 0))
 
         def submit():
-            uid = uid_var.get().strip()
+            uid = entry.get().strip()
             if not uid:
-                error_var.set("Please enter a staff RFID card ID.")
+                error_lbl.configure(text="Please enter a staff RFID card ID.")
                 return
             user = self.get_user_by_uid_data(uid)
             if not user or not user["is_staff"]:
-                error_var.set("Invalid staff card.")
+                error_lbl.configure(text="Invalid staff card.")
                 return
-            error_var.set("")
+            error_lbl.configure(text="")
             self.show_restock_screen(user)
 
-        ok_btn = tk.Button(
+        ctk.CTkButton(
             btn_frame,
             text="OK",
             font=(UI_FONT, 11, "bold"),
             command=submit,
-            bg=LOGIN_BTN_BG,
-            fg="#ffffff",
-            relief=tk.FLAT,
-            padx=24,
-            pady=8,
-            cursor="hand2",
-        )
-        ok_btn.pack(side=tk.LEFT, padx=(0, 10))
-        _hover_btn(ok_btn, LOGIN_BTN_BG, LOGIN_BTN_HOVER)
+            fg_color=LOGIN_BTN_BG,
+            hover_color=LOGIN_BTN_HOVER,
+            text_color="#ffffff",
+            corner_radius=8,
+            height=38,
+        ).pack(side=tk.LEFT, padx=(0, 10))
 
-        cancel_btn = tk.Button(
+        ctk.CTkButton(
             btn_frame,
             text="Cancel",
             font=(UI_FONT, 11, "bold"),
             command=self.build_main_menu,
-            bg=LOGIN_BTN_BG,
-            fg="#ffffff",
-            relief=tk.FLAT,
-            padx=20,
-            pady=8,
-            cursor="hand2",
-        )
-        cancel_btn.pack(side=tk.LEFT)
-        _hover_btn(cancel_btn, LOGIN_BTN_BG, LOGIN_BTN_HOVER)
+            fg_color=LOGIN_BTN_BG,
+            hover_color=LOGIN_BTN_HOVER,
+            text_color="#ffffff",
+            corner_radius=8,
+            height=38,
+        ).pack(side=tk.LEFT)
 
         entry.bind("<Return>", lambda _: submit())
         self.add_theme_toggle_footer()
@@ -152,140 +146,86 @@ class StaffMixin:
         frame.after(step_ms, lambda: step(0))
 
     def show_restock_screen(self, staff_user):
+        self._current_screen_builder = lambda: self.show_restock_screen(staff_user)
         self.clear_screen()
         self._current_staff_user = staff_user
 
-        frame = tk.Frame(self.content_holder, bg=self.current_theme["bg"])
+        frame = ctk.CTkFrame(self.content_holder, fg_color=self.current_theme["bg"])
         frame.place(relx=0, rely=0, relwidth=1, relheight=1, anchor="nw")
-        inner = tk.Frame(frame, bg=self.current_theme["bg"])
+        inner = ctk.CTkFrame(frame, fg_color=self.current_theme["bg"])
         inner.pack(expand=True, fill=tk.BOTH, padx=20, pady=16)
 
-        top_bar = tk.Frame(inner, bg=self.current_theme["bg"])
+        top_bar = ctk.CTkFrame(inner, fg_color=self.current_theme["bg"])
         top_bar.pack(fill=tk.X, pady=(0, 12))
-        back_btn = tk.Button(
+        ctk.CTkButton(
             top_bar,
             text="← Back to Dashboard",
             font=(UI_FONT, 11, "bold"),
             command=self.build_main_menu,
-            bg=self.current_theme.get("accent", "#0d9488"),
-            fg="#ffffff",
-            relief=tk.FLAT,
-            padx=14,
-            pady=6,
-            cursor="hand2",
-        )
-        back_btn.pack(side=tk.LEFT)
-        _hover_btn(back_btn, self.current_theme.get("accent", "#0d9488"), LOGIN_BTN_HOVER)
+            fg_color=self.current_theme.get("accent", "#0d9488"),
+            hover_color=LOGIN_BTN_HOVER,
+            text_color="#ffffff",
+            corner_radius=8,
+            height=36,
+        ).pack(side=tk.LEFT)
 
-        tk.Label(
+        ctk.CTkLabel(
             inner,
             text=f"Restock Mode – Staff: {staff_user['name'] or staff_user['rfid_uid']}",
             font=(UI_FONT, 18, "bold"),
-            bg=self.current_theme["bg"],
-            fg=self.current_theme["fg"],
+            text_color=self.current_theme["fg"],
         ).pack(pady=(0, 12))
 
         products = self.get_all_products_data()
 
-        # Scrollable list container so all slots can be restocked even on small LCD
-        list_container = tk.Frame(inner, bg=self.current_theme["bg"])
-        list_container.pack(expand=True, fill=tk.BOTH)
-
-        canvas = tk.Canvas(
-            list_container,
-            bg=self.current_theme["bg"],
-            highlightthickness=0,
-            bd=0,
-        )
-        scrollbar = tk.Scrollbar(list_container, orient="vertical", command=canvas.yview)
-        canvas.configure(yscrollcommand=scrollbar.set)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-
-        list_frame = tk.Frame(canvas, bg=self.current_theme["bg"])
-        canvas.create_window((0, 0), window=list_frame, anchor="nw")
-
-        def _on_configure(_event=None):
-            try:
-                canvas.configure(scrollregion=canvas.bbox("all"))
-            except Exception:
-                pass
-
-        list_frame.bind("<Configure>", _on_configure)
-
         accent = self.current_theme.get("accent", "#0d9488")
         card_bg = self.current_theme.get("card_bg", self.current_theme["button_bg"])
-        card_border = self.current_theme.get("card_border", "#e2e8f0")
+
+        list_frame = ctk.CTkScrollableFrame(inner, fg_color=self.current_theme["bg"])
+        list_frame.pack(expand=True, fill=tk.BOTH)
 
         for p in products:
-            row = tk.Frame(
+            row = ctk.CTkFrame(
                 list_frame,
-                bg=card_bg,
-                highlightthickness=1,
-                highlightbackground=card_border,
+                fg_color=card_bg,
+                corner_radius=8,
+                border_width=1,
+                border_color=self.current_theme.get("card_border", "#e2e8f0"),
             )
             row.pack(fill=tk.X, padx=0, pady=6)
 
             info = f"Slot {p['slot_number']} – {p['name']}  |  {p['current_stock']}/{p['capacity']}  |  ₱{p['price']:.2f}"
-            tk.Label(
+            ctk.CTkLabel(
                 row,
                 text=info,
                 anchor="w",
                 font=UI_FONT_BODY,
-                bg=card_bg,
-                fg=self.current_theme["button_fg"],
+                text_color=self.current_theme["button_fg"],
             ).pack(side=tk.LEFT, expand=True, padx=12, pady=10)
 
-            restock_btn = tk.Button(
+            ctk.CTkButton(
                 row,
                 text="Restock",
                 font=UI_FONT_BODY,
                 command=lambda prod=p: self.restock_product_dialog(prod),
-                bg=accent,
-                fg="#ffffff",
-                relief=tk.FLAT,
-                padx=14,
-                pady=6,
-                cursor="hand2",
-            )
-            restock_btn._restock_btn = True
-            restock_btn.pack(side=tk.RIGHT, padx=10, pady=8)
-            _hover_btn(restock_btn, accent, LOGIN_BTN_HOVER)
+                fg_color=accent,
+                hover_color=LOGIN_BTN_HOVER,
+                text_color="#ffffff",
+                corner_radius=8,
+                width=90,
+            ).pack(side=tk.RIGHT, padx=10, pady=8)
 
-            # Row-level Leave fallback: when mouse leaves row, reset button (fixes stuck hover in scrollable canvas)
-            def _row_leave(_e):
-                if restock_btn.winfo_exists():
-                    restock_btn.configure(bg=getattr(restock_btn, "_hover_normal", accent))
-            row.bind("<Leave>", _row_leave)
-
-        # Use high-contrast colors so text is visible without hover (matches admin fix)
-        exit_bg = "#e2e8f0" if self.current_theme_name == "light" else "#334155"
-        exit_fg = "#0f172a" if self.current_theme_name == "light" else "#ffffff"
-        exit_btn = tk.Button(
+        ctk.CTkButton(
             inner,
             text="Exit Restock Mode",
             font=UI_FONT_BODY,
             command=self.build_main_menu,
-            bg=exit_bg,
-            fg=exit_fg,
-            relief=tk.FLAT,
-            padx=16,
-            pady=8,
-            cursor="hand2",
-        )
-        exit_btn._staff_exit_btn = True
-        exit_btn._staff_exit_bg = exit_bg
-        exit_btn._staff_exit_fg = exit_fg
-        exit_btn.pack(pady=12)
-
-        def _on_enter(_e):
-            if exit_btn.winfo_exists():
-                exit_btn.configure(bg=self.current_theme.get("accent", "#0d9488"), fg="#ffffff")
-        def _on_leave(_e):
-            if exit_btn.winfo_exists():
-                exit_btn.configure(bg=exit_btn._staff_exit_bg, fg=exit_btn._staff_exit_fg)
-        exit_btn.bind("<Enter>", _on_enter)
-        exit_btn.bind("<Leave>", _on_leave)
+            fg_color="#e2e8f0" if self.current_theme_name == "light" else "#334155",
+            hover_color=accent,
+            text_color="#0f172a" if self.current_theme_name == "light" else "#ffffff",
+            corner_radius=8,
+            height=38,
+        ).pack(pady=12)
 
         self._slide_in(frame)
         self.add_theme_toggle_footer()
