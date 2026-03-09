@@ -1,0 +1,3 @@
+{"sessionId": "2b0b71", "runId": "run-1773039410", "hypothesisId": "H3", "location": "main.py:show_role_menu", "message": "hamburger action invoked", "data": {"sidebar_exists_before": false, "current_theme": "light"}, "timestamp": 1773039495528}
+{"sessionId": "2b0b71", "runId": "run-1773039410", "hypothesisId": "H3", "location": "main.py:show_role_menu", "message": "sidebar created", "data": {"sidebar_width": 220, "sidebar_exists_after": true}, "timestamp": 1773039495542}
+{"sessionId": "2b0b71", "runId": "run-1773039410", "hypothesisId": "H3", "location": "main.py:show_role_menu", "message": "hamburger action invoked", "data": {"sidebar_exists_before": true, "current_theme": "light"}, "timestamp": 1773039496828}
