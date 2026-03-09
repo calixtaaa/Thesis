@@ -586,6 +586,128 @@ class AdminMixin:
         )
         self.create_low_stock_chart(body, "Low-stock Products", "Current stock vs capacity", low_stock_points)
 
+        # -----------------------------
+        # Prediction Analysis (runtime)
+        # -----------------------------
+        pred_card = tk.Frame(
+            body,
+            bg=self.current_theme.get("card_bg", self.current_theme["button_bg"]),
+            highlightthickness=1,
+            highlightbackground=self.current_theme.get("card_border", "#e2e8f0"),
+            padx=14,
+            pady=12,
+        )
+        pred_card.pack(anchor="nw", fill=tk.X, pady=(14, 0))
+
+        tk.Label(
+            pred_card,
+            text="Prediction Analysis (Demand + Restock)",
+            font=(UI_FONT, 12, "bold"),
+            bg=pred_card["bg"],
+            fg=self.current_theme["fg"],
+        ).pack(anchor="w")
+
+        sub = tk.Label(
+            pred_card,
+            text="Predicts sales tomorrow and recommends restock using historical transactions (runs once per session).",
+            font=UI_FONT_SMALL,
+            bg=pred_card["bg"],
+            fg=self.current_theme.get("muted", self.current_theme["fg"]),
+            wraplength=520,
+            justify="left",
+        )
+        sub.pack(anchor="w", pady=(2, 10))
+
+        btn_row = tk.Frame(pred_card, bg=pred_card["bg"])
+        btn_row.pack(anchor="w", fill=tk.X)
+
+        def _run_pred():
+            self.run_prediction_analysis_once(force=False)
+            self.show_admin_dashboard(staff_user)
+
+        ran = bool(getattr(self, "_prediction_ran", False))
+        run_btn = tk.Button(
+            btn_row,
+            text="Run Prediction Analysis" if not ran else "Prediction Ready",
+            font=(UI_FONT, 11, "bold"),
+            command=_run_pred if not ran else None,
+            state=tk.NORMAL if not ran else tk.DISABLED,
+            bg=self.current_theme.get("accent", "#1A948E"),
+            fg="#ffffff",
+            activebackground=self.current_theme.get("accent_hover", "#15857B"),
+            activeforeground="#ffffff",
+            relief=tk.FLAT,
+            padx=16,
+            pady=8,
+            cursor="hand2",
+        )
+        run_btn.pack(side=tk.LEFT)
+
+        # Show results table if available
+        results = getattr(self, "_prediction_results", None)
+        summary = getattr(self, "_prediction_summary", None)
+        if results:
+            info = []
+            if summary and getattr(summary, "based_on_last_date", None):
+                info.append(f"Based on data up to: {summary.based_on_last_date}")
+            if summary and getattr(summary, "generated_at_iso", None):
+                info.append(f"Generated: {summary.generated_at_iso}")
+            if info:
+                tk.Label(
+                    pred_card,
+                    text="  ·  ".join(info),
+                    font=UI_FONT_SMALL,
+                    bg=pred_card["bg"],
+                    fg=self.current_theme.get("muted", self.current_theme["fg"]),
+                ).pack(anchor="w", pady=(10, 6))
+
+            table = tk.Frame(pred_card, bg=pred_card["bg"])
+            table.pack(fill=tk.X, pady=(2, 0))
+
+            headers = ["Product", "Predicted Sales Tomorrow", "Restock Needed"]
+            col_widths = [0.52, 0.28, 0.20]
+            head_row = tk.Frame(table, bg=pred_card["bg"])
+            head_row.pack(fill=tk.X)
+            for h, w in zip(headers, col_widths):
+                tk.Label(
+                    head_row,
+                    text=h,
+                    font=(UI_FONT, 10, "bold"),
+                    bg=pred_card["bg"],
+                    fg=self.current_theme["fg"],
+                    anchor="w",
+                ).pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+            # Show top 6 products (fits dashboard)
+            for r in results[:6]:
+                row = tk.Frame(table, bg=pred_card["bg"])
+                row.pack(fill=tk.X, pady=1)
+                tk.Label(
+                    row,
+                    text=str(getattr(r, "product_name", "")),
+                    font=UI_FONT_SMALL,
+                    bg=pred_card["bg"],
+                    fg=self.current_theme["fg"],
+                    anchor="w",
+                ).pack(side=tk.LEFT, fill=tk.X, expand=True)
+                tk.Label(
+                    row,
+                    text=str(getattr(r, "predicted_sales_tomorrow", 0)),
+                    font=UI_FONT_SMALL,
+                    bg=pred_card["bg"],
+                    fg=self.current_theme["fg"],
+                    anchor="w",
+                ).pack(side=tk.LEFT, fill=tk.X, expand=True)
+                need = "Yes" if getattr(r, "recommended_restock_qty", 0) > 0 else "No"
+                tk.Label(
+                    row,
+                    text=need,
+                    font=UI_FONT_SMALL,
+                    bg=pred_card["bg"],
+                    fg=self.current_theme.get("accent", "#1A948E") if need == "Yes" else self.current_theme.get("muted", self.current_theme["fg"]),
+                    anchor="w",
+                ).pack(side=tk.LEFT, fill=tk.X, expand=True)
+
         tk.Button(
             body,
             text="Generate Excel Report",

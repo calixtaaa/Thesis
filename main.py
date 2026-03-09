@@ -8,6 +8,9 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox, simpledialog
 
+import bugreport
+import prediction_runtime
+
 from admin.admin import AdminMixin
 from admin.reports import get_reports_dir
 from staff.staff import (
@@ -341,11 +344,33 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
         self.theme_animating = False
         self._pending_theme_apply_id = None
 
+        # Prediction Analysis cache (run once per session unless forced)
+        self._prediction_results = None
+        self._prediction_summary = None
+        self._prediction_ran = False
+
         # Main content lives here; sidebar (when shown) is a sibling on the right
         self.content_holder = tk.Frame(self, bg=self.current_theme["bg"])
         self.content_holder.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         self.build_welcome_screen()
+
+    def run_prediction_analysis_once(self, force: bool = False):
+        """
+        Run lightweight prediction analysis using SQLite data.
+        Runs once per session unless force=True.
+        """
+        if self._prediction_ran and not force and self._prediction_results is not None:
+            return self._prediction_results, self._prediction_summary
+        try:
+            results, summary = prediction_runtime.run_prediction_analysis(db_path=BASE_DIR / "vending.db")
+            self._prediction_results = results
+            self._prediction_summary = summary
+            self._prediction_ran = True
+            return results, summary
+        except Exception as e:
+            messagebox.showerror("Prediction Analysis", f"Failed to run prediction.\n\n{e}")
+            return None, None
 
     def _apply_lcd_fit(self, profile: str = "customer"):
         """
@@ -377,6 +402,20 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
     # ---------- Screen helpers ----------
 
     def clear_screen(self):
+        # Close any right-side sidebars (not children of content_holder)
+        try:
+            if self.sidebar_frame is not None and self.sidebar_frame.winfo_exists():
+                self.sidebar_frame.destroy()
+        except Exception:
+            pass
+        self.sidebar_frame = None
+        try:
+            if self.sidebar_holder is not None and self.sidebar_holder.winfo_exists():
+                self.sidebar_holder.destroy()
+        except Exception:
+            pass
+        self.sidebar_holder = None
+
         try:
             self.unbind_all("<MouseWheel>")
         except Exception:
@@ -485,15 +524,47 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
                         child.configure(text=f"Theme: {self.current_theme_name.capitalize()}")
                 elif isinstance(child, tk.Label):
                     if getattr(child, "_datetime_label", False):
-                        fg = self.current_theme["fg"] if self.current_theme_name == "dark" else self.current_theme.get("muted", self.current_theme["fg"])
-                        child.configure(bg=self.current_theme["bg"], fg=fg)
+                        # Datetime uses a "badge" background for visibility
+                        badge_bg = self.current_theme.get("button_bg", self.current_theme["bg"])
+                        fg = self.current_theme["fg"]
+                        child.configure(bg=badge_bg, fg=fg)
                     elif getattr(child, "_admin_metric_value", False):
                         acc = self.current_theme.get("accent", "#1A948E")
                         child.configure(bg=self.current_theme.get("card_bg", "#ffffff"), fg=acc)
                     else:
                         child.configure(bg=self.current_theme["bg"], fg=self.current_theme["fg"])
+                elif isinstance(child, tk.Radiobutton) and getattr(child, "_bug_report", False):
+                    try:
+                        parent_bg = child.master.cget("bg")
+                    except Exception:
+                        parent_bg = self.current_theme.get("card_bg", self.current_theme["bg"])
+                    child.configure(
+                        bg=parent_bg,
+                        fg=self.current_theme["fg"],
+                        activebackground=parent_bg,
+                        activeforeground=self.current_theme["fg"],
+                        selectcolor=self.current_theme.get("card_bg", "#ffffff"),
+                    )
+                elif isinstance(child, tk.Text) and getattr(child, "_bug_report", False):
+                    try:
+                        parent_bg = child.master.cget("bg")
+                    except Exception:
+                        parent_bg = self.current_theme.get("card_bg", self.current_theme["bg"])
+                    child.configure(
+                        bg=self.current_theme.get("search_bg", self.current_theme.get("card_bg", "#ffffff")),
+                        fg=self.current_theme["fg"],
+                        insertbackground=self.current_theme["fg"],
+                        highlightbackground=self.current_theme.get("card_border", "#e2e8f0"),
+                    )
                 elif isinstance(child, tk.Frame):
-                    child.configure(bg=self.current_theme["bg"])
+                    if getattr(child, "_datetime_badge", False):
+                        badge_bg = self.current_theme.get("button_bg", self.current_theme["bg"])
+                        child.configure(
+                            bg=badge_bg,
+                            highlightbackground=self.current_theme.get("card_border", "#e2e8f0"),
+                        )
+                    else:
+                        child.configure(bg=self.current_theme["bg"])
                     self.apply_theme_to_widget(child, _depth + 1)
                 elif isinstance(child, tk.Canvas):
                     try:
@@ -658,16 +729,26 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
 
     def add_ph_datetime_label(self, parent):
         """Show a live Philippine date/time label inside the given parent."""
-        # Use fg (not muted) in dark mode for better visibility
-        dt_fg = self.current_theme["fg"] if self.current_theme_name == "dark" else self.current_theme.get("muted", self.current_theme["fg"])
-        label = tk.Label(
+        # Use a small badge so the datetime is always readable.
+        badge_bg = self.current_theme.get("button_bg", self.current_theme["bg"])
+        badge = tk.Frame(
             parent,
-            font=UI_FONT_SMALL,
-            bg=self.current_theme["bg"],
-            fg=dt_fg,
+            bg=badge_bg,
+            highlightthickness=1,
+            highlightbackground=self.current_theme.get("card_border", "#e2e8f0"),
+            bd=0,
+        )
+        badge._datetime_badge = True
+        badge.pack(side=tk.RIGHT, padx=8, pady=2)
+
+        label = tk.Label(
+            badge,
+            font=(UI_FONT, 11, "bold"),
+            bg=badge_bg,
+            fg=self.current_theme["fg"],
         )
         label._datetime_label = True
-        label.pack(side=tk.RIGHT, padx=10)
+        label.pack(padx=10, pady=4)
 
         ph_tz = datetime.timezone(datetime.timedelta(hours=8))
 
@@ -675,7 +756,8 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
             if not label.winfo_exists():
                 return
             now = datetime.datetime.now(ph_tz)
-            label.config(text=now.strftime("PH Time: %b %d, %Y %I:%M %p"))
+            # Shorter, high-signal format so it fits beside footer buttons.
+            label.config(text=now.strftime("PH %b %d, %I:%M %p"))
             label.after(1000, _refresh)
 
         _refresh()
@@ -1030,55 +1112,8 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
             self.sidebar_holder.destroy()
             self.sidebar_holder = None
 
-        # Right teal sidebar – IPINAPAKITA LAMANG kapag WALANG cart (hindi sa quantity/order section)
-        if not self.cart:
-            sidebar_width = 220
-            sidebar_bg = "#1A948E"
-            strip_bg = "#14b8a6"
-            self.sidebar_holder = tk.Frame(self, bg=sidebar_bg, width=sidebar_width)
-            self.sidebar_holder.pack_propagate(False)
-            self.sidebar_holder.pack(side=tk.RIGHT, fill=tk.Y)
-
-            tk.Label(
-                self.sidebar_holder,
-                text="Menu",
-                font=(UI_FONT, 12, "bold"),
-                bg=sidebar_bg,
-                fg="#ffffff",
-            ).pack(anchor="w", padx=14, pady=(14, 10))
-
-            hover_strip = "#2dd4bf"
-            def make_nav_btn(text, cmd):
-                b = tk.Button(
-                    self.sidebar_holder,
-                    text=text,
-                    anchor="w",
-                    font=(UI_FONT, 11, "bold"),
-                    command=cmd,
-                    bg=strip_bg,
-                    fg="#ffffff",
-                    activebackground=hover_strip,
-                    activeforeground="#ffffff",
-                    relief=tk.FLAT,
-                    padx=12,
-                    pady=10,
-                    cursor="hand2",
-                )
-                b.pack(fill=tk.X, padx=10, pady=4)
-                def on_enter(_e):
-                    if b.winfo_exists():
-                        b.configure(bg=hover_strip)
-                def on_leave(_e):
-                    if b.winfo_exists():
-                        b.configure(bg=strip_bg)
-                b.bind("<Enter>", on_enter)
-                b.bind("<Leave>", on_leave)
-                return b
-
-            make_nav_btn("Dashboard", lambda: None)
-            make_nav_btn("Staff", lambda: self.enter_restock_mode())
-            make_nav_btn("Admin", lambda: self.enter_admin_dashboard())
-            make_nav_btn("Back to main screen", lambda: self.show_thank_you_screen())
+        # Note: The right-side menu is shown only via the hamburger (☰),
+        # not automatically on the main menu.
 
         # Left + order panel area (inside content_holder)
         main_row = tk.Frame(self.content_holder, bg=self.current_theme["bg"])
@@ -1366,14 +1401,18 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
                 command=lambda: self._confirm_cart_order(),
             ).pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=(8, 12))
 
-        # Footer: isang linya lang, walang duplicate text sa gilid
+        # Footer: two rows so the datetime is always visible
         bottom = tk.Frame(self.content_holder, bg=self.current_theme["bg"])
         bottom.pack(side=tk.BOTTOM, fill=tk.X, pady=(6, 8))
+        actions_row = tk.Frame(bottom, bg=self.current_theme["bg"])
+        actions_row.pack(side=tk.TOP, fill=tk.X)
+        info_row = tk.Frame(bottom, bg=self.current_theme["bg"])
+        info_row.pack(side=tk.TOP, fill=tk.X, pady=(6, 0))
 
         accent = self.current_theme.get("accent", "#1A948E")
         accent_hover = self.current_theme.get("accent_hover", "#0f766e")
         reload_btn = tk.Button(
-            bottom,
+            actions_row,
             text="Reload (RFID)",
             command=self.reload_card_flow,
             font=UI_FONT_BUTTON,
@@ -1390,7 +1429,7 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
         reload_btn.bind("<Enter>", lambda e: reload_btn.configure(bg=accent_hover) if reload_btn.winfo_exists() else None)
         reload_btn.bind("<Leave>", lambda e: reload_btn.configure(bg=accent) if reload_btn.winfo_exists() else None)
         buy_btn = tk.Button(
-            bottom,
+            actions_row,
             text="Buy RFID Card",
             command=self.buy_card_flow,
             font=UI_FONT_BUTTON,
@@ -1408,7 +1447,24 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
         buy_btn.bind("<Leave>", lambda e: buy_btn.configure(bg=accent) if buy_btn.winfo_exists() else None)
 
         tk.Button(
-            bottom,
+            actions_row,
+            text="Report",
+            command=lambda: bugreport.show_bug_report_screen(self, version=VERSION, hover_scale_btn=_hover_scale_btn),
+            font=UI_FONT_BODY,
+            bg=self.current_theme["bg"],
+            fg=self.current_theme["fg"],
+            activebackground=self.current_theme["button_bg"],
+            activeforeground=self.current_theme["fg"],
+            relief=tk.FLAT,
+            highlightthickness=1,
+            highlightbackground=self.current_theme.get("card_border", "#e2e8f0"),
+            padx=12,
+            pady=6,
+            cursor="hand2",
+        ).pack(side=tk.LEFT, padx=6)
+
+        tk.Button(
+            actions_row,
             text="How to use?",
             command=self.show_help_dialog,
             font=UI_FONT_BODY,
@@ -1424,7 +1480,7 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
             cursor="hand2",
         ).pack(side=tk.LEFT, padx=6)
         tk.Button(
-            bottom,
+            actions_row,
             text="Patch Notes",
             command=self.show_patch_notes_dialog,
             font=UI_FONT_BODY,
@@ -1440,10 +1496,10 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
             cursor="hand2",
         ).pack(side=tk.LEFT, padx=6)
 
-        # Pack datetime first (side=RIGHT) so it reserves space and is not truncated
-        self.add_ph_datetime_label(bottom)
+        # Info row: datetime on the right, version on the left
+        self.add_ph_datetime_label(info_row)
         tk.Label(
-            bottom,
+            info_row,
             text=f"SyntaxError™  ·  {VERSION}",
             font=UI_FONT_SMALL,
             bg=self.current_theme["bg"],

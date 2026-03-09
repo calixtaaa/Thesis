@@ -7,7 +7,7 @@ from datetime import datetime
 
 
 # App version (bump when releasing; shown in title, footers, and patch notes)
-VERSION = "v.0.02"
+VERSION = "v.0.03"
 
 
 # ---------------------------------------------------------------------------
@@ -75,8 +75,32 @@ PATCH_v0_02 = {
     ],
 }
 
+# v0.03 – bug report UI + prediction analysis + UI fixes
+PATCH_v0_03 = {
+    "version": "v.0.03",
+    "added": [
+        "In-app Bug Report screen (category + explanation + submit) with local NDJSON storage.",
+        "Prediction Analysis (runtime) shown in Admin Dashboard (predict demand tomorrow + restock recommendation).",
+        "New project folder: predictionAnalysis/ (ML pipeline scripts, optional offline analysis).",
+    ],
+    "improved": [
+        "Bug Report code extracted into bugreport.py for cleaner main.py.",
+        "Main menu footer redesigned to two rows so PH time is always visible.",
+        "PH date/time readability improved (badge style + larger bold text).",
+    ],
+    "bugs_fixed": [
+        "Hamburger sidebar no longer persists across screens; sidebars now close on clear_screen().",
+        "Main menu auto 'Menu' sidebar removed; sidebar only appears when hamburger is used.",
+        "Prediction analysis ignores transactions without product_id (e.g., reload/buy flows) to prevent crashes.",
+    ],
+    "future": [
+        "Optional: upgrade prediction analysis to full ML models (Random Forest / Time Series) when Python 3.12 environment is available.",
+        "Optional: export prediction results to Excel and add scheduled low-stock alerts.",
+    ],
+}
+
 # All versions in order (oldest first)
-PATCH_HISTORY = [PATCH_v0_01, PATCH_v0_02]
+PATCH_HISTORY = [PATCH_v0_01, PATCH_v0_02, PATCH_v0_03]
 
 
 def get_patch_notes_text() -> str:
