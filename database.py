@@ -224,6 +224,54 @@ def update_user_balance(user_id: int, new_balance: float):
     conn.close()
 
 
+def finalize_purchase_records(items, payment_method: str, rfid_user_id: int | None = None, new_balance: float | None = None):
+    """Apply stock, optional RFID balance, and transaction inserts in one DB transaction."""
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        if rfid_user_id is not None:
+            if new_balance is None:
+                raise ValueError("New RFID balance is required for RFID purchases.")
+            cur.execute(
+                "UPDATE rfid_users SET balance = ? WHERE id = ?",
+                (new_balance, rfid_user_id),
+            )
+            if cur.rowcount == 0:
+                raise ValueError("RFID card account not found.")
+
+        for item in items:
+            product_id = int(item["product_id"])
+            quantity = int(item["quantity"])
+            product_name = item.get("product_name") or "Selected product"
+            line_total = float(item["line_total"])
+
+            cur.execute(
+                """
+                UPDATE products
+                SET current_stock = current_stock - ?
+                WHERE id = ? AND current_stock >= ?
+                """,
+                (quantity, product_id, quantity),
+            )
+            if cur.rowcount == 0:
+                raise ValueError(f"Insufficient stock for {product_name}.")
+
+            cur.execute(
+                """
+                INSERT INTO transactions (product_id, quantity, total_amount, payment_method, rfid_user_id)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (product_id, quantity, line_total, payment_method, rfid_user_id),
+            )
+
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
 def adjust_user_balance(user_id: int, delta: float):
     conn = get_connection()
     cur = conn.cursor()
