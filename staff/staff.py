@@ -14,20 +14,34 @@ LOGIN_PAGE_BG = "#1e293b"
 
 
 def _hover_btn(btn, normal, hover):
-    """Hover effect; stores colors on btn so Leave always restores correctly (fixes stuck hover)."""
+    """Hover/press effect; works for mouse and touch (press highlights, release restores)."""
     btn._hover_normal = normal
     btn._hover_hover = hover
 
-    def on_enter(_e):
+    def apply_hover():
         if btn.winfo_exists():
             btn.configure(bg=btn._hover_hover)
 
-    def on_leave(_e):
+    def apply_normal():
         if btn.winfo_exists():
             btn.configure(bg=btn._hover_normal)
 
+    def on_enter(_e):
+        apply_hover()
+
+    def on_leave(_e):
+        apply_normal()
+
+    def on_press(_e):
+        apply_hover()
+
+    def on_release(_e):
+        apply_normal()
+
     btn.bind("<Enter>", on_enter)
     btn.bind("<Leave>", on_leave)
+    btn.bind("<ButtonPress-1>", on_press)
+    btn.bind("<ButtonRelease-1>", on_release)
 
 
 class StaffMixin:
