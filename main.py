@@ -1,12 +1,13 @@
 import os
 import sys
 import time
+import threading
 import uuid
 import json
 import datetime
 from pathlib import Path
 import tkinter as tk
-from tkinter import messagebox, simpledialog
+from tkinter import messagebox
 
 from admin.admin import AdminMixin
 from admin.reports import get_reports_dir
@@ -23,14 +24,13 @@ from database import (
     update_admin_credentials,
     get_all_products,
     get_product_by_id,
-    decrement_stock,
     record_transaction,
     get_user_by_uid,
     create_user,
     update_user_balance,
-    adjust_user_balance,
     restock_product,
     export_sales_report,
+    finalize_purchase_records,
     get_admin_overview_stats,
     get_sales_trend_data,
     get_monthly_sales_data,
@@ -193,7 +193,7 @@ def dispense_from_slot(slot_number: int, quantity: int = 1):
         time.sleep(delay)
 
 def dispense_change(amount: float):
-    coins_to_dispense = int(amount // COIN_VALUE)
+    coins_to_dispense = int(round(amount / COIN_VALUE))
     if coins_to_dispense <= 0:
         return
     print(f"[HW] Dispensing change: {coins_to_dispense} coins (₱{amount:.2f})")
@@ -354,6 +354,9 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
         self.cart = []
         # Checkout snapshot (so totals stay consistent after leaving main menu)
         self.checkout_items = []  # list of {"product": p, "quantity": int}
+        self._thank_you_after_id = None
+        self.debug_session_id = uuid.uuid4().hex[:6]
+        self.debug_run_id = f"run-{int(time.time())}"
 
         self.search_var = tk.StringVar()
         self.theme_animating = False
@@ -405,18 +408,19 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
     def _debug_log(self, hypothesis_id: str, location: str, message: str, data: dict):
         DEBUG_LOGS_DIR.mkdir(parents=True, exist_ok=True)
         payload = {
-            "sessionId": "14d174",
-            "runId": "initial",
+            "sessionId": self.debug_session_id,
+            "runId": self.debug_run_id,
             "hypothesisId": hypothesis_id,
             "location": location,
             "message": message,
             "data": data,
             "timestamp": int(time.time() * 1000),
         }
-        with open(DEBUG_LOGS_DIR / "debug-14d174.log", "a", encoding="utf-8") as fh:
+        log_name = f"debug-{self.debug_session_id}.log"
+        with open(DEBUG_LOGS_DIR / log_name, "a", encoding="utf-8") as fh:
             fh.write(json.dumps(payload, ensure_ascii=True) + "\n")
         # Keep a compatibility copy in the project root for existing tooling.
-        with open(BASE_DIR / "debug-14d174.log", "a", encoding="utf-8") as fh:
+        with open(BASE_DIR / log_name, "a", encoding="utf-8") as fh:
             fh.write(json.dumps(payload, ensure_ascii=True) + "\n")
 
     # Data wrappers for extracted admin/staff modules
@@ -972,6 +976,76 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
         self.current_product = None
         self.current_quantity = 1
 
+    def _prepare_checkout_items(self, expected_total: float | None = None):
+        """Refresh checkout items from the DB and validate stock and totals."""
+        raw_items = self._get_checkout_items()
+        if not raw_items:
+            return [], 0.0
+
+        prepared_items = []
+        for entry in raw_items:
+            product = entry.get("product") if isinstance(entry, dict) else None
+            product_id = product["id"] if product and "id" in product.keys() else None
+            if product_id is None:
+                raise ValueError("One of the selected products is invalid.")
+
+            fresh_product = get_product_by_id(int(product_id))
+            if fresh_product is None:
+                raise ValueError("One of the selected products is no longer available.")
+
+            quantity = max(1, int(entry.get("quantity", 1) or 1))
+            if int(fresh_product["current_stock"]) < quantity:
+                raise ValueError(f"Insufficient stock for {fresh_product['name']}.")
+
+            prepared_items.append(
+                {
+                    "product": fresh_product,
+                    "quantity": quantity,
+                    "line_total": float(fresh_product["price"]) * quantity,
+                }
+            )
+
+        total = sum(item["line_total"] for item in prepared_items)
+        if expected_total is not None and abs(total - expected_total) > 0.009:
+            raise ValueError("Product prices changed. Please review your order again.")
+
+        self.checkout_items = [
+            {"product": item["product"], "quantity": item["quantity"]}
+            for item in prepared_items
+        ]
+        if len(prepared_items) == 1:
+            self.current_product = prepared_items[0]["product"]
+            self.current_quantity = prepared_items[0]["quantity"]
+
+        return prepared_items, total
+
+    def _run_background_task(self, wait_text: str, worker, on_success, on_error=None):
+        """Run a blocking task off the Tk thread and marshal results back to the UI."""
+        self.show_wait_screen(wait_text)
+        try:
+            self.update_idletasks()
+        except Exception:
+            pass
+
+        def runner():
+            try:
+                result = worker()
+            except Exception as exc:
+                handler = on_error or self._handle_background_error
+                self.after(0, lambda exc=exc: handler(exc))
+            else:
+                self.after(0, lambda result=result: on_success(result))
+
+        threading.Thread(target=runner, daemon=True).start()
+
+    def _handle_background_error(self, exc: Exception):
+        messagebox.showerror(
+            "Operation failed",
+            f"{exc}\n\nPlease check the machine for any partially dispensed items before retrying.",
+        )
+        self._reset_checkout_state()
+        self.build_main_menu()
+
     def show_order_review_screen(self):
         """Step 2 of 3 for multi-item carts: review order & totals."""
         if self.sidebar_holder is not None and self.sidebar_holder.winfo_exists():
@@ -1080,11 +1154,24 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
         continue_btn.bind("<Enter>", lambda e: continue_btn.configure(bg=accent_hover) if continue_btn.winfo_exists() else None)
         continue_btn.bind("<Leave>", lambda e: continue_btn.configure(bg=accent) if continue_btn.winfo_exists() else None)
 
+        tk.Button(
+            card,
+            text="Back to products",
+            font=UI_FONT_BODY,
+            command=lambda: (self._reset_checkout_state(), self.build_main_menu()),
+            bg=self.current_theme["button_bg"],
+            fg=self.current_theme["button_fg"],
+            relief=tk.FLAT,
+            padx=18,
+            pady=8,
+            cursor="hand2",
+        ).pack(fill=tk.X, pady=(0, 4))
+
         back_btn = tk.Button(
             frame,
             text="Back to products",
             font=UI_FONT_BODY,
-            command=lambda: (self.checkout_items.clear(), self.build_main_menu()),
+            command=lambda: (self._reset_checkout_state(), self.build_main_menu()),
             bg=self.current_theme["button_bg"],
             fg=self.current_theme["button_fg"],
             relief=tk.FLAT,
@@ -1092,7 +1179,7 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
             pady=8,
             cursor="hand2",
         )
-        back_btn.pack(pady=10)
+        back_btn.pack_forget()
         _hover_scale_btn(back_btn, normal_padx=18, normal_pady=8, hover_padx=22, hover_pady=12)
         back_btn.bind("<Enter>", lambda e: back_btn.configure(bg=accent, fg="#ffffff") if back_btn.winfo_exists() else None)
         back_btn.bind("<Leave>", lambda e: back_btn.configure(bg=self.current_theme["button_bg"], fg=self.current_theme["button_fg"]) if back_btn.winfo_exists() else None)
@@ -1107,6 +1194,9 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
             self.sidebar_holder = None
         self.clear_screen()
         p = self.current_product
+        if p is None:
+            self.build_main_menu()
+            return
         accent = self.current_theme.get("accent", "#1A948E")
         accent_hover = self.current_theme.get("accent_hover", "#0f766e")
 
@@ -1241,19 +1331,32 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
         continue_btn.bind("<Enter>", lambda e: continue_btn.configure(bg=accent_hover) if continue_btn.winfo_exists() else None)
         continue_btn.bind("<Leave>", lambda e: continue_btn.configure(bg=accent) if continue_btn.winfo_exists() else None)
 
+        tk.Button(
+            card,
+            text="Back to products",
+            font=UI_FONT_BODY,
+            padx=18,
+            pady=8,
+            command=lambda: (self._reset_checkout_state(), self.build_main_menu()),
+            bg=self.current_theme["button_bg"],
+            fg=self.current_theme["button_fg"],
+            relief=tk.FLAT,
+            cursor="hand2",
+        ).pack(fill=tk.X)
+
         back_btn = tk.Button(
             frame,
             text="Back to products",
             font=UI_FONT_BODY,
             padx=18,
             pady=8,
-            command=lambda: (self.checkout_items.clear(), self.build_main_menu()),
+            command=lambda: (self._reset_checkout_state(), self.build_main_menu()),
             bg=self.current_theme["button_bg"],
             fg=self.current_theme["button_fg"],
             relief=tk.FLAT,
             cursor="hand2",
         )
-        back_btn.pack(pady=10)
+        back_btn.pack_forget()
         _hover_scale_btn(back_btn, normal_padx=18, normal_pady=8, hover_padx=22, hover_pady=12)
         back_btn.bind("<Enter>", lambda e: back_btn.configure(bg=self.current_theme.get("accent", "#1A948E"), fg="#ffffff") if back_btn.winfo_exists() else None)
         back_btn.bind("<Leave>", lambda e: back_btn.configure(bg=self.current_theme["button_bg"], fg=self.current_theme["button_fg"]) if back_btn.winfo_exists() else None)
@@ -1473,7 +1576,7 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
             frame,
             text="Cancel and go back",
             font=UI_FONT_BODY,
-            command=self.build_main_menu,
+            command=lambda: (self._reset_checkout_state(), self.build_main_menu()),
             bg="#E53935",
             fg=self.current_theme["button_fg"],
             padx=16,
@@ -1483,33 +1586,45 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
         self.add_theme_toggle_footer()
 
     def complete_purchase_cash(self, total_amount: float, inserted: float):
-        items = self._get_checkout_items()
-        if not items:
-            self.build_main_menu()
-            return
-        change = max(0.0, inserted - total_amount)
-
-        self.show_wait_screen("Processing payment and dispensing...")
-
         try:
-            for it in items:
-                p = it["product"]
-                q = int(it["quantity"])
-                line_total = float(p["price"]) * q
-                decrement_stock(p["id"], q)
-                dispense_from_slot(p["slot_number"], q)
-                record_transaction(p["id"], q, line_total, "cash")
-            if change > 0:
-                dispense_change(change)
-            self.show_success_screen(
-                "Thank you!",
-                f"Please take your products.\n\nChange: ₱{change:.2f}",
-                on_ok=lambda: (self._reset_checkout_state(), self.build_main_menu()),
-            )
-        except Exception as e:
-            messagebox.showerror("Error", str(e))
+            items, refreshed_total = self._prepare_checkout_items(expected_total=total_amount)
+        except Exception as exc:
+            messagebox.showerror("Checkout Error", str(exc))
             self._reset_checkout_state()
             self.build_main_menu()
+            return
+
+        change = max(0.0, inserted - refreshed_total)
+        purchase_rows = [
+            {
+                "product_id": int(item["product"]["id"]),
+                "product_name": str(item["product"]["name"]),
+                "quantity": int(item["quantity"]),
+                "line_total": float(item["line_total"]),
+            }
+            for item in items
+        ]
+
+        def worker():
+            for item in items:
+                dispense_from_slot(int(item["product"]["slot_number"]), int(item["quantity"]))
+            if change > 0:
+                dispense_change(change)
+            finalize_purchase_records(purchase_rows, payment_method="cash")
+            return change
+
+        def on_success(change_due: float):
+            self.show_success_screen(
+                "Thank you!",
+                f"Please take your products.\n\nChange: ₱{change_due:.2f}",
+                on_ok=lambda: (self._reset_checkout_state(), self.build_main_menu()),
+            )
+
+        self._run_background_task(
+            "Processing payment and dispensing...",
+            worker,
+            on_success,
+        )
 
     # ---------- Utility Screens ----------
 
@@ -1700,22 +1815,32 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
                 messagebox.showwarning("Not enough", "Please insert full card price.")
                 return
 
-            uid = uuid.uuid4().hex[:8].upper()
-            user_id = create_user(uid, name=None, is_staff=0, initial_balance=0.0)
+            change = max(0.0, inserted - CARD_PRICE)
 
-            record_transaction(
-                product_id=None,
-                quantity=None,
-                total_amount=CARD_PRICE,
-                payment_method="card_purchase",
-                rfid_user_id=user_id,
-            )
+            def worker():
+                uid = uuid.uuid4().hex[:8].upper()
+                user_id = create_user(uid, name=None, is_staff=0, initial_balance=0.0)
+                record_transaction(
+                    product_id=None,
+                    quantity=None,
+                    total_amount=CARD_PRICE,
+                    payment_method="card_purchase",
+                    rfid_user_id=user_id,
+                )
+                if change > 0:
+                    dispense_change(change)
+                return uid, change
 
-            self.show_success_screen(
-                "Card Issued",
-                f"New RFID card created.\nCard ID (simulate UID): {uid}",
-                on_ok=self.build_main_menu,
-            )
+            def on_success(result):
+                uid, change_due = result
+                change_text = f"\nChange returned: ₱{change_due:.2f}" if change_due > 0 else ""
+                self.show_success_screen(
+                    "Card Issued",
+                    f"New RFID card created.\nCard ID (simulate UID): {uid}{change_text}",
+                    on_ok=lambda: (self._reset_checkout_state(), self.build_main_menu()),
+                )
+
+            self._run_background_task("Issuing RFID card...", worker, on_success)
 
         action_frame = tk.Frame(panel, bg=LOGIN_PANEL_BG)
         action_frame.pack(pady=(8, 0), fill=tk.X)
@@ -1739,7 +1864,7 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
             action_frame,
             text="Cancel and go back",
             font=UI_FONT_BODY,
-            command=self.build_main_menu,
+            command=lambda: (self._reset_checkout_state(), self.build_main_menu()),
             bg=LOGIN_BTN_BG,
             fg="#ffffff",
             relief=tk.FLAT,
@@ -1843,7 +1968,7 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
             btn_row,
             text="Cancel",
             font=(UI_FONT, 11, "bold"),
-            command=self.build_main_menu,
+            command=lambda: (self._reset_checkout_state(), self.build_main_menu()),
             bg=LOGIN_BTN_BG,
             fg="#ffffff",
             relief=tk.FLAT,
@@ -1969,7 +2094,7 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
             frame,
             text="Cancel and go back",
             font=UI_FONT_BODY,
-            command=self.build_main_menu,
+            command=lambda: (self._reset_checkout_state(), self.build_main_menu()),
             bg="#E53935",
             fg=self.current_theme["button_fg"],
             padx=16,
@@ -1984,58 +2109,159 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
 
     def rfid_payment_flow(self, total_amount: float):
         """Purchase products using RFID card balance."""
-        uid = simpledialog.askstring(
-            "RFID Payment",
-            "Enter RFID Card ID (simulate tap):",
-            parent=self,
-        )
-        if not uid:
-            self.build_main_menu()
-            return
-
-        user = get_user_by_uid(uid)
-        if not user:
-            messagebox.showerror("Error", "Card not found.")
-            self.build_main_menu()
-            return
-
-        if user["balance"] < total_amount:
-            messagebox.showerror("Error", "Insufficient card balance.")
-            self.build_main_menu()
-            return
-
-        new_balance = user["balance"] - total_amount
-        update_user_balance(user["id"], new_balance)
-
         items = self._get_checkout_items()
         if not items:
             self.build_main_menu()
             return
+        if self.sidebar_holder is not None and self.sidebar_holder.winfo_exists():
+            self.sidebar_holder.destroy()
+            self.sidebar_holder = None
+        self.clear_screen()
+        self.content_holder.configure(bg=LOGIN_PAGE_BG)
 
-        self.show_wait_screen("Processing RFID payment and dispensing...")
-        try:
-            for it in items:
-                p = it["product"]
-                q = int(it["quantity"])
-                line_total = float(p["price"]) * q
-                decrement_stock(p["id"], q)
-                dispense_from_slot(p["slot_number"], q)
-                record_transaction(
-                    product_id=p["id"],
-                    quantity=q,
-                    total_amount=line_total,
+        frame = tk.Frame(self.content_holder, bg=LOGIN_PAGE_BG)
+        frame.pack(expand=True, fill=tk.BOTH)
+
+        panel = tk.Frame(frame, bg=LOGIN_PANEL_BG, padx=40, pady=28)
+        panel.place(relx=0.5, rely=0.5, anchor="center")
+
+        tk.Label(
+            panel,
+            text="RFID Payment",
+            font=(UI_FONT, 18, "bold"),
+            bg=LOGIN_PANEL_BG,
+            fg="#0f766e",
+        ).pack(pady=(0, 10))
+
+        tk.Label(
+            panel,
+            text=f"Total amount: ₱{total_amount:.2f}",
+            font=UI_FONT_BODY,
+            bg=LOGIN_PANEL_BG,
+            fg="#134e4a",
+        ).pack(pady=(0, 10))
+
+        tk.Label(
+            panel,
+            text="Enter RFID Card ID (simulate tap):",
+            font=UI_FONT_SMALL,
+            bg=LOGIN_PANEL_BG,
+            fg="#134e4a",
+        ).pack(anchor="w", pady=(0, 6))
+
+        uid_var = tk.StringVar()
+        entry = tk.Entry(
+            panel,
+            textvariable=uid_var,
+            font=UI_FONT_BODY,
+            width=28,
+            relief=tk.FLAT,
+            bg="#ffffff",
+            fg="#1e293b",
+        )
+        entry.pack(pady=(0, 8), ipady=8, ipadx=10)
+        entry.focus_set()
+
+        error_var = tk.StringVar(value="")
+        tk.Label(
+            panel,
+            textvariable=error_var,
+            font=UI_FONT_SMALL,
+            bg=LOGIN_PANEL_BG,
+            fg="#b91c1c",
+        ).pack(pady=(0, 4))
+
+        def confirm_payment():
+            uid = uid_var.get().strip()
+            if not uid:
+                error_var.set("Please enter a card ID.")
+                return
+
+            user = get_user_by_uid(uid)
+            if not user:
+                error_var.set("Card not found.")
+                return
+
+            try:
+                prepared_items, refreshed_total = self._prepare_checkout_items(expected_total=total_amount)
+            except Exception as exc:
+                error_var.set(str(exc))
+                return
+
+            if float(user["balance"]) < refreshed_total:
+                error_var.set("Insufficient card balance.")
+                return
+
+            new_balance = float(user["balance"]) - refreshed_total
+            purchase_rows = [
+                {
+                    "product_id": int(item["product"]["id"]),
+                    "product_name": str(item["product"]["name"]),
+                    "quantity": int(item["quantity"]),
+                    "line_total": float(item["line_total"]),
+                }
+                for item in prepared_items
+            ]
+
+            def worker():
+                for item in prepared_items:
+                    dispense_from_slot(int(item["product"]["slot_number"]), int(item["quantity"]))
+                finalize_purchase_records(
+                    purchase_rows,
                     payment_method="rfid_purchase",
-                    rfid_user_id=user["id"],
+                    rfid_user_id=int(user["id"]),
+                    new_balance=new_balance,
                 )
-            self.show_success_screen(
-                "Thank you!",
-                f"Payment successful.\n\nRemaining balance: ₱{new_balance:.2f}\nPlease take your products.",
-                on_ok=lambda: (self._reset_checkout_state(), self.build_main_menu()),
+                return new_balance
+
+            def on_success(balance_after: float):
+                self.show_success_screen(
+                    "Thank you!",
+                    f"Payment successful.\n\nRemaining balance: ₱{balance_after:.2f}\nPlease take your products.",
+                    on_ok=lambda: (self._reset_checkout_state(), self.build_main_menu()),
+                )
+
+            self._run_background_task(
+                "Processing RFID payment and dispensing...",
+                worker,
+                on_success,
             )
-        except Exception as e:
-            messagebox.showerror("Error", str(e))
-            self._reset_checkout_state()
-            self.build_main_menu()
+
+        btn_row = tk.Frame(panel, bg=LOGIN_PANEL_BG)
+        btn_row.pack(fill=tk.X, pady=(8, 0))
+
+        confirm_btn = tk.Button(
+            btn_row,
+            text="Confirm payment",
+            font=(UI_FONT, 11, "bold"),
+            command=confirm_payment,
+            bg=LOGIN_BTN_BG,
+            fg="#ffffff",
+            relief=tk.FLAT,
+            padx=24,
+            pady=8,
+            cursor="hand2",
+        )
+        confirm_btn.pack(side=tk.LEFT, padx=(0, 10))
+        _hover_scale_btn(confirm_btn, normal_padx=24, normal_pady=8, hover_padx=28, hover_pady=12)
+
+        cancel_btn = tk.Button(
+            btn_row,
+            text="Cancel",
+            font=(UI_FONT, 11, "bold"),
+            command=lambda: (self._reset_checkout_state(), self.build_main_menu()),
+            bg=LOGIN_BTN_BG,
+            fg="#ffffff",
+            relief=tk.FLAT,
+            padx=20,
+            pady=8,
+            cursor="hand2",
+        )
+        cancel_btn.pack(side=tk.LEFT)
+        _hover_scale_btn(cancel_btn, normal_padx=20, normal_pady=8, hover_padx=24, hover_pady=12)
+
+        entry.bind("<Return>", lambda _e: confirm_payment())
+        self.add_theme_toggle_footer()
 
     # ---------- Sales Report Export ----------
 
@@ -2043,9 +2269,10 @@ class MainApp(AdminMixin, StaffMixin, tk.Tk):
         """Generate an Excel file with transaction, daily, and monthly sales."""
         try:
             path = export_sales_report()
+            reports_dir = get_reports_dir()
             messagebox.showinfo(
                 "Export Complete",
-                f"Sales report saved as:\n{path}"
+                f"Sales report saved as:\n{path}\n\nReports folder:\n{reports_dir}"
             )
         except Exception as e:
             messagebox.showerror("Export Failed", str(e))

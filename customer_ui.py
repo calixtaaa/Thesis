@@ -10,6 +10,7 @@ UI_FONT_BUTTON = (UI_FONT, 12, "bold")
 
 
 def build_welcome_screen(app):
+    app._reset_checkout_state()
     if hasattr(app, "_apply_lcd_fit"):
         try:
             app._apply_lcd_fit(profile="customer")
@@ -81,6 +82,7 @@ def build_welcome_screen(app):
 
 
 def show_thank_you_screen(app):
+    app._reset_checkout_state()
     if app.sidebar_holder is not None and app.sidebar_holder.winfo_exists():
         app.sidebar_holder.destroy()
         app.sidebar_holder = None
@@ -99,6 +101,13 @@ def show_thank_you_screen(app):
     ).pack(pady=(0, 24))
 
     def go_welcome():
+        after_id = getattr(app, "_thank_you_after_id", None)
+        if after_id:
+            try:
+                app.after_cancel(after_id)
+            except tk.TclError:
+                pass
+            app._thank_you_after_id = None
         app.build_welcome_screen()
 
     ok_btn = tk.Button(
@@ -113,7 +122,7 @@ def show_thank_you_screen(app):
         pady=8,
     )
     ok_btn.pack(pady=0)
-    app.after(3500, go_welcome)
+    app._thank_you_after_id = app.after(3500, go_welcome)
 
 
 def build_main_menu(app):
@@ -123,74 +132,11 @@ def build_main_menu(app):
         except Exception:
             pass
     app.clear_screen()
-    all_products = get_all_products()
+    all_products = app.get_all_products_data() if hasattr(app, "get_all_products_data") else get_all_products()
 
     if app.sidebar_holder is not None and app.sidebar_holder.winfo_exists():
         app.sidebar_holder.destroy()
         app.sidebar_holder = None
-
-    if not app.cart:
-        sidebar_width = 220
-        sidebar_bg = "#1A948E"
-        strip_bg = "#14b8a6"
-        app.sidebar_holder = tk.Frame(app, bg=sidebar_bg, width=sidebar_width)
-        app.sidebar_holder.pack_propagate(False)
-        app.sidebar_holder.pack(side=tk.RIGHT, fill=tk.Y)
-
-        tk.Label(
-            app.sidebar_holder,
-            text="Menu",
-            font=(UI_FONT, 12, "bold"),
-            bg=sidebar_bg,
-            fg="#ffffff",
-        ).pack(anchor="w", padx=14, pady=(14, 10))
-
-        hover_strip = "#2dd4bf"
-
-        def make_nav_btn(text, cmd):
-            b = tk.Button(
-                app.sidebar_holder,
-                text=text,
-                anchor="w",
-                font=(UI_FONT, 11, "bold"),
-                command=cmd,
-                bg=strip_bg,
-                fg="#ffffff",
-                activebackground=hover_strip,
-                activeforeground="#ffffff",
-                relief=tk.FLAT,
-                padx=12,
-                pady=10,
-                cursor="hand2",
-            )
-            b.pack(fill=tk.X, padx=10, pady=4)
-
-            def on_enter(_e):
-                if b.winfo_exists():
-                    b.configure(bg=hover_strip)
-
-            def on_leave(_e):
-                if b.winfo_exists():
-                    b.configure(bg=strip_bg)
-
-            def on_press(_e):
-                if b.winfo_exists():
-                    b.configure(bg=hover_strip)
-
-            def on_release(_e):
-                if b.winfo_exists():
-                    b.configure(bg=strip_bg)
-
-            b.bind("<Enter>", on_enter)
-            b.bind("<Leave>", on_leave)
-            b.bind("<ButtonPress-1>", on_press)
-            b.bind("<ButtonRelease-1>", on_release)
-            return b
-
-        make_nav_btn("Dashboard", lambda: None)
-        make_nav_btn("Staff", lambda: app.enter_restock_mode())
-        make_nav_btn("Admin", lambda: app.enter_admin_dashboard())
-        make_nav_btn("Back to main screen", lambda: app.show_thank_you_screen())
 
     main_row = tk.Frame(app.content_holder, bg=app.current_theme["bg"])
     main_row.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
@@ -314,7 +260,7 @@ def build_main_menu(app):
             card,
             text=name_text,
             font=UI_FONT_BODY,
-            bg=card_bg,
+            bg=selected_bg if in_cart else card_bg,
             fg=app.current_theme["fg"],
             wraplength=placeholder_size + 40,
             justify="center",
@@ -323,7 +269,7 @@ def build_main_menu(app):
             card,
             text=f"₱{p['price']:.2f}",
             font=UI_FONT_SMALL,
-            bg=card_bg,
+            bg=selected_bg if in_cart else card_bg,
             fg=app.current_theme.get("muted", app.current_theme["fg"]),
         ).pack(pady=(0, 6))
 
@@ -411,7 +357,7 @@ def build_main_menu(app):
             relief=tk.FLAT,
             padx=16,
             pady=8,
-            command=lambda: (app.cart.clear(), app.build_main_menu()),
+            command=lambda: (app._reset_checkout_state(), app.build_main_menu()),
         ).pack(side=tk.TOP, fill=tk.X, padx=10, pady=(10, 8))
 
         for entry in app.cart:
@@ -526,6 +472,22 @@ def build_main_menu(app):
         bottom,
         text="How to use?",
         command=app.show_help_dialog,
+        font=UI_FONT_BODY,
+        bg=app.current_theme["bg"],
+        fg=app.current_theme["fg"],
+        activebackground=app.current_theme["button_bg"],
+        activeforeground=app.current_theme["fg"],
+        relief=tk.FLAT,
+        highlightthickness=1,
+        highlightbackground=app.current_theme.get("card_border", "#e2e8f0"),
+        padx=12,
+        pady=6,
+        cursor="hand2",
+    ).pack(side=tk.LEFT, padx=6)
+    tk.Button(
+        bottom,
+        text="Back to Main Screen",
+        command=app.show_thank_you_screen,
         font=UI_FONT_BODY,
         bg=app.current_theme["bg"],
         fg=app.current_theme["fg"],
