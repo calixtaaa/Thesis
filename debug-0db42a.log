@@ -1,0 +1,47 @@
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:clear_screen", "message": "clear_screen destroying", "data": {"child_count": 0}, "timestamp": 1773361191512}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:clear_screen", "message": "clear_screen destroying", "data": {"child_count": 1}, "timestamp": 1773361192507}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:slider_step10", "message": "slider step10 calling rebuild", "data": {"target_dark": true}, "timestamp": 1773361193937}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:slider_step10", "message": "slider step10 calling rebuild", "data": {"target_dark": false}, "timestamp": 1773361194637}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:slider_step10", "message": "slider step10 calling rebuild", "data": {"target_dark": true}, "timestamp": 1773361195164}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:slider_step10", "message": "slider step10 calling rebuild", "data": {"target_dark": false}, "timestamp": 1773361195658}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:slider_step10", "message": "slider step10 calling rebuild", "data": {"target_dark": true}, "timestamp": 1773361196159}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:slider_step10", "message": "slider step10 calling rebuild", "data": {"target_dark": false}, "timestamp": 1773361196607}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:slider_step10", "message": "slider step10 calling rebuild", "data": {"target_dark": true}, "timestamp": 1773361197087}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:slider_step10", "message": "slider step10 calling rebuild", "data": {"target_dark": false}, "timestamp": 1773361197491}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:slider_step10", "message": "slider step10 calling rebuild", "data": {"target_dark": true}, "timestamp": 1773361198298}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:slider_step10", "message": "slider step10 calling rebuild", "data": {"target_dark": false}, "timestamp": 1773361199353}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:slider_step10", "message": "slider step10 calling rebuild", "data": {"target_dark": true}, "timestamp": 1773361200021}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:slider_step10", "message": "slider step10 calling rebuild", "data": {"target_dark": false}, "timestamp": 1773361200627}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:slider_step10", "message": "slider step10 calling rebuild", "data": {"target_dark": true}, "timestamp": 1773361201343}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:slider_step10", "message": "slider step10 calling rebuild", "data": {"target_dark": false}, "timestamp": 1773361202323}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:slider_step10", "message": "slider step10 calling rebuild", "data": {"target_dark": true}, "timestamp": 1773361203137}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:clear_screen", "message": "clear_screen destroying", "data": {"child_count": 0}, "timestamp": 1773361319741}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:clear_screen", "message": "clear_screen destroying", "data": {"child_count": 1}, "timestamp": 1773361320655}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:slider_step10", "message": "slider step10 calling rebuild", "data": {"target_dark": true}, "timestamp": 1773361321982}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:clear_screen", "message": "clear_screen destroying", "data": {"child_count": 2}, "timestamp": 1773361322105}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:slider_step10", "message": "slider step10 calling rebuild", "data": {"target_dark": false}, "timestamp": 1773361323276}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:clear_screen", "message": "clear_screen destroying", "data": {"child_count": 2}, "timestamp": 1773361323401}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:slider_step10", "message": "slider step10 calling rebuild", "data": {"target_dark": true}, "timestamp": 1773361324420}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:clear_screen", "message": "clear_screen destroying", "data": {"child_count": 2}, "timestamp": 1773361324543}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:slider_step10", "message": "slider step10 calling rebuild", "data": {"target_dark": false}, "timestamp": 1773361325632}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:clear_screen", "message": "clear_screen destroying", "data": {"child_count": 2}, "timestamp": 1773361325753}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:slider_step10", "message": "slider step10 calling rebuild", "data": {"target_dark": true}, "timestamp": 1773361326689}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:clear_screen", "message": "clear_screen destroying", "data": {"child_count": 2}, "timestamp": 1773361326839}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:slider_step10", "message": "slider step10 calling rebuild", "data": {"target_dark": false}, "timestamp": 1773361327897}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:clear_screen", "message": "clear_screen destroying", "data": {"child_count": 2}, "timestamp": 1773361328060}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:slider_step10", "message": "slider step10 calling rebuild", "data": {"target_dark": true}, "timestamp": 1773361328737}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:clear_screen", "message": "clear_screen destroying", "data": {"child_count": 2}, "timestamp": 1773361328859}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:slider_step10", "message": "slider step10 calling rebuild", "data": {"target_dark": false}, "timestamp": 1773361329497}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:clear_screen", "message": "clear_screen destroying", "data": {"child_count": 2}, "timestamp": 1773361329618}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:slider_step10", "message": "slider step10 calling rebuild", "data": {"target_dark": true}, "timestamp": 1773361330290}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:clear_screen", "message": "clear_screen destroying", "data": {"child_count": 2}, "timestamp": 1773361330411}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:slider_step10", "message": "slider step10 calling rebuild", "data": {"target_dark": false}, "timestamp": 1773361331049}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:clear_screen", "message": "clear_screen destroying", "data": {"child_count": 2}, "timestamp": 1773361331170}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:slider_step10", "message": "slider step10 calling rebuild", "data": {"target_dark": true}, "timestamp": 1773361331904}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:clear_screen", "message": "clear_screen destroying", "data": {"child_count": 2}, "timestamp": 1773361332025}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:slider_step10", "message": "slider step10 calling rebuild", "data": {"target_dark": false}, "timestamp": 1773361332990}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:clear_screen", "message": "clear_screen destroying", "data": {"child_count": 2}, "timestamp": 1773361333113}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:slider_step10", "message": "slider step10 calling rebuild", "data": {"target_dark": true}, "timestamp": 1773361333983}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:clear_screen", "message": "clear_screen destroying", "data": {"child_count": 2}, "timestamp": 1773361334106}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:slider_step10", "message": "slider step10 calling rebuild", "data": {"target_dark": false}, "timestamp": 1773361334837}
+{"sessionId": "0db42a", "hypothesisId": "A", "location": "main.py:clear_screen", "message": "clear_screen destroying", "data": {"child_count": 2}, "timestamp": 1773361334959}

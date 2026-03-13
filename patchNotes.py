@@ -92,6 +92,8 @@ PATCH_v0_03 = {
         "Hamburger sidebar no longer persists across screens; sidebars now close on clear_screen().",
         "Main menu auto 'Menu' sidebar removed; sidebar only appears when hamburger is used.",
         "Prediction analysis ignores transactions without product_id (e.g., reload/buy flows) to prevent crashes.",
+        "Theme toggle flicker: full-window overlay during clear+rebuild so theme switch is smooth (no visible destruction/redraw).",
+        "'Back to products' on Order review and Choose quantity screens moved to a fixed bottom bar so it is always visible above the theme footer.",
     ],
     "future": [
         "Optional: upgrade prediction analysis to full ML models (Random Forest / Time Series) when Python 3.12 environment is available.",

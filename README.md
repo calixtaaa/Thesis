@@ -143,3 +143,5 @@ On Raspberry Pi with a 7" touchscreen, the app can run fullscreen; on Windows it
 - **Prediction Analysis:** Added lightweight runtime demand/restock predictor shown on Admin Dashboard (runs once per session).
 - **UI fixes:** Main footer split into two rows; PH time is a readable badge; hamburger sidebar no longer appears unless opened.
 - **PredictionAnalysis folder:** Added `predictionAnalysis/` scripts for offline ML (Random Forest + time-series features) when using Python 3.12.
+- **Theme toggle:** Flicker when switching light/dark is fixed; full-window overlay during clear+rebuild makes the theme switch smooth.
+- **Checkout:** "Back to products" on Order review (Step 2) and Choose quantity screens is now in a fixed bottom bar so it is always visible above the theme footer.

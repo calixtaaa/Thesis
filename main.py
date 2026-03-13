@@ -594,11 +594,20 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         self.current_theme = THEMES[self.current_theme_name]
         ctk.set_appearance_mode(self.current_theme_name)
         self.configure(fg_color=self.current_theme["bg"])
-        # Rebuild the active screen so all widgets pick up the new theme colors
-        if callable(self._current_screen_builder):
-            self._current_screen_builder()
-        else:
-            self.build_main_menu()
+        # Overlay in new theme color so clear+rebuild is not visible (reduces flicker)
+        overlay = ctk.CTkFrame(self, fg_color=self.current_theme["bg"], corner_radius=0)
+        overlay.place(x=0, y=0, relwidth=1, relheight=1)
+        try:
+            if callable(self._current_screen_builder):
+                self._current_screen_builder()
+            else:
+                self.build_main_menu()
+        finally:
+            try:
+                if overlay.winfo_exists():
+                    overlay.destroy()
+            except Exception:
+                pass
 
     def animate_button_press(self, button, callback):
         """Play a quick press animation before running a button action."""
@@ -687,11 +696,20 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                     ctk.set_appearance_mode(self.current_theme_name)
                     self.configure(fg_color=self.current_theme["bg"])
                     self.theme_animating = False
-                    # Rebuild the active screen so all widgets use the new theme
-                    if callable(self._current_screen_builder):
-                        self._current_screen_builder()
-                    else:
-                        self.build_main_menu()
+                    # Overlay in new theme color so clear+rebuild is not visible (reduces flicker)
+                    overlay = ctk.CTkFrame(self, fg_color=self.current_theme["bg"], corner_radius=0)
+                    overlay.place(x=0, y=0, relwidth=1, relheight=1)
+                    try:
+                        if callable(self._current_screen_builder):
+                            self._current_screen_builder()
+                        else:
+                            self.build_main_menu()
+                    finally:
+                        try:
+                            if overlay.winfo_exists():
+                                overlay.destroy()
+                        except Exception:
+                            pass
                     return
 
                 canvas.move(knob, delta, 0)
@@ -1492,6 +1510,21 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         frame = ctk.CTkFrame(self.content_holder, fg_color=self.current_theme["bg"], corner_radius=0)
         frame.pack(expand=True, fill=tk.BOTH)
 
+        # Bottom bar first so "Back to products" is always visible above the theme footer
+        back_bar = ctk.CTkFrame(frame, fg_color=self.current_theme["bg"], corner_radius=0)
+        back_bar.pack(side=tk.BOTTOM, fill=tk.X, pady=(8, 0))
+        ctk.CTkButton(
+            back_bar,
+            text="Back to products",
+            font=UI_FONT_BODY,
+            command=lambda: (self.checkout_items.clear(), self.build_main_menu()),
+            fg_color=self.current_theme["button_bg"],
+            hover_color=accent,
+            text_color=self.current_theme["button_fg"],
+            corner_radius=8,
+            height=38,
+        ).pack(pady=10)
+
         ctk.CTkLabel(
             frame,
             text="Step 2 of 3 – Review order",
@@ -1567,18 +1600,6 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             height=44,
         ).pack(fill=tk.X, padx=30, pady=(6, 22))
 
-        ctk.CTkButton(
-            frame,
-            text="Back to products",
-            font=UI_FONT_BODY,
-            command=lambda: (self.checkout_items.clear(), self.build_main_menu()),
-            fg_color=self.current_theme["button_bg"],
-            hover_color=accent,
-            text_color=self.current_theme["button_fg"],
-            corner_radius=8,
-            height=38,
-        ).pack(pady=10)
-
         self.add_theme_toggle_footer()
 
     # ---------- Quantity Screen ----------
@@ -1595,6 +1616,21 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
 
         frame = ctk.CTkFrame(self.content_holder, fg_color=self.current_theme["bg"], corner_radius=0)
         frame.pack(expand=True, fill=tk.BOTH)
+
+        # Bottom bar first so "Back to products" is always visible above the theme footer
+        back_bar = ctk.CTkFrame(frame, fg_color=self.current_theme["bg"], corner_radius=0)
+        back_bar.pack(side=tk.BOTTOM, fill=tk.X, pady=(8, 0))
+        ctk.CTkButton(
+            back_bar,
+            text="Back to products",
+            font=UI_FONT_BODY,
+            command=lambda: (self.checkout_items.clear(), self.build_main_menu()),
+            fg_color=self.current_theme["button_bg"],
+            hover_color=accent,
+            text_color=self.current_theme["button_fg"],
+            corner_radius=8,
+            height=38,
+        ).pack(pady=10)
 
         ctk.CTkLabel(
             frame,
@@ -1702,18 +1738,6 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             corner_radius=10,
             height=44,
         ).pack(pady=(18, 28), padx=36, fill=tk.X)
-
-        ctk.CTkButton(
-            frame,
-            text="Back to products",
-            font=UI_FONT_BODY,
-            command=lambda: (self.checkout_items.clear(), self.build_main_menu()),
-            fg_color=self.current_theme["button_bg"],
-            hover_color=accent,
-            text_color=self.current_theme["button_fg"],
-            corner_radius=8,
-            height=38,
-        ).pack(pady=10)
 
         self.add_theme_toggle_footer()
 
