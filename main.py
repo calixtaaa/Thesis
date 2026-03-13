@@ -588,6 +588,14 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         except Exception:
             pass
 
+    def _safe_focus(self, widget):
+        """Focus widget only if it still exists (prevents async focus TclError)."""
+        try:
+            if widget is not None and widget.winfo_exists():
+                widget.focus_set()
+        except Exception:
+            pass
+
     def toggle_theme(self):
         """Switch between light and dark modes and rebuild the current screen."""
         self.current_theme_name = "dark" if self.current_theme_name == "light" else "light"
@@ -1124,6 +1132,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         # Left + order panel area (inside content_holder)
         main_row = ctk.CTkFrame(self.content_holder, fg_color=self.current_theme["bg"], corner_radius=0)
         main_row.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+        self._main_row = main_row
 
         left_part = ctk.CTkFrame(main_row, fg_color=self.current_theme["bg"], corner_radius=0)
         left_part.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
@@ -1198,6 +1207,13 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         # Larger placeholder so products are easier to tap on touch screen
         placeholder_size = 160
 
+        # Helpers used by _cancel_cart / partial panel refresh
+        self._cart_card_bg = card_bg
+        self._cart_card_border = card_border
+        self._cart_selected_bg = selected_bg
+        self._cart_selected_border = selected_border
+        self._product_card_refs = {}
+
         def cart_has(p):
             return any(e["product"]["id"] == p["id"] for e in self.cart)
 
@@ -1223,7 +1239,6 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                 corner_radius=12,
             )
             card.grid(row=r, column=c, padx=10, pady=8, sticky="nsew")
-            grid.grid_rowconfigure(r, weight=1)
 
             # Placeholder (gray square for product image)
             placeholder = ctk.CTkFrame(
@@ -1285,81 +1300,15 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                 )
                 action_btn._product_add_btn = True
             action_btn.pack(pady=(2, 12))
+            self._product_card_refs[p["id"]] = {
+                "card": card,
+                "btn": action_btn,
+                "product": p,
+                "add_cmd": lambda prod=p: add_to_cart(prod),
+            }
 
         # Order panel (dark green) – right of left_part, only when cart has items
-        order_panel_width = 260
-        panel_bg = "#0f766e" if self.current_theme_name == "light" else "#134e4a"
-        if self.cart:
-            order_panel = ctk.CTkFrame(main_row, fg_color=panel_bg, width=order_panel_width, corner_radius=0)
-            order_panel.pack(side=tk.RIGHT, fill=tk.Y, padx=0, pady=0)
-            order_panel.pack_propagate(False)
-
-            ctk.CTkButton(
-                order_panel,
-                text="Cancel",
-                font=(UI_FONT, 11, "bold"),
-                text_color="#ffffff",
-                fg_color=panel_bg,
-                hover_color=self.current_theme.get("accent_hover", "#0f766e"),
-                corner_radius=8,
-                height=36,
-                command=lambda: (self.cart.clear(), self.build_main_menu()),
-            ).pack(side=tk.TOP, fill=tk.X, padx=10, pady=(10, 8))
-
-            for entry in self.cart:
-                prod = entry["product"]
-                qty_var = tk.IntVar(value=entry["quantity"])
-
-                row = ctk.CTkFrame(order_panel, fg_color=panel_bg, corner_radius=0)
-                row.pack(side=tk.TOP, fill=tk.X, padx=10, pady=4)
-
-                ctk.CTkLabel(
-                    row,
-                    text=prod["name"][:18] + ("…" if len(prod["name"]) > 18 else ""),
-                    font=UI_FONT_SMALL,
-                    text_color="#ffffff",
-                ).pack(anchor="center")
-
-                ctrl = ctk.CTkFrame(row, fg_color=panel_bg, corner_radius=0)
-                ctrl.pack(anchor="center", pady=2)
-
-                ctk.CTkButton(
-                    ctrl,
-                    text="-",
-                    font=(UI_FONT, 12, "bold"),
-                    text_color="#ffffff",
-                    fg_color=panel_bg,
-                    hover_color="#134e4a",
-                    width=32,
-                    height=28,
-                    corner_radius=6,
-                    command=lambda e=entry: (e.update({"quantity": max(1, e["quantity"] - 1)}), self.build_main_menu()),
-                ).pack(side=tk.LEFT, padx=(0, 6))
-                tk.Label(ctrl, textvariable=qty_var, font=(UI_FONT, 12, "bold"), bg=panel_bg, fg="#ffffff", width=3).pack(side=tk.LEFT, padx=(0, 6))
-                ctk.CTkButton(
-                    ctrl,
-                    text="+",
-                    font=(UI_FONT, 12, "bold"),
-                    text_color="#ffffff",
-                    fg_color=panel_bg,
-                    hover_color="#134e4a",
-                    width=32,
-                    height=28,
-                    corner_radius=6,
-                    command=lambda e=entry: (e.update({"quantity": min(e["product"]["current_stock"], e["quantity"] + 1)}), self.build_main_menu()),
-                ).pack(side=tk.LEFT)
-
-            ctk.CTkButton(
-                order_panel,
-                text="Confirm Order",
-                font=(UI_FONT, 12, "bold"),
-                text_color="#ffffff",
-                fg_color=self.current_theme.get("accent", "#1A948E"),
-                hover_color=self.current_theme.get("accent_hover", "#0f766e"),
-                corner_radius=10,
-                height=44,
-                command=lambda: self._confirm_cart_order(),
-            ).pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=(8, 12))
+        self._build_order_panel(main_row)
 
         # Footer: two rows so the datetime is always visible
         bottom = ctk.CTkFrame(self.content_holder, fg_color=self.current_theme["bg"], corner_radius=0)
@@ -1445,6 +1394,114 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             font=UI_FONT_SMALL,
             text_color=self.current_theme.get("muted", self.current_theme["fg"]),
         ).pack(side=tk.LEFT, padx=(12, 8))
+
+    def _cancel_cart(self):
+        """Clear the cart and reset every product card button in-place — no full screen rebuild."""
+        self.cart.clear()
+        card_bg = getattr(self, "_cart_card_bg", None)
+        card_border = getattr(self, "_cart_card_border", None)
+        for ref in getattr(self, "_product_card_refs", {}).values():
+            p = ref["product"]
+            try:
+                if ref["card"].winfo_exists() and card_bg:
+                    ref["card"].configure(fg_color=card_bg, border_color=card_border)
+                if ref["btn"].winfo_exists():
+                    ref["btn"].configure(
+                        text="+",
+                        hover_color=self.current_theme.get("accent_hover", "#15857B"),
+                        state=tk.NORMAL if p["current_stock"] > 0 else tk.DISABLED,
+                        command=ref["add_cmd"],
+                    )
+            except Exception:
+                pass
+        self._refresh_order_panel()
+
+    def _build_order_panel(self, main_row):
+        """Build (or rebuild) only the order panel inside main_row."""
+        order_panel_width = 260
+        panel_bg = "#0f766e" if self.current_theme_name == "light" else "#134e4a"
+        if not self.cart:
+            self._order_panel = None
+            return
+        self._order_panel = ctk.CTkFrame(main_row, fg_color=panel_bg, width=order_panel_width, corner_radius=0)
+        self._order_panel.pack(side=tk.RIGHT, fill=tk.Y, padx=0, pady=0)
+        self._order_panel.pack_propagate(False)
+        order_panel = self._order_panel
+
+        ctk.CTkButton(
+            order_panel,
+            text="Cancel",
+            font=(UI_FONT, 11, "bold"),
+            text_color="#ffffff",
+            fg_color=panel_bg,
+            hover_color=self.current_theme.get("accent_hover", "#0f766e"),
+            corner_radius=8,
+            height=36,
+            command=self._cancel_cart,
+        ).pack(side=tk.TOP, fill=tk.X, padx=10, pady=(10, 8))
+
+        for entry in self.cart:
+            prod = entry["product"]
+            qty_var = tk.IntVar(value=entry["quantity"])
+
+            row = ctk.CTkFrame(order_panel, fg_color=panel_bg, corner_radius=0)
+            row.pack(side=tk.TOP, fill=tk.X, padx=10, pady=4)
+
+            ctk.CTkLabel(
+                row,
+                text=prod["name"][:18] + ("…" if len(prod["name"]) > 18 else ""),
+                font=UI_FONT_SMALL,
+                text_color="#ffffff",
+            ).pack(anchor="center")
+
+            ctrl = ctk.CTkFrame(row, fg_color=panel_bg, corner_radius=0)
+            ctrl.pack(anchor="center", pady=2)
+
+            ctk.CTkButton(
+                ctrl,
+                text="-",
+                font=(UI_FONT, 12, "bold"),
+                text_color="#ffffff",
+                fg_color=panel_bg,
+                hover_color="#134e4a",
+                width=32,
+                height=28,
+                corner_radius=6,
+                command=lambda e=entry: (e.update({"quantity": max(1, e["quantity"] - 1)}), self._refresh_order_panel()),
+            ).pack(side=tk.LEFT, padx=(0, 6))
+            tk.Label(ctrl, textvariable=qty_var, font=(UI_FONT, 12, "bold"), bg=panel_bg, fg="#ffffff", width=3).pack(side=tk.LEFT, padx=(0, 6))
+            ctk.CTkButton(
+                ctrl,
+                text="+",
+                font=(UI_FONT, 12, "bold"),
+                text_color="#ffffff",
+                fg_color=panel_bg,
+                hover_color="#134e4a",
+                width=32,
+                height=28,
+                corner_radius=6,
+                command=lambda e=entry: (e.update({"quantity": min(e["product"]["current_stock"], e["quantity"] + 1)}), self._refresh_order_panel()),
+            ).pack(side=tk.LEFT)
+
+        ctk.CTkButton(
+            order_panel,
+            text="Confirm Order",
+            font=(UI_FONT, 12, "bold"),
+            text_color="#ffffff",
+            fg_color=self.current_theme.get("accent", "#1A948E"),
+            hover_color=self.current_theme.get("accent_hover", "#0f766e"),
+            corner_radius=10,
+            height=44,
+            command=lambda: self._confirm_cart_order(),
+        ).pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=(8, 12))
+
+    def _refresh_order_panel(self):
+        """Destroy and rebuild only the order panel, leaving the product grid untouched."""
+        if hasattr(self, "_order_panel") and self._order_panel is not None and self._order_panel.winfo_exists():
+            self._order_panel.destroy()
+            self._order_panel = None
+        if hasattr(self, "_main_row") and self._main_row is not None and self._main_row.winfo_exists():
+            self._build_order_panel(self._main_row)
 
     def _confirm_cart_order(self):
         """Proceed to review/quantity/payment based on current cart."""
@@ -1976,9 +2033,10 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             self.build_main_menu()
             return
         change = max(0.0, inserted - total_amount)
+        self._show_dispensing_screen()
+        self.after(50, lambda: self._do_dispense_cash(items, change))
 
-        self.show_wait_screen("Processing payment and dispensing...")
-
+    def _do_dispense_cash(self, items, change):
         try:
             for it in items:
                 p = it["product"]
@@ -2026,6 +2084,63 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         ).pack(padx=40, pady=24)
 
         self.add_theme_toggle_footer()
+
+
+    def _show_dispensing_screen(self):
+        """Full-screen dispensing overlay - shown before the blocking hardware call."""
+        if self.sidebar_holder is not None and self.sidebar_holder.winfo_exists():
+            self.sidebar_holder.destroy()
+            self.sidebar_holder = None
+        self.clear_screen()
+        frame = ctk.CTkFrame(self.content_holder, fg_color=self.current_theme["bg"], corner_radius=0)
+        frame.pack(expand=True, fill=tk.BOTH)
+        card = ctk.CTkFrame(
+            frame,
+            fg_color=self.current_theme.get("card_bg", "#ffffff"),
+            border_width=2,
+            border_color=self.current_theme.get("accent", "#1A948E"),
+            corner_radius=16,
+        )
+        card.place(relx=0.5, rely=0.5, anchor="center")
+        ctk.CTkLabel(
+            card,
+            text="⏳  Dispensing product...",
+            font=(UI_FONT, 18, "bold"),
+            text_color=self.current_theme.get("accent", "#1A948E"),
+        ).pack(pady=(32, 8), padx=52)
+        ctk.CTkLabel(
+            card,
+            text="Please wait - do not remove items\nuntil the machine finishes.",
+            font=UI_FONT_BODY,
+            text_color=self.current_theme["fg"],
+            justify="center",
+        ).pack(pady=(0, 32), padx=52)
+        self.update_idletasks()
+
+    def _do_dispense_rfid(self, items, rfid_user_id, new_balance):
+        try:
+            for it in items:
+                p = it["product"]
+                q = int(it["quantity"])
+                line_total = float(p["price"]) * q
+                decrement_stock(p["id"], q)
+                dispense_from_slot(p["slot_number"], q)
+                record_transaction(
+                    product_id=p["id"],
+                    quantity=q,
+                    total_amount=line_total,
+                    payment_method="rfid_purchase",
+                    rfid_user_id=rfid_user_id,
+                )
+            self.show_success_screen(
+                "Thank you!",
+                f"Payment successful.\n\nRemaining balance: ₱{new_balance:.2f}\nPlease take your products.",
+                on_ok=lambda: (self._reset_checkout_state(), self.build_main_menu()),
+            )
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+            self._reset_checkout_state()
+            self.build_main_menu()
 
     def show_success_screen(self, title: str, message: str, on_ok=None):
         """In-app success screen (no messagebox pop-up)."""
@@ -2254,7 +2369,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             height=40,
         )
         uid_entry.pack(pady=(0, 8))
-        uid_entry.focus_set()
+        self.after_idle(lambda w=uid_entry: self._safe_focus(w))
 
         error_lbl = ctk.CTkLabel(
             inner,
@@ -2486,7 +2601,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             height=40,
         )
         uid_entry.pack(pady=(0, 8))
-        uid_entry.focus_set()
+        self.after_idle(lambda w=uid_entry: self._safe_focus(w))
 
         error_lbl = ctk.CTkLabel(
             inner,
@@ -2519,30 +2634,8 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                 self.build_main_menu()
                 return
 
-            self.show_wait_screen("Processing RFID payment and dispensing...")
-            try:
-                for it in items:
-                    p = it["product"]
-                    q = int(it["quantity"])
-                    line_total = float(p["price"]) * q
-                    decrement_stock(p["id"], q)
-                    dispense_from_slot(p["slot_number"], q)
-                    record_transaction(
-                        product_id=p["id"],
-                        quantity=q,
-                        total_amount=line_total,
-                        payment_method="rfid_purchase",
-                        rfid_user_id=user["id"],
-                    )
-                self.show_success_screen(
-                    "Thank you!",
-                    f"Payment successful.\n\nRemaining balance: ₱{new_balance:.2f}\nPlease take your products.",
-                    on_ok=lambda: (self._reset_checkout_state(), self.build_main_menu()),
-                )
-            except Exception as e:
-                messagebox.showerror("Error", str(e))
-                self._reset_checkout_state()
-                self.build_main_menu()
+            self._show_dispensing_screen()
+            self.after(50, lambda i=items, uid=user["id"], nb=new_balance: self._do_dispense_rfid(i, uid, nb))
 
         btn_row = ctk.CTkFrame(inner, fg_color=LOGIN_PANEL_BG)
         btn_row.pack(fill=tk.X, pady=(8, 0))
