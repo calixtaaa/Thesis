@@ -9,8 +9,8 @@ import tkinter as tk
 from tkinter import messagebox, simpledialog
 import customtkinter as ctk
 
-import bugreport
 import prediction_runtime
+from customer import checkout_ui, main_menu_ui, status_ui
 
 from admin.admin import AdminMixin
 from admin.reports import get_reports_dir
@@ -251,6 +251,13 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         self.current_theme_name = "light"
         self.current_theme = THEMES[self.current_theme_name]
         self.configure(bg=self.current_theme["bg"])
+        self._ui_font_name = UI_FONT
+        self._ui_font_bold = UI_FONT_BOLD
+        self._ui_font_title = UI_FONT_TITLE
+        self._ui_font_body = UI_FONT_BODY
+        self._ui_font_small = UI_FONT_SMALL
+        self._ui_font_button = UI_FONT_BUTTON
+        self.cash_session = cash_session
 
         # Icon images (loaded lazily if files exist)
         self.staff_icon = None
@@ -1137,263 +1144,75 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         left_part = ctk.CTkFrame(main_row, fg_color=self.current_theme["bg"], corner_radius=0)
         left_part.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        top = ctk.CTkFrame(left_part, fg_color=self.current_theme["bg"], corner_radius=0)
-        top.pack(side=tk.TOP, fill=tk.X)
-
-        header = ctk.CTkFrame(top, fg_color=self.current_theme["bg"], corner_radius=0)
-        header.pack(side=tk.TOP, fill=tk.X, pady=(2, 4), padx=10)
-
-        title_block = ctk.CTkFrame(header, fg_color=self.current_theme["bg"], corner_radius=0)
-        title_block.pack(side=tk.LEFT)
-        ctk.CTkLabel(
-            title_block,
-            text="Syntax Error",
-            font=UI_FONT_TITLE,
-            text_color=self.current_theme["fg"],
-        ).pack(anchor="w")
-        ctk.CTkLabel(
-            title_block,
-            text="Main menu",
-            font=UI_FONT_SMALL,
-            text_color=self.current_theme.get("muted", self.current_theme["fg"]),
-        ).pack(anchor="w")
-
-        # Menu + theme toggle (right side)
-        icons_frame = ctk.CTkFrame(header, fg_color=self.current_theme["bg"], corner_radius=0)
-        icons_frame.pack(side=tk.RIGHT)
-
-        # Hamburger / role menu button
-        menu_btn = ctk.CTkButton(
-            icons_frame,
-            text="☰",
-            command=self.show_role_menu,
-            font=(UI_FONT, 16, "bold"),
-            fg_color="transparent",
-            hover_color=self.current_theme["button_bg"],
-            text_color=self.current_theme["fg"],
-            width=40,
-            height=36,
-            corner_radius=8,
-        )
-        menu_btn._hamburger_btn = True
-        menu_btn.pack(side=tk.RIGHT, padx=(0, 6), pady=0)
-
-        self.create_theme_slider(icons_frame).pack(side=tk.RIGHT, padx=6, pady=0)
-
-        products = all_products
-
-        # Scrollable product area (using CTkScrollableFrame)
-        content_frame = ctk.CTkFrame(left_part, fg_color=self.current_theme["bg"], corner_radius=0)
-        content_frame.pack(expand=True, fill=tk.BOTH)
-
-        scroll_frame = ctk.CTkScrollableFrame(
-            content_frame,
-            fg_color=self.current_theme["bg"],
-            corner_radius=0,
-        )
-        scroll_frame.pack(fill=tk.BOTH, expand=True)
-
-        grid = scroll_frame
-
-        # 2 products per row (2 columns, scroll for more rows)
-        for col in range(2):
-            grid.grid_columnconfigure(col, weight=1)
-
-        card_bg = self.current_theme.get("card_bg", self.current_theme["button_bg"])
-        card_border = self.current_theme.get("card_border", "#e2e8f0")
-        selected_bg = "#bbf7d0" if self.current_theme_name == "light" else "#14532d"
-        selected_border = self.current_theme.get("accent", "#1A948E")
-        placeholder_bg = "#cbd5e1" if self.current_theme_name == "light" else "#475569"
-        # Larger placeholder so products are easier to tap on touch screen
-        placeholder_size = 160
-
-        # Helpers used by _cancel_cart / partial panel refresh
-        self._cart_card_bg = card_bg
-        self._cart_card_border = card_border
-        self._cart_selected_bg = selected_bg
-        self._cart_selected_border = selected_border
-        self._product_card_refs = {}
-
-        def cart_has(p):
-            return any(e["product"]["id"] == p["id"] for e in self.cart)
-
-        def add_to_cart(p):
-            if p["current_stock"] <= 0:
-                return
-            self.cart.append({"product": p, "quantity": 1})
-            self.build_main_menu()
-
-        def remove_from_cart(p):
-            self.cart = [e for e in self.cart if e["product"]["id"] != p["id"]]
-            self.build_main_menu()
-
-        for idx, p in enumerate(products):
-            in_cart = cart_has(p)
-            r, c = idx // 2, idx % 2  # 2 by N: 2 products per line
-
-            card = ctk.CTkFrame(
-                grid,
-                fg_color=selected_bg if in_cart else card_bg,
-                border_width=2,
-                border_color=selected_border if in_cart else card_border,
-                corner_radius=12,
-            )
-            card.grid(row=r, column=c, padx=10, pady=8, sticky="nsew")
-
-            # Placeholder (gray square for product image)
-            placeholder = ctk.CTkFrame(
-                card,
-                fg_color=placeholder_bg,
-                width=placeholder_size,
-                height=placeholder_size,
-                corner_radius=8,
-            )
-            placeholder.pack(pady=(10, 8), padx=10, fill=tk.NONE)
-            placeholder.pack_propagate(False)
-
-            # Product name and price inside the card
-            name_text = p["name"]
-            if len(name_text) > 18:
-                name_text = name_text[:18] + "…"
-            ctk.CTkLabel(
-                card,
-                text=name_text,
-                font=UI_FONT_BODY,
-                text_color=self.current_theme["fg"],
-                wraplength=placeholder_size + 40,
-                justify="center",
-            ).pack(padx=8, pady=(0, 2))
-            ctk.CTkLabel(
-                card,
-                text=f"₱{p['price']:.2f}",
-                font=UI_FONT_SMALL,
-                text_color=self.current_theme.get("muted", self.current_theme["fg"]),
-            ).pack(pady=(0, 6))
-
-            # Add (+) or Remove (X) button
-            if in_cart:
-                action_btn = ctk.CTkButton(
-                    card,
-                    text="✕",
-                    font=(UI_FONT, 18, "bold"),
-                    text_color="#ffffff",
-                    fg_color=self.current_theme.get("accent", "#1A948E"),
-                    hover_color=self.current_theme.get("accent_hover", "#0f766e"),
-                    width=60,
-                    height=36,
-                    corner_radius=8,
-                    command=lambda prod=p: remove_from_cart(prod),
-                )
-            else:
-                action_btn = ctk.CTkButton(
-                    card,
-                    text="+",
-                    font=(UI_FONT, 20, "bold"),
-                    text_color="#ffffff",
-                    fg_color=self.current_theme.get("accent", "#1A948E"),
-                    hover_color=self.current_theme.get("accent_hover", "#15857B"),
-                    width=60,
-                    height=36,
-                    corner_radius=8,
-                    state=tk.NORMAL if p["current_stock"] > 0 else tk.DISABLED,
-                    command=lambda prod=p: add_to_cart(prod),
-                )
-                action_btn._product_add_btn = True
-            action_btn.pack(pady=(2, 12))
-            self._product_card_refs[p["id"]] = {
-                "card": card,
-                "btn": action_btn,
-                "product": p,
-                "add_cmd": lambda prod=p: add_to_cart(prod),
-            }
+        self._build_main_menu_header(left_part)
+        self._build_main_menu_products(left_part, all_products)
 
         # Order panel (dark green) – right of left_part, only when cart has items
         self._build_order_panel(main_row)
 
-        # Footer: two rows so the datetime is always visible
-        bottom = ctk.CTkFrame(self.content_holder, fg_color=self.current_theme["bg"], corner_radius=0)
-        bottom.pack(side=tk.BOTTOM, fill=tk.X, pady=(6, 8))
-        actions_row = ctk.CTkFrame(bottom, fg_color=self.current_theme["bg"], corner_radius=0)
-        actions_row.pack(side=tk.TOP, fill=tk.X)
-        info_row = ctk.CTkFrame(bottom, fg_color=self.current_theme["bg"], corner_radius=0)
-        info_row.pack(side=tk.TOP, fill=tk.X, pady=(6, 0))
+        self._build_main_menu_footer()
 
-        accent = self.current_theme.get("accent", "#1A948E")
-        accent_hover = self.current_theme.get("accent_hover", "#0f766e")
-        reload_btn = ctk.CTkButton(
-            actions_row,
-            text="Reload (RFID)",
-            command=self.reload_card_flow,
-            font=UI_FONT_BUTTON,
-            fg_color=accent,
-            hover_color=accent_hover,
-            text_color="#ffffff",
-            corner_radius=10,
-            height=36,
+    def _build_main_menu_header(self, parent):
+        """Main menu top bar: title, menu button, and theme slider."""
+        main_menu_ui.build_main_menu_header(
+            self,
+            parent,
+            ui_font=UI_FONT,
+            ui_font_title=UI_FONT_TITLE,
+            ui_font_small=UI_FONT_SMALL,
         )
-        reload_btn.pack(side=tk.LEFT, padx=(12, 6))
-        buy_btn = ctk.CTkButton(
-            actions_row,
-            text="Buy RFID Card",
-            command=self.buy_card_flow,
-            font=UI_FONT_BUTTON,
-            fg_color=accent,
-            hover_color=accent_hover,
-            text_color="#ffffff",
-            corner_radius=10,
-            height=36,
-        )
-        buy_btn.pack(side=tk.LEFT, padx=6)
 
-        ctk.CTkButton(
-            actions_row,
-            text="Report",
-            command=lambda: bugreport.show_bug_report_screen(self, version=VERSION, hover_scale_btn=_hover_scale_btn),
-            font=UI_FONT_BODY,
-            fg_color="transparent",
-            hover_color=self.current_theme["button_bg"],
-            text_color=self.current_theme["fg"],
-            border_width=1,
-            border_color=self.current_theme.get("card_border", "#e2e8f0"),
-            corner_radius=8,
-            height=36,
-        ).pack(side=tk.LEFT, padx=6)
+    def _build_main_menu_products(self, parent, products):
+        """Scrollable product grid for the customer main menu."""
+        main_menu_ui.build_main_menu_products(self, parent, products)
 
-        ctk.CTkButton(
-            actions_row,
-            text="How to use?",
-            command=self.show_help_dialog,
-            font=UI_FONT_BODY,
-            fg_color="transparent",
-            hover_color=self.current_theme["button_bg"],
-            text_color=self.current_theme["fg"],
-            border_width=1,
-            border_color=self.current_theme.get("card_border", "#e2e8f0"),
-            corner_radius=8,
-            height=36,
-        ).pack(side=tk.LEFT, padx=6)
-        ctk.CTkButton(
-            actions_row,
-            text="Patch Notes",
-            command=self.show_patch_notes_dialog,
-            font=UI_FONT_BODY,
-            fg_color="transparent",
-            hover_color=self.current_theme["button_bg"],
-            text_color=self.current_theme["fg"],
-            border_width=1,
-            border_color=self.current_theme.get("card_border", "#e2e8f0"),
-            corner_radius=8,
-            height=36,
-        ).pack(side=tk.LEFT, padx=6)
+    def _build_product_card(self, grid, product, idx):
+        """Single product card in the main menu grid."""
+        main_menu_ui.build_product_card(self, grid, product, idx)
 
-        # Info row: datetime on the right, version on the left
-        self.add_ph_datetime_label(info_row)
-        ctk.CTkLabel(
-            info_row,
-            text=f"SyntaxError™  ·  {VERSION}",
-            font=UI_FONT_SMALL,
-            text_color=self.current_theme.get("muted", self.current_theme["fg"]),
-        ).pack(side=tk.LEFT, padx=(12, 8))
+    def _build_product_card_button(self, card, product, in_cart):
+        """Add/remove button for a product card."""
+        return main_menu_ui.build_product_card_button(self, card, product, in_cart)
+
+    def _build_main_menu_footer(self):
+        """Footer actions and info row for the main menu."""
+        main_menu_ui.build_main_menu_footer(self, version=VERSION, hover_scale_btn=_hover_scale_btn)
+
+    def _cart_has_product(self, product):
+        return any(entry["product"]["id"] == product["id"] for entry in self.cart)
+
+    def _add_product_to_cart(self, product):
+        if product["current_stock"] <= 0:
+            return
+        self.cart.append({"product": product, "quantity": 1})
+        ref = self._product_card_refs.get(product["id"])
+        if ref:
+            try:
+                ref["card"].configure(fg_color=self._cart_selected_bg, border_color=self._cart_selected_border)
+                ref["btn"].configure(
+                    text="✕",
+                    hover_color=self.current_theme.get("accent_hover", "#0f766e"),
+                    command=lambda prod=product: self._remove_product_from_cart(prod),
+                )
+            except Exception:
+                pass
+        self._refresh_order_panel()
+
+    def _remove_product_from_cart(self, product):
+        self.cart = [entry for entry in self.cart if entry["product"]["id"] != product["id"]]
+        ref = self._product_card_refs.get(product["id"])
+        if ref:
+            try:
+                ref["card"].configure(fg_color=self._cart_card_bg, border_color=self._cart_card_border)
+                ref["btn"].configure(
+                    text="+",
+                    hover_color=self.current_theme.get("accent_hover", "#15857B"),
+                    state=tk.NORMAL if product["current_stock"] > 0 else tk.DISABLED,
+                    command=ref["add_cmd"],
+                )
+            except Exception:
+                pass
+        self._refresh_order_panel()
 
     def _cancel_cart(self):
         """Clear the cart and reset every product card button in-place — no full screen rebuild."""
@@ -1422,11 +1241,13 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         panel_bg = "#0f766e" if self.current_theme_name == "light" else "#134e4a"
         if not self.cart:
             self._order_panel = None
+            self._order_qty_vars = {}
             return
         self._order_panel = ctk.CTkFrame(main_row, fg_color=panel_bg, width=order_panel_width, corner_radius=0)
         self._order_panel.pack(side=tk.RIGHT, fill=tk.Y, padx=0, pady=0)
         self._order_panel.pack_propagate(False)
         order_panel = self._order_panel
+        self._order_qty_vars = {}
 
         ctk.CTkButton(
             order_panel,
@@ -1443,6 +1264,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         for entry in self.cart:
             prod = entry["product"]
             qty_var = tk.IntVar(value=entry["quantity"])
+            self._order_qty_vars[prod["id"]] = qty_var
 
             row = ctk.CTkFrame(order_panel, fg_color=panel_bg, corner_radius=0)
             row.pack(side=tk.TOP, fill=tk.X, padx=10, pady=4)
@@ -1467,7 +1289,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                 width=32,
                 height=28,
                 corner_radius=6,
-                command=lambda e=entry: (e.update({"quantity": max(1, e["quantity"] - 1)}), self._refresh_order_panel()),
+                command=lambda pid=prod["id"]: self._change_cart_quantity(pid, -1),
             ).pack(side=tk.LEFT, padx=(0, 6))
             tk.Label(ctrl, textvariable=qty_var, font=(UI_FONT, 12, "bold"), bg=panel_bg, fg="#ffffff", width=3).pack(side=tk.LEFT, padx=(0, 6))
             ctk.CTkButton(
@@ -1480,7 +1302,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                 width=32,
                 height=28,
                 corner_radius=6,
-                command=lambda e=entry: (e.update({"quantity": min(e["product"]["current_stock"], e["quantity"] + 1)}), self._refresh_order_panel()),
+                command=lambda pid=prod["id"]: self._change_cart_quantity(pid, 1),
             ).pack(side=tk.LEFT)
 
         ctk.CTkButton(
@@ -1502,6 +1324,25 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             self._order_panel = None
         if hasattr(self, "_main_row") and self._main_row is not None and self._main_row.winfo_exists():
             self._build_order_panel(self._main_row)
+
+    def _change_cart_quantity(self, product_id: int, delta: int):
+        """Update a single cart item's quantity and its on-screen label in place."""
+        for entry in self.cart:
+            if entry["product"]["id"] != product_id:
+                continue
+            old_qty = int(entry["quantity"] if entry["quantity"] is not None else 1)
+            max_stock = int(entry["product"]["current_stock"] or old_qty)
+            new_qty = max(1, min(max_stock, old_qty + int(delta)))
+            if new_qty == old_qty:
+                return
+            entry["quantity"] = new_qty
+            var = getattr(self, "_order_qty_vars", {}).get(product_id)
+            if var is not None:
+                try:
+                    var.set(new_qty)
+                except Exception:
+                    pass
+            return
 
     def _confirm_cart_order(self):
         """Proceed to review/quantity/payment based on current cart."""
@@ -1567,97 +1408,21 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         frame = ctk.CTkFrame(self.content_holder, fg_color=self.current_theme["bg"], corner_radius=0)
         frame.pack(expand=True, fill=tk.BOTH)
 
-        # Bottom bar first so "Back to products" is always visible above the theme footer
-        back_bar = ctk.CTkFrame(frame, fg_color=self.current_theme["bg"], corner_radius=0)
-        back_bar.pack(side=tk.BOTTOM, fill=tk.X, pady=(8, 0))
-        ctk.CTkButton(
-            back_bar,
+        self._build_checkout_back_bar(
+            frame,
             text="Back to products",
-            font=UI_FONT_BODY,
             command=lambda: (self.checkout_items.clear(), self.build_main_menu()),
-            fg_color=self.current_theme["button_bg"],
-            hover_color=accent,
-            text_color=self.current_theme["button_fg"],
-            corner_radius=8,
-            height=38,
-        ).pack(pady=10)
-
-        ctk.CTkLabel(
-            frame,
-            text="Step 2 of 3 – Review order",
-            font=UI_FONT_SMALL,
-            text_color=self.current_theme.get("muted", self.current_theme["fg"]),
-        ).pack(pady=(16, 0))
-        ctk.CTkLabel(
-            frame,
-            text="Order Summary",
-            font=(UI_FONT, 22, "bold"),
-            text_color=self.current_theme["fg"],
-        ).pack(pady=10)
-
-        card = ctk.CTkFrame(
-            frame,
-            fg_color=self.current_theme.get("card_bg", self.current_theme["button_bg"]),
-            border_width=1,
-            border_color=self.current_theme.get("card_border", "#e2e8f0"),
-            corner_radius=12,
         )
-        card.pack(padx=40, pady=18)
-
-        card_bg_color = self.current_theme.get("card_bg", self.current_theme["button_bg"])
-        list_frame = ctk.CTkFrame(card, fg_color=card_bg_color, corner_radius=0)
-        list_frame.pack(fill=tk.BOTH, expand=True, padx=30, pady=(22, 0))
-        for col in range(3):
-            list_frame.grid_columnconfigure(col, weight=1 if col == 0 else 0)
-
-        for r, it in enumerate(items):
-            p = it["product"]
-            q = int(it["quantity"])
-            line_total = float(p["price"]) * q
-            ctk.CTkLabel(
-                list_frame,
-                text=p["name"],
-                font=UI_FONT_BODY,
-                text_color=self.current_theme["button_fg"],
-                anchor="w",
-                wraplength=420,
-                justify="left",
-            ).grid(row=r, column=0, sticky="w", pady=4)
-            ctk.CTkLabel(
-                list_frame,
-                text=f"x{q}",
-                font=(UI_FONT, 12, "bold"),
-                text_color=self.current_theme.get("muted", self.current_theme["button_fg"]),
-                anchor="e",
-            ).grid(row=r, column=1, sticky="e", padx=(10, 0))
-            ctk.CTkLabel(
-                list_frame,
-                text=f"₱{line_total:.2f}",
-                font=(UI_FONT, 12, "bold"),
-                text_color=self.current_theme["button_fg"],
-                anchor="e",
-            ).grid(row=r, column=2, sticky="e", padx=(18, 0))
-
-        ctk.CTkLabel(
-            card,
-            text=f"Total: ₱{total:.2f}",
-            font=(UI_FONT, 16, "bold"),
-            text_color=self.current_theme["button_fg"],
-        ).pack(pady=(14, 10), padx=30)
-
-        ctk.CTkButton(
-            card,
-            text="Continue to payment",
-            font=UI_FONT_BUTTON,
-            command=self.show_payment_method_screen,
-            fg_color=accent,
-            hover_color=accent_hover,
-            text_color="#ffffff",
-            corner_radius=10,
-            height=44,
-        ).pack(fill=tk.X, padx=30, pady=(6, 22))
-
+        self._build_order_review_content(frame, items, total, accent, accent_hover)
         self.add_theme_toggle_footer()
+
+    def _build_checkout_back_bar(self, parent, text, command):
+        """Bottom back/cancel bar shared by checkout-related screens."""
+        checkout_ui.build_checkout_back_bar(self, parent, text, command)
+
+    def _build_order_review_content(self, parent, items, total, accent, accent_hover):
+        """Order review title, item list, and continue button."""
+        checkout_ui.build_order_review_content(self, parent, items, total, accent, accent_hover)
 
     # ---------- Quantity Screen ----------
 
@@ -1674,129 +1439,17 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         frame = ctk.CTkFrame(self.content_holder, fg_color=self.current_theme["bg"], corner_radius=0)
         frame.pack(expand=True, fill=tk.BOTH)
 
-        # Bottom bar first so "Back to products" is always visible above the theme footer
-        back_bar = ctk.CTkFrame(frame, fg_color=self.current_theme["bg"], corner_radius=0)
-        back_bar.pack(side=tk.BOTTOM, fill=tk.X, pady=(8, 0))
-        ctk.CTkButton(
-            back_bar,
+        self._build_checkout_back_bar(
+            frame,
             text="Back to products",
-            font=UI_FONT_BODY,
             command=lambda: (self.checkout_items.clear(), self.build_main_menu()),
-            fg_color=self.current_theme["button_bg"],
-            hover_color=accent,
-            text_color=self.current_theme["button_fg"],
-            corner_radius=8,
-            height=38,
-        ).pack(pady=10)
-
-        ctk.CTkLabel(
-            frame,
-            text="Step 2 of 3 – Choose quantity",
-            font=UI_FONT_SMALL,
-            text_color=self.current_theme.get("muted", self.current_theme["fg"]),
-        ).pack(pady=(16, 0))
-
-        ctk.CTkLabel(
-            frame,
-            text="Choose Quantity",
-            font=(UI_FONT, 22, "bold"),
-            text_color=self.current_theme["fg"],
-        ).pack(pady=10)
-
-        card_bg_color = self.current_theme.get("card_bg", self.current_theme["button_bg"])
-        card = ctk.CTkFrame(
-            frame,
-            fg_color=card_bg_color,
-            border_width=1,
-            border_color=self.current_theme.get("card_border", "#e2e8f0"),
-            corner_radius=12,
         )
-        card.pack(padx=40, pady=20)
-
-        ctk.CTkLabel(
-            card,
-            text=f"Selected: {p['name']}",
-            font=(UI_FONT, 14, "bold"),
-            text_color=self.current_theme["button_fg"],
-            wraplength=420,
-            justify="center",
-        ).pack(pady=(28, 10), padx=36)
-        ctk.CTkLabel(
-            card,
-            text=f"Price: ₱{p['price']:.2f}",
-            font=UI_FONT_BODY,
-            text_color=self.current_theme["button_fg"],
-        ).pack(pady=4, padx=36)
-        ctk.CTkLabel(
-            card,
-            text=f"Available: {p['current_stock']}",
-            font=UI_FONT_BODY,
-            text_color=self.current_theme.get("muted", self.current_theme["button_fg"]),
-        ).pack(pady=(4, 16), padx=36)
-
-        qty_var = tk.IntVar(value=self.current_quantity)
-
-        def update_qty(delta):
-            new = qty_var.get() + delta
-            if 1 <= new <= p["current_stock"]:
-                qty_var.set(new)
-
-        qty_frame = ctk.CTkFrame(card, fg_color=card_bg_color, corner_radius=0)
-        qty_frame.pack(pady=14)
-
-        ctk.CTkButton(
-            qty_frame,
-            text="−",
-            font=(UI_FONT, 16, "bold"),
-            command=lambda: update_qty(-1),
-            fg_color=accent,
-            hover_color=accent_hover,
-            text_color="#ffffff",
-            width=60,
-            height=40,
-            corner_radius=10,
-        ).pack(side=tk.LEFT, padx=12)
-
-        tk.Label(
-            qty_frame,
-            textvariable=qty_var,
-            font=(UI_FONT, 28, "bold"),
-            bg=card_bg_color,
-            fg=self.current_theme["button_fg"],
-            width=5,
-        ).pack(side=tk.LEFT, padx=12)
-
-        ctk.CTkButton(
-            qty_frame,
-            text="+",
-            font=(UI_FONT, 16, "bold"),
-            command=lambda: update_qty(1),
-            fg_color=accent,
-            hover_color=accent_hover,
-            text_color="#ffffff",
-            width=60,
-            height=40,
-            corner_radius=10,
-        ).pack(side=tk.LEFT, padx=12)
-
-        def proceed():
-            self.current_quantity = qty_var.get()
-            self.checkout_items = [{"product": p, "quantity": int(self.current_quantity or 1)}]
-            self.show_payment_method_screen()
-
-        ctk.CTkButton(
-            card,
-            text="Continue to payment",
-            font=UI_FONT_BUTTON,
-            command=proceed,
-            fg_color=accent,
-            hover_color=accent_hover,
-            text_color="#ffffff",
-            corner_radius=10,
-            height=44,
-        ).pack(pady=(18, 28), padx=36, fill=tk.X)
-
+        self._build_quantity_content(frame, p, accent, accent_hover)
         self.add_theme_toggle_footer()
+
+    def _build_quantity_content(self, parent, product, accent, accent_hover):
+        """Single-product quantity selector card."""
+        checkout_ui.build_quantity_content(self, parent, product, accent, accent_hover)
 
     # ---------- Payment Method ----------
 
@@ -1815,87 +1468,12 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         frame = ctk.CTkFrame(self.content_holder, fg_color=self.current_theme["bg"], corner_radius=0)
         frame.pack(expand=True, fill=tk.BOTH)
 
-        ctk.CTkLabel(
-            frame,
-            text="Step 3 of 3 – Choose payment method",
-            font=UI_FONT_SMALL,
-            text_color=self.current_theme["fg"],
-        ).pack(pady=(10, 0))
-        ctk.CTkLabel(
-            frame,
-            text="Choose Payment Method",
-            font=UI_FONT_BOLD,
-            text_color=self.current_theme["fg"],
-        ).pack(pady=6)
-
-        card = ctk.CTkFrame(
-            frame,
-            fg_color=self.current_theme["button_bg"],
-            border_width=1,
-            border_color=self.current_theme.get("card_border", "#e2e8f0"),
-            corner_radius=12,
-        )
-        card.pack(padx=24, pady=10)
-
-        summary_lines = []
-        for it in items:
-            p = it["product"]
-            q = int(it["quantity"])
-            summary_lines.append(f"{p['name']} x{q}")
-        summary_text = "\n".join(summary_lines)
-
-        ctk.CTkLabel(
-            card,
-            text=summary_text,
-            font=UI_FONT_BODY,
-            text_color=self.current_theme["button_fg"],
-            wraplength=360,
-            justify="center",
-        ).pack(pady=(20, 8), padx=20)
-        ctk.CTkLabel(
-            card,
-            text=f"Total: ₱{total:.2f}",
-            font=UI_FONT_TITLE,
-            text_color=self.current_theme["button_fg"],
-        ).pack(pady=(0, 16), padx=20)
-
-        ctk.CTkButton(
-            card,
-            text="Pay with Cash\nInsert coins or bills",
-            font=UI_FONT_BUTTON,
-            fg_color=self.current_theme.get("accent", "#1A948E"),
-            hover_color=self.current_theme.get("accent_hover", "#15857B"),
-            text_color="#ffffff",
-            corner_radius=10,
-            height=60,
-            command=lambda: self.cash_payment_flow(total),
-        ).pack(pady=8, padx=20, fill=tk.X)
-
-        ctk.CTkButton(
-            card,
-            text="Pay with RFID Card\nCashless payment",
-            font=UI_FONT_BUTTON,
-            fg_color=self.current_theme.get("accent", "#1A948E"),
-            hover_color=self.current_theme.get("accent_hover", "#15857B"),
-            text_color="#ffffff",
-            corner_radius=10,
-            height=60,
-            command=lambda: self.rfid_payment_flow(total),
-        ).pack(pady=(8, 20), padx=20, fill=tk.X)
-
-        ctk.CTkButton(
-            frame,
-            text="Back",
-            font=UI_FONT_BODY,
-            fg_color=self.current_theme["button_bg"],
-            hover_color=self.current_theme.get("accent", "#1A948E"),
-            text_color=self.current_theme["button_fg"],
-            corner_radius=8,
-            height=36,
-            command=(self.show_order_review_screen if self.checkout_items and len(self.checkout_items) > 1 else self.show_quantity_screen),
-        ).pack(pady=10)
-
+        self._build_payment_method_content(frame, items, total)
         self.add_theme_toggle_footer()
+
+    def _build_payment_method_content(self, parent, items, total):
+        """Payment method chooser with order summary."""
+        checkout_ui.build_payment_method_content(self, parent, items, total)
 
     # ---------- Cash Payment Flow ----------
 
@@ -1910,122 +1488,12 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         frame = ctk.CTkFrame(self.content_holder, fg_color=self.current_theme["bg"], corner_radius=0)
         frame.pack(expand=True, fill=tk.BOTH)
 
-        ctk.CTkLabel(
-            frame,
-            text="Pay with Cash",
-            font=UI_FONT_BOLD,
-            text_color=self.current_theme["fg"],
-        ).pack(pady=(10, 6))
-        ctk.CTkLabel(
-            frame,
-            text="Press the buttons below to simulate inserting coins/bills.",
-            font=UI_FONT_SMALL,
-            text_color=self.current_theme["fg"],
-        ).pack(pady=2)
-
-        card = ctk.CTkFrame(
-            frame,
-            fg_color=self.current_theme["button_bg"],
-            border_width=1,
-            border_color=self.current_theme.get("card_border", "#e2e8f0"),
-            corner_radius=12,
-        )
-        card.pack(padx=24, pady=10)
-
-        ctk.CTkLabel(
-            card,
-            text=f"Total to Pay: ₱{total_amount:.2f}",
-            font=UI_FONT_TITLE,
-            text_color=self.current_theme["button_fg"],
-        ).pack(pady=(20, 12), padx=20)
-
-        amount_var = tk.DoubleVar(value=0.0)
-        remaining_var = tk.DoubleVar(value=total_amount)
-
-        ctk.CTkLabel(
-            card,
-            text="Amount Inserted:",
-            font=UI_FONT_BODY,
-            text_color=self.current_theme["button_fg"],
-        ).pack(pady=4, padx=20)
-        tk.Label(
-            card,
-            textvariable=amount_var,
-            font=(UI_FONT, 22, "bold"),
-            bg=self.current_theme["button_bg"],
-            fg=self.current_theme["button_fg"],
-        ).pack()
-
-        ctk.CTkLabel(
-            card,
-            text="Remaining:",
-            font=UI_FONT_BODY,
-            text_color=self.current_theme["button_fg"],
-        ).pack(pady=(10, 4), padx=20)
-        tk.Label(
-            card,
-            textvariable=remaining_var,
-            font=(UI_FONT, 22, "bold"),
-            bg=self.current_theme["button_bg"],
-            fg=self.current_theme["button_fg"],
-        ).pack()
-
-        # Simulated cash buttons for development
-        btn_frame = ctk.CTkFrame(card, fg_color=self.current_theme["button_bg"], corner_radius=0)
-        btn_frame.pack(pady=15, padx=20)
-
-        def add_money(val):
-            cash_session.add(val)
-            current = cash_session.get_amount()
-            amount_var.set(current)
-            remaining_var.set(max(0.0, total_amount - current))
-
-        for text, val in [("+₱1", 1), ("+₱5", 5), ("+₱10", 10), ("+₱20", 20)]:
-            ctk.CTkButton(
-                btn_frame,
-                text=text,
-                font=UI_FONT_BODY,
-                fg_color=self.current_theme.get("accent", "#1A948E"),
-                hover_color=self.current_theme.get("accent_hover", "#15857B"),
-                text_color="#ffffff",
-                corner_radius=8,
-                width=70,
-                height=34,
-                command=lambda v=val: add_money(v),
-            ).pack(side=tk.LEFT, padx=5)
-
-        def finish_if_enough():
-            current = cash_session.get_amount()
-            if current < total_amount:
-                messagebox.showwarning("Not enough", "Please insert more cash.")
-                return
-            self.complete_purchase_cash(total_amount, current)
-
-        ctk.CTkButton(
-            card,
-            text="Dispense product",
-            font=UI_FONT_BUTTON,
-            command=finish_if_enough,
-            fg_color="#4CAF50",
-            hover_color="#388E3C",
-            text_color="#ffffff",
-            corner_radius=10,
-            height=44,
-        ).pack(pady=(10, 20), padx=20, fill=tk.X)
-
-        ctk.CTkButton(
-            frame,
-            text="Cancel and go back",
-            font=UI_FONT_BODY,
-            command=self.build_main_menu,
-            fg_color="#E53935",
-            hover_color="#C62828",
-            text_color="#ffffff",
-            corner_radius=8,
-            height=36,
-        ).pack(pady=5)
-
+        self._build_cash_payment_content(frame, total_amount)
         self.add_theme_toggle_footer()
+
+    def _build_cash_payment_content(self, parent, total_amount: float):
+        """Cash payment screen with simulated coin/bill buttons."""
+        checkout_ui.build_cash_payment_content(self, parent, total_amount)
 
     def complete_purchase_cash(self, total_amount: float, inserted: float):
         items = self._get_checkout_items()
@@ -2066,24 +1534,12 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             self.sidebar_holder.destroy()
             self.sidebar_holder = None
         self.clear_screen()
-        frame = ctk.CTkFrame(self.content_holder, fg_color=self.current_theme["bg"], corner_radius=0)
-        frame.pack(expand=True, fill=tk.BOTH)
-        card = ctk.CTkFrame(
-            frame,
-            fg_color=self.current_theme.get("card_bg", "#ffffff"),
-            border_width=1,
-            border_color=self.current_theme.get("card_border", "#e2e8f0"),
-            corner_radius=12,
-        )
-        card.place(relx=0.5, rely=0.5, anchor="center")
-        ctk.CTkLabel(
-            card,
-            text=text,
-            font=(UI_FONT, 14),
-            text_color=self.current_theme["fg"],
-        ).pack(padx=40, pady=24)
-
+        self._build_wait_screen_content(text)
         self.add_theme_toggle_footer()
+
+    def _build_wait_screen_content(self, text: str):
+        """Centered wait/status card used for transient wait states."""
+        status_ui.build_wait_screen_content(self, text)
 
 
     def _show_dispensing_screen(self):
@@ -2092,30 +1548,12 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             self.sidebar_holder.destroy()
             self.sidebar_holder = None
         self.clear_screen()
-        frame = ctk.CTkFrame(self.content_holder, fg_color=self.current_theme["bg"], corner_radius=0)
-        frame.pack(expand=True, fill=tk.BOTH)
-        card = ctk.CTkFrame(
-            frame,
-            fg_color=self.current_theme.get("card_bg", "#ffffff"),
-            border_width=2,
-            border_color=self.current_theme.get("accent", "#1A948E"),
-            corner_radius=16,
-        )
-        card.place(relx=0.5, rely=0.5, anchor="center")
-        ctk.CTkLabel(
-            card,
-            text="⏳  Dispensing product...",
-            font=(UI_FONT, 18, "bold"),
-            text_color=self.current_theme.get("accent", "#1A948E"),
-        ).pack(pady=(32, 8), padx=52)
-        ctk.CTkLabel(
-            card,
-            text="Please wait - do not remove items\nuntil the machine finishes.",
-            font=UI_FONT_BODY,
-            text_color=self.current_theme["fg"],
-            justify="center",
-        ).pack(pady=(0, 32), padx=52)
+        self._build_dispensing_screen_content()
         self.update_idletasks()
+
+    def _build_dispensing_screen_content(self):
+        """Centered dispensing status card."""
+        status_ui.build_dispensing_screen_content(self)
 
     def _do_dispense_rfid(self, items, rfid_user_id, new_balance):
         try:
@@ -2149,42 +1587,12 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             self.sidebar_holder.destroy()
             self.sidebar_holder = None
         self.clear_screen()
-        frame = ctk.CTkFrame(self.content_holder, fg_color=self.current_theme["bg"], corner_radius=0)
-        frame.pack(expand=True, fill=tk.BOTH)
-        card = ctk.CTkFrame(
-            frame,
-            fg_color=self.current_theme.get("card_bg", "#ffffff"),
-            border_width=2,
-            border_color=self.current_theme.get("accent", "#1A948E"),
-            corner_radius=12,
-        )
-        card.place(relx=0.5, rely=0.5, anchor="center")
-        ctk.CTkLabel(
-            card,
-            text=title,
-            font=(UI_FONT, 18, "bold"),
-            text_color=self.current_theme.get("accent", "#1A948E"),
-        ).pack(pady=(20, 8), padx=32)
-        ctk.CTkLabel(
-            card,
-            text=message,
-            font=UI_FONT_BODY,
-            text_color=self.current_theme["fg"],
-            justify="center",
-        ).pack(padx=32, pady=(0, 20))
-        ctk.CTkButton(
-            card,
-            text="OK",
-            font=(UI_FONT, 12, "bold"),
-            command=on_ok or self.build_main_menu,
-            fg_color=self.current_theme.get("accent", "#1A948E"),
-            hover_color=self.current_theme.get("accent_hover", "#15857B"),
-            text_color="#ffffff",
-            corner_radius=10,
-            width=120,
-            height=40,
-        ).pack(pady=(0, 20))
+        self._build_success_screen_content(title, message, on_ok)
         self.add_theme_toggle_footer()
+
+    def _build_success_screen_content(self, title: str, message: str, on_ok=None):
+        """Centered success/result card with OK action."""
+        status_ui.build_success_screen_content(self, title, message, on_ok)
 
     # ---------- RFID Card Purchase ----------
 
@@ -2202,20 +1610,20 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         frame = ctk.CTkFrame(self.content_holder, fg_color=LOGIN_PAGE_BG)
         frame.pack(expand=True, fill=tk.BOTH)
 
-        panel = ctk.CTkFrame(frame, fg_color=LOGIN_PANEL_BG, corner_radius=16)
+        self._build_buy_card_content(frame, CARD_PRICE)
+        self.add_theme_toggle_footer()
+
+    def _build_buy_card_content(self, parent, card_price: float):
+        """RFID card purchase UI and actions."""
+        panel = ctk.CTkFrame(parent, fg_color=LOGIN_PANEL_BG, corner_radius=16)
         panel.place(relx=0.5, rely=0.5, anchor="center")
         inner = ctk.CTkFrame(panel, fg_color=LOGIN_PANEL_BG)
         inner.pack(padx=40, pady=28)
 
+        ctk.CTkLabel(inner, text="Buy a New RFID Card", font=(UI_FONT, 18, "bold"), text_color="#0f766e").pack(pady=(0, 10))
         ctk.CTkLabel(
             inner,
-            text="Buy a New RFID Card",
-            font=(UI_FONT, 18, "bold"),
-            text_color="#0f766e",
-        ).pack(pady=(0, 10))
-        ctk.CTkLabel(
-            inner,
-            text=f"Please pay ₱{CARD_PRICE:.2f} using the cash buttons below.",
+            text=f"Please pay ₱{card_price:.2f} using the cash buttons below.",
             font=UI_FONT_BODY,
             text_color="#134e4a",
             wraplength=360,
@@ -2223,50 +1631,27 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         ).pack(pady=(0, 10))
 
         amount_var = tk.DoubleVar(value=0.0)
-        remaining_var = tk.DoubleVar(value=CARD_PRICE)
+        remaining_var = tk.DoubleVar(value=card_price)
+        ctk.CTkLabel(inner, text="Amount Inserted:", font=UI_FONT_BODY, text_color="#134e4a").pack(pady=4)
+        tk.Label(inner, textvariable=amount_var, font=(UI_FONT, 20, "bold"), bg=LOGIN_PANEL_BG, fg="#0f172a").pack()
+        ctk.CTkLabel(inner, text="Remaining:", font=UI_FONT_BODY, text_color="#134e4a").pack(pady=4)
+        tk.Label(inner, textvariable=remaining_var, font=(UI_FONT, 20, "bold"), bg=LOGIN_PANEL_BG, fg="#0f172a").pack()
 
-        ctk.CTkLabel(
-            inner,
-            text="Amount Inserted:",
-            font=UI_FONT_BODY,
-            text_color="#134e4a",
-        ).pack(pady=4)
-        tk.Label(
-            inner,
-            textvariable=amount_var,
-            font=(UI_FONT, 20, "bold"),
-            bg=LOGIN_PANEL_BG,
-            fg="#0f172a",
-        ).pack()
-        ctk.CTkLabel(
-            inner,
-            text="Remaining:",
-            font=UI_FONT_BODY,
-            text_color="#134e4a",
-        ).pack(pady=4)
-        tk.Label(
-            inner,
-            textvariable=remaining_var,
-            font=(UI_FONT, 20, "bold"),
-            bg=LOGIN_PANEL_BG,
-            fg="#0f172a",
-        ).pack()
-
-        def add_money(val):
-            cash_session.add(val)
+        def add_money(value):
+            cash_session.add(value)
             current = cash_session.get_amount()
             amount_var.set(current)
-            remaining_var.set(max(0.0, CARD_PRICE - current))
+            remaining_var.set(max(0.0, card_price - current))
 
         btn_frame = ctk.CTkFrame(inner, fg_color=LOGIN_PANEL_BG)
         btn_frame.pack(pady=12)
-        for txt, val in [("+₱1", 1), ("+₱5", 5), ("+₱10", 10), ("+₱20", 20)]:
+        for text, value in [("+₱1", 1), ("+₱5", 5), ("+₱10", 10), ("+₱20", 20)]:
             ctk.CTkButton(
                 btn_frame,
-                text=txt,
+                text=text,
                 width=80,
                 font=UI_FONT_BODY,
-                command=lambda v=val: add_money(v),
+                command=lambda v=value: add_money(v),
                 fg_color=LOGIN_BTN_BG,
                 hover_color=LOGIN_BTN_HOVER,
                 text_color="#ffffff",
@@ -2275,55 +1660,18 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
 
         def confirm_purchase():
             inserted = cash_session.get_amount()
-            if inserted < CARD_PRICE:
+            if inserted < card_price:
                 messagebox.showwarning("Not enough", "Please insert full card price.")
                 return
-
             uid = uuid.uuid4().hex[:8].upper()
             user_id = create_user(uid, name=None, is_staff=0, initial_balance=0.0)
-
-            record_transaction(
-                product_id=None,
-                quantity=None,
-                total_amount=CARD_PRICE,
-                payment_method="card_purchase",
-                rfid_user_id=user_id,
-            )
-
-            self.show_success_screen(
-                "Card Issued",
-                f"New RFID card created.\nCard ID (simulate UID): {uid}",
-                on_ok=self.build_main_menu,
-            )
+            record_transaction(product_id=None, quantity=None, total_amount=card_price, payment_method="card_purchase", rfid_user_id=user_id)
+            self.show_success_screen("Card Issued", f"New RFID card created.\nCard ID (simulate UID): {uid}", on_ok=self.build_main_menu)
 
         action_frame = ctk.CTkFrame(inner, fg_color=LOGIN_PANEL_BG)
         action_frame.pack(pady=(8, 0), fill=tk.X)
-
-        ctk.CTkButton(
-            action_frame,
-            text="Confirm and issue card",
-            font=UI_FONT_BUTTON,
-            command=confirm_purchase,
-            fg_color=LOGIN_BTN_BG,
-            hover_color=LOGIN_BTN_HOVER,
-            text_color="#ffffff",
-            corner_radius=8,
-            height=40,
-        ).pack(side=tk.LEFT, padx=(0, 10))
-
-        ctk.CTkButton(
-            action_frame,
-            text="Cancel and go back",
-            font=UI_FONT_BODY,
-            command=self.build_main_menu,
-            fg_color=LOGIN_BTN_BG,
-            hover_color=LOGIN_BTN_HOVER,
-            text_color="#ffffff",
-            corner_radius=8,
-            height=36,
-        ).pack(side=tk.LEFT)
-
-        self.add_theme_toggle_footer()
+        ctk.CTkButton(action_frame, text="Confirm and issue card", font=UI_FONT_BUTTON, command=confirm_purchase, fg_color=LOGIN_BTN_BG, hover_color=LOGIN_BTN_HOVER, text_color="#ffffff", corner_radius=8, height=40).pack(side=tk.LEFT, padx=(0, 10))
+        ctk.CTkButton(action_frame, text="Cancel and go back", font=UI_FONT_BODY, command=self.build_main_menu, fg_color=LOGIN_BTN_BG, hover_color=LOGIN_BTN_HOVER, text_color="#ffffff", corner_radius=8, height=36).pack(side=tk.LEFT)
 
     # ---------- RFID Reload ----------
 
@@ -2339,44 +1687,23 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         frame = ctk.CTkFrame(self.content_holder, fg_color=LOGIN_PAGE_BG)
         frame.pack(expand=True, fill=tk.BOTH)
 
-        panel = ctk.CTkFrame(frame, fg_color=LOGIN_PANEL_BG, corner_radius=16)
+        self._build_reload_card_content(frame)
+        self.add_theme_toggle_footer()
+
+    def _build_reload_card_content(self, parent):
+        """RFID reload card lookup screen."""
+        panel = ctk.CTkFrame(parent, fg_color=LOGIN_PANEL_BG, corner_radius=16)
         panel.place(relx=0.5, rely=0.5, anchor="center")
         inner = ctk.CTkFrame(panel, fg_color=LOGIN_PANEL_BG)
         inner.pack(padx=40, pady=28)
+        ctk.CTkLabel(inner, text="Reload RFID Card", font=(UI_FONT, 18, "bold"), text_color="#0f766e").pack(pady=(0, 10))
+        ctk.CTkLabel(inner, text="Enter RFID Card ID (simulate tap):", font=UI_FONT_SMALL, text_color="#134e4a").pack(anchor="w", pady=(0, 6))
 
-        ctk.CTkLabel(
-            inner,
-            text="Reload RFID Card",
-            font=(UI_FONT, 18, "bold"),
-            text_color="#0f766e",
-        ).pack(pady=(0, 10))
-
-        ctk.CTkLabel(
-            inner,
-            text="Enter RFID Card ID (simulate tap):",
-            font=UI_FONT_SMALL,
-            text_color="#134e4a",
-        ).pack(anchor="w", pady=(0, 6))
-
-        uid_entry = ctk.CTkEntry(
-            inner,
-            font=UI_FONT_BODY,
-            width=280,
-            fg_color="#ffffff",
-            text_color="#1e293b",
-            border_color="#94a3b8",
-            corner_radius=8,
-            height=40,
-        )
+        uid_entry = ctk.CTkEntry(inner, font=UI_FONT_BODY, width=280, fg_color="#ffffff", text_color="#1e293b", border_color="#94a3b8", corner_radius=8, height=40)
         uid_entry.pack(pady=(0, 8))
         self.after_idle(lambda w=uid_entry: self._safe_focus(w))
 
-        error_lbl = ctk.CTkLabel(
-            inner,
-            text="",
-            font=UI_FONT_SMALL,
-            text_color="#b91c1c",
-        )
+        error_lbl = ctk.CTkLabel(inner, text="", font=UI_FONT_SMALL, text_color="#b91c1c")
         error_lbl.pack(pady=(0, 4))
 
         def proceed_to_amount():
@@ -2384,43 +1711,17 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             if not uid:
                 error_lbl.configure(text="Please enter a card ID.")
                 return
-
             user = get_user_by_uid(uid)
             if not user:
                 error_lbl.configure(text="Card not found. Please buy a new card first.")
                 return
-
             self._reload_amount_screen(uid, user)
 
         btn_row = ctk.CTkFrame(inner, fg_color=LOGIN_PANEL_BG)
         btn_row.pack(fill=tk.X, pady=(8, 0))
-
-        ctk.CTkButton(
-            btn_row,
-            text="OK",
-            font=(UI_FONT, 11, "bold"),
-            command=proceed_to_amount,
-            fg_color=LOGIN_BTN_BG,
-            hover_color=LOGIN_BTN_HOVER,
-            text_color="#ffffff",
-            corner_radius=8,
-            height=38,
-        ).pack(side=tk.LEFT, padx=(0, 10))
-
-        ctk.CTkButton(
-            btn_row,
-            text="Cancel",
-            font=(UI_FONT, 11, "bold"),
-            command=self.build_main_menu,
-            fg_color=LOGIN_BTN_BG,
-            hover_color=LOGIN_BTN_HOVER,
-            text_color="#ffffff",
-            corner_radius=8,
-            height=38,
-        ).pack(side=tk.LEFT)
-
+        ctk.CTkButton(btn_row, text="OK", font=(UI_FONT, 11, "bold"), command=proceed_to_amount, fg_color=LOGIN_BTN_BG, hover_color=LOGIN_BTN_HOVER, text_color="#ffffff", corner_radius=8, height=38).pack(side=tk.LEFT, padx=(0, 10))
+        ctk.CTkButton(btn_row, text="Cancel", font=(UI_FONT, 11, "bold"), command=self.build_main_menu, fg_color=LOGIN_BTN_BG, hover_color=LOGIN_BTN_HOVER, text_color="#ffffff", corner_radius=8, height=38).pack(side=tk.LEFT)
         uid_entry.bind("<Return>", lambda _e: proceed_to_amount())
-        self.add_theme_toggle_footer()
 
     def _reload_amount_screen(self, uid, user):
         """Second step for reload – choose amount, still in-app."""
@@ -2436,121 +1737,45 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         frame = ctk.CTkFrame(self.content_holder, fg_color=theme["bg"])
         frame.pack(expand=True, fill=tk.BOTH)
 
-        ctk.CTkLabel(
-            frame,
-            text="Reload RFID Card",
-            font=UI_FONT_BOLD,
-            text_color=theme["fg"],
-        ).pack(pady=10)
+        self._build_reload_amount_content(frame, uid, user, theme)
+        self.add_theme_toggle_footer()
 
-        card = ctk.CTkFrame(
-            frame,
-            fg_color=theme["button_bg"],
-            corner_radius=12,
-            border_width=1,
-            border_color="#94a3b8",
-        )
+    def _build_reload_amount_content(self, parent, uid, user, theme):
+        """RFID reload amount entry screen."""
+        ctk.CTkLabel(parent, text="Reload RFID Card", font=UI_FONT_BOLD, text_color=theme["fg"]).pack(pady=10)
+        card = ctk.CTkFrame(parent, fg_color=theme["button_bg"], corner_radius=12, border_width=1, border_color="#94a3b8")
         card.pack(padx=24, pady=10)
         card_inner = ctk.CTkFrame(card, fg_color=theme["button_bg"])
         card_inner.pack(padx=20, pady=18)
-
-        ctk.CTkLabel(
-            card_inner,
-            text=f"Card ID: {uid}",
-            font=UI_FONT_BODY,
-            text_color=theme["button_fg"],
-        ).pack(pady=(0, 4))
-        ctk.CTkLabel(
-            card_inner,
-            text=f"Current Balance: ₱{user['balance']:.2f}",
-            font=UI_FONT_BODY,
-            text_color=theme["button_fg"],
-        ).pack(pady=(0, 10))
+        ctk.CTkLabel(card_inner, text=f"Card ID: {uid}", font=UI_FONT_BODY, text_color=theme["button_fg"]).pack(pady=(0, 4))
+        ctk.CTkLabel(card_inner, text=f"Current Balance: ₱{user['balance']:.2f}", font=UI_FONT_BODY, text_color=theme["button_fg"]).pack(pady=(0, 10))
 
         amount_var = tk.DoubleVar(value=0.0)
-
-        ctk.CTkLabel(
-            card_inner,
-            text="Amount to Load:",
-            font=UI_FONT_BODY,
-            text_color=theme["button_fg"],
-        ).pack(pady=5)
-        tk.Label(
-            card_inner,
-            textvariable=amount_var,
-            font=(UI_FONT, 22, "bold"),
-            bg=theme["button_bg"],
-            fg=theme["button_fg"],
-        ).pack()
+        ctk.CTkLabel(card_inner, text="Amount to Load:", font=UI_FONT_BODY, text_color=theme["button_fg"]).pack(pady=5)
+        tk.Label(card_inner, textvariable=amount_var, font=(UI_FONT, 22, "bold"), bg=theme["button_bg"], fg=theme["button_fg"]).pack()
 
         btn_frame = ctk.CTkFrame(card_inner, fg_color=theme["button_bg"])
         btn_frame.pack(pady=15)
 
-        def add_money(val):
-            cash_session.add(val)
+        def add_money(value):
+            cash_session.add(value)
             amount_var.set(cash_session.get_amount())
 
-        for txt, val in [("+₱1", 1), ("+₱5", 5), ("+₱10", 10), ("+₱20", 20)]:
-            ctk.CTkButton(
-                btn_frame,
-                text=txt,
-                width=70,
-                font=UI_FONT_BODY,
-                command=lambda v=val: add_money(v),
-                fg_color=LOGIN_BTN_BG,
-                hover_color=LOGIN_BTN_HOVER,
-                text_color="#ffffff",
-                corner_radius=8,
-            ).pack(side=tk.LEFT, padx=5)
+        for text, value in [("+₱1", 1), ("+₱5", 5), ("+₱10", 10), ("+₱20", 20)]:
+            ctk.CTkButton(btn_frame, text=text, width=70, font=UI_FONT_BODY, command=lambda v=value: add_money(v), fg_color=LOGIN_BTN_BG, hover_color=LOGIN_BTN_HOVER, text_color="#ffffff", corner_radius=8).pack(side=tk.LEFT, padx=5)
 
         def confirm_reload():
             amount = cash_session.get_amount()
             if amount <= 0:
                 messagebox.showwarning("No amount", "Please add some amount to reload.")
                 return
-
             new_balance = user["balance"] + amount
             update_user_balance(user["id"], new_balance)
+            record_transaction(product_id=None, quantity=None, total_amount=amount, payment_method="rfid_reload", rfid_user_id=user["id"])
+            self.show_success_screen("Reload Successful", f"New balance: ₱{new_balance:.2f}", on_ok=self.build_main_menu)
 
-            record_transaction(
-                product_id=None,
-                quantity=None,
-                total_amount=amount,
-                payment_method="rfid_reload",
-                rfid_user_id=user["id"],
-            )
-
-            self.show_success_screen(
-                "Reload Successful",
-                f"New balance: ₱{new_balance:.2f}",
-                on_ok=self.build_main_menu,
-            )
-
-        ctk.CTkButton(
-            card_inner,
-            text="Add balance",
-            font=UI_FONT_BUTTON,
-            command=confirm_reload,
-            fg_color="#4CAF50",
-            hover_color="#388E3C",
-            text_color="#ffffff",
-            corner_radius=8,
-            height=44,
-        ).pack(pady=(10, 8), fill=tk.X)
-
-        ctk.CTkButton(
-            frame,
-            text="Cancel and go back",
-            font=UI_FONT_BODY,
-            command=self.build_main_menu,
-            fg_color="#E53935",
-            hover_color="#C62828",
-            text_color="#ffffff",
-            corner_radius=8,
-            height=36,
-        ).pack(pady=5)
-
-        self.add_theme_toggle_footer()
+        ctk.CTkButton(card_inner, text="Add balance", font=UI_FONT_BUTTON, command=confirm_reload, fg_color="#4CAF50", hover_color="#388E3C", text_color="#ffffff", corner_radius=8, height=44).pack(pady=(10, 8), fill=tk.X)
+        ctk.CTkButton(parent, text="Cancel and go back", font=UI_FONT_BODY, command=self.build_main_menu, fg_color="#E53935", hover_color="#C62828", text_color="#ffffff", corner_radius=8, height=36).pack(pady=5)
 
     # ---------- RFID Purchase Payment ----------
 
@@ -2566,49 +1791,23 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         frame = ctk.CTkFrame(self.content_holder, fg_color=LOGIN_PAGE_BG)
         frame.pack(expand=True, fill=tk.BOTH)
 
-        panel = ctk.CTkFrame(frame, fg_color=LOGIN_PANEL_BG, corner_radius=16)
+        self._build_rfid_payment_content(frame, total_amount)
+        self.add_theme_toggle_footer()
+
+    def _build_rfid_payment_content(self, parent, total_amount: float):
+        """RFID payment entry and validation screen."""
+        panel = ctk.CTkFrame(parent, fg_color=LOGIN_PANEL_BG, corner_radius=16)
         panel.place(relx=0.5, rely=0.5, anchor="center")
         inner = ctk.CTkFrame(panel, fg_color=LOGIN_PANEL_BG)
         inner.pack(padx=40, pady=28)
+        ctk.CTkLabel(inner, text="RFID Payment", font=(UI_FONT, 18, "bold"), text_color="#0f766e").pack(pady=(0, 6))
+        ctk.CTkLabel(inner, text=f"Total: ₱{total_amount:.2f}", font=(UI_FONT, 16), text_color="#134e4a").pack(pady=(0, 10))
+        ctk.CTkLabel(inner, text="Enter RFID Card ID (simulate tap):", font=UI_FONT_SMALL, text_color="#134e4a").pack(anchor="w", pady=(0, 6))
 
-        ctk.CTkLabel(
-            inner,
-            text="RFID Payment",
-            font=(UI_FONT, 18, "bold"),
-            text_color="#0f766e",
-        ).pack(pady=(0, 6))
-        ctk.CTkLabel(
-            inner,
-            text=f"Total: ₱{total_amount:.2f}",
-            font=(UI_FONT, 16),
-            text_color="#134e4a",
-        ).pack(pady=(0, 10))
-        ctk.CTkLabel(
-            inner,
-            text="Enter RFID Card ID (simulate tap):",
-            font=UI_FONT_SMALL,
-            text_color="#134e4a",
-        ).pack(anchor="w", pady=(0, 6))
-
-        uid_entry = ctk.CTkEntry(
-            inner,
-            font=UI_FONT_BODY,
-            width=280,
-            fg_color="#ffffff",
-            text_color="#1e293b",
-            border_color="#94a3b8",
-            corner_radius=8,
-            height=40,
-        )
+        uid_entry = ctk.CTkEntry(inner, font=UI_FONT_BODY, width=280, fg_color="#ffffff", text_color="#1e293b", border_color="#94a3b8", corner_radius=8, height=40)
         uid_entry.pack(pady=(0, 8))
         self.after_idle(lambda w=uid_entry: self._safe_focus(w))
-
-        error_lbl = ctk.CTkLabel(
-            inner,
-            text="",
-            font=UI_FONT_SMALL,
-            text_color="#b91c1c",
-        )
+        error_lbl = ctk.CTkLabel(inner, text="", font=UI_FONT_SMALL, text_color="#b91c1c")
         error_lbl.pack(pady=(0, 4))
 
         def process_rfid():
@@ -2616,56 +1815,27 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             if not uid:
                 error_lbl.configure(text="Please enter a card ID.")
                 return
-
             user = get_user_by_uid(uid)
             if not user:
                 error_lbl.configure(text="Card not found.")
                 return
-
             if user["balance"] < total_amount:
                 error_lbl.configure(text="Insufficient card balance.")
                 return
-
             new_balance = user["balance"] - total_amount
             update_user_balance(user["id"], new_balance)
-
             items = self._get_checkout_items()
             if not items:
                 self.build_main_menu()
                 return
-
             self._show_dispensing_screen()
             self.after(50, lambda i=items, uid=user["id"], nb=new_balance: self._do_dispense_rfid(i, uid, nb))
 
         btn_row = ctk.CTkFrame(inner, fg_color=LOGIN_PANEL_BG)
         btn_row.pack(fill=tk.X, pady=(8, 0))
-
-        ctk.CTkButton(
-            btn_row,
-            text="Pay Now",
-            font=(UI_FONT, 11, "bold"),
-            command=process_rfid,
-            fg_color=LOGIN_BTN_BG,
-            hover_color=LOGIN_BTN_HOVER,
-            text_color="#ffffff",
-            corner_radius=8,
-            height=38,
-        ).pack(side=tk.LEFT, padx=(0, 10))
-
-        ctk.CTkButton(
-            btn_row,
-            text="Cancel",
-            font=(UI_FONT, 11, "bold"),
-            command=lambda: (self._reset_checkout_state(), self.build_main_menu()),
-            fg_color="#E53935",
-            hover_color="#C62828",
-            text_color="#ffffff",
-            corner_radius=8,
-            height=38,
-        ).pack(side=tk.LEFT)
-
+        ctk.CTkButton(btn_row, text="Pay Now", font=(UI_FONT, 11, "bold"), command=process_rfid, fg_color=LOGIN_BTN_BG, hover_color=LOGIN_BTN_HOVER, text_color="#ffffff", corner_radius=8, height=38).pack(side=tk.LEFT, padx=(0, 10))
+        ctk.CTkButton(btn_row, text="Cancel", font=(UI_FONT, 11, "bold"), command=lambda: (self._reset_checkout_state(), self.build_main_menu()), fg_color="#E53935", hover_color="#C62828", text_color="#ffffff", corner_radius=8, height=38).pack(side=tk.LEFT)
         uid_entry.bind("<Return>", lambda _e: process_rfid())
-        self.add_theme_toggle_footer()
 
     # ---------- Sales Report Export ----------
 
