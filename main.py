@@ -1745,9 +1745,13 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                 messagebox.showwarning("Not enough", "Please insert full card price.")
                 return
             uid = uuid.uuid4().hex[:8].upper()
-            user_id = create_user(uid, name=None, is_staff=0, initial_balance=0.0)
+            user_id = create_user(uid, name=None, is_staff=0, initial_balance=card_price)
             record_transaction(product_id=None, quantity=None, total_amount=card_price, payment_method="card_purchase", rfid_user_id=user_id)
-            self.show_success_screen("Card Issued", f"New RFID card created.\nCard ID (simulate UID): {uid}", on_ok=self.build_main_menu)
+            self.show_success_screen(
+                "Card Issued",
+                f"New RFID card created.\nCard ID (simulate UID): {uid}\nStarting balance: ₱{card_price:.2f}",
+                on_ok=self.build_main_menu,
+            )
 
         action_frame = ctk.CTkFrame(inner, fg_color=theme["card_bg"])
         action_frame.pack(pady=(8, 0), fill=tk.X)
