@@ -351,7 +351,7 @@ def get_admin_overview_stats():
     )
     active_customers = cur.fetchone()["active_customers"]
 
-    cur.execute("SELECT COUNT(*) AS low_count FROM products WHERE capacity > 0 AND current_stock <= capacity * 0.2")
+    cur.execute("SELECT COUNT(*) AS low_count FROM products WHERE current_stock < 4")
     low_stock = cur.fetchone()["low_count"]
 
     conn.close()
@@ -433,37 +433,40 @@ def get_monthly_sales_data(months: int = 6):
     return points
 
 
-def get_top_selling_products(limit: int = 5):
-    """Return top-selling products by quantity sold."""
+def get_top_selling_products(limit: int | None = None):
+    """Return product sales totals, including products with zero sales."""
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute(
-        """
-        SELECT COALESCE(p.name, 'Unknown') AS product_name, COALESCE(SUM(t.quantity), 0) AS total_quantity
-        FROM transactions t
-        LEFT JOIN products p ON t.product_id = p.id
-        WHERE t.product_id IS NOT NULL AND t.quantity IS NOT NULL
-        GROUP BY t.product_id, p.name
-        ORDER BY total_quantity DESC, product_name ASC
-        LIMIT ?
-        """,
-        (limit,),
-    )
+    query = """
+        SELECT
+            p.name AS product_name,
+            COALESCE(SUM(t.quantity), 0) AS total_quantity
+        FROM products p
+        LEFT JOIN transactions t ON t.product_id = p.id AND t.quantity IS NOT NULL
+        GROUP BY p.id, p.name
+        ORDER BY total_quantity DESC, p.name ASC
+    """
+    params: tuple = ()
+    if limit is not None:
+        query += " LIMIT ?"
+        params = (int(limit),)
+
+    cur.execute(query, params)
     rows = cur.fetchall()
     conn.close()
     return [{"label": row["product_name"], "value": float(row["total_quantity"] or 0)} for row in rows]
 
 
-def get_low_stock_chart_data(limit: int = 5):
-    """Return low-stock product data for charting."""
+def get_low_stock_chart_data(limit: int = 10):
+    """Return low-stock product data for charting (current stock under 4)."""
     conn = get_connection()
     cur = conn.cursor()
     cur.execute(
         """
         SELECT name, current_stock, capacity
         FROM products
-        WHERE capacity > 0
-        ORDER BY CAST(current_stock AS FLOAT) / capacity ASC, name ASC
+        WHERE current_stock < 4
+        ORDER BY current_stock ASC, name ASC
         LIMIT ?
         """,
         (limit,),

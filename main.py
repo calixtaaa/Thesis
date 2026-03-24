@@ -486,7 +486,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
     def get_monthly_sales_data_points(self, months: int = 6):
         return get_monthly_sales_data(months)
 
-    def get_top_selling_products_data(self, limit: int = 5):
+    def get_top_selling_products_data(self, limit: int | None = None):
         return get_top_selling_products(limit)
 
     def get_low_stock_chart_data_points(self, limit: int = 5):
