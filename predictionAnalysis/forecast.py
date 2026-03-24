@@ -46,15 +46,15 @@ def add_time_series_features(daily: pd.DataFrame) -> pd.DataFrame:
     df["sale_date"] = pd.to_datetime(df["sale_date"])
     df = df.sort_values(["product_id", "sale_date"])
 
-    def _per_product(g: pd.DataFrame) -> pd.DataFrame:
-        g = g.sort_values("sale_date").copy()
-        g["lag_1"] = g["daily_qty"].shift(1)
-        g["lag_7"] = g["daily_qty"].shift(7)
-        g["lag_14"] = g["daily_qty"].shift(14)
-        g["roll7_mean"] = g["daily_qty"].rolling(7, min_periods=1).mean().shift(1)
-        return g
-
-    df = df.groupby("product_id", group_keys=False).apply(_per_product)
+    # Use groupby shift/transform directly so product_id remains a normal column
+    # across pandas versions (groupby.apply can alter grouping columns behavior).
+    g = df.groupby("product_id", sort=False)
+    df["lag_1"] = g["daily_qty"].shift(1)
+    df["lag_7"] = g["daily_qty"].shift(7)
+    df["lag_14"] = g["daily_qty"].shift(14)
+    df["roll7_mean"] = g["daily_qty"].transform(
+        lambda s: s.rolling(7, min_periods=1).mean().shift(1)
+    )
     df["dow"] = df["sale_date"].dt.dayofweek
     df["month"] = df["sale_date"].dt.month
     df["is_weekend"] = (df["dow"] >= 5).astype(int)
@@ -184,7 +184,23 @@ def forecast_and_restock(
             }
         )
 
-    forecasts_df = pd.DataFrame(forecasts).sort_values("predicted_sales_tomorrow", ascending=False)
-    metrics_df = pd.DataFrame([m.__dict__ for m in metrics_rows]).sort_values("rmse", ascending=True)
+    forecast_columns = [
+        "product_id",
+        "product_name",
+        "predicted_sales_tomorrow",
+        "current_stock",
+        "capacity",
+        "recommended_restock_qty",
+    ]
+    if forecasts:
+        forecasts_df = pd.DataFrame(forecasts).sort_values("predicted_sales_tomorrow", ascending=False)
+    else:
+        forecasts_df = pd.DataFrame(columns=forecast_columns)
+
+    metric_columns = ["product_id", "product_name", "mae", "rmse", "train_days", "test_days"]
+    if metrics_rows:
+        metrics_df = pd.DataFrame([m.__dict__ for m in metrics_rows]).sort_values("rmse", ascending=True)
+    else:
+        metrics_df = pd.DataFrame(columns=metric_columns)
     return forecasts_df, metrics_df
 
