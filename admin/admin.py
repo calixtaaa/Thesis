@@ -40,7 +40,7 @@ class AdminMixin:
 
         canvas = tk.Canvas(
             chart_inner,
-            height=240,
+            height=180,
             bg="#ffffff" if self.current_theme_name == "light" else "#253041",
             highlightthickness=0,
             bd=0,
@@ -120,7 +120,16 @@ class AdminMixin:
         draw_chart()
         return chart_card
 
-    def create_bar_chart(self, parent, title: str, subtitle: str, points, color="#5C6BC0"):
+    def create_bar_chart(
+        self,
+        parent,
+        title: str,
+        subtitle: str,
+        points,
+        color="#5C6BC0",
+        left_pad: int = 46,
+        right_pad: int = 20,
+    ):
         """Create a responsive vertical bar chart card."""
         chart_card = ctk.CTkFrame(
             parent,
@@ -159,8 +168,6 @@ class AdminMixin:
             canvas.delete("all")
             width = max(canvas.winfo_width(), 520)
             height = max(canvas.winfo_height(), 220)
-            left_pad = 46
-            right_pad = 20
             top_pad = 20
             bottom_pad = 62
 
@@ -260,38 +267,80 @@ class AdminMixin:
 
         def draw_chart(_event=None):
             canvas.delete("all")
-            width = max(canvas.winfo_width(), 520)
-            height = max(canvas.winfo_height(), 220)
-            left_pad = 110
-            right_pad = 20
-            top_pad = 20
-            bottom_pad = 20
+            width = canvas.winfo_width()
+            height = canvas.winfo_height()
+            if width <= 1 or height <= 1:
+                return
+            max_label_chars = max((len(str(p.get("label", ""))) for p in points), default=12)
+            left_pad = min(240, max(130, int(max_label_chars * 6.2) + 28))
+            right_pad = 120
+            top_pad = 30
+            bottom_pad = 16
+
+            # Keep this chart compact while preserving readable row labels/values.
+            visible_rows = max(1, min(len(points), 6))
+            target_height = max(150, top_pad + bottom_pad + (visible_rows * 30))
+            if abs(canvas.winfo_height() - target_height) > 2:
+                canvas.after_idle(lambda h=target_height: canvas.configure(height=h))
 
             plot_w = width - left_pad - right_pad
             plot_h = height - top_pad - bottom_pad
             if plot_w <= 0 or plot_h <= 0 or not points:
                 return
 
+            # Keep a minimum drawable width for bars even when labels are long.
+            if plot_w < 170:
+                left_pad = max(110, width - right_pad - 170)
+                plot_w = width - left_pad - right_pad
+                if plot_w <= 0:
+                    return
+
+            # Keep bars visually shorter so labels/values are easier to scan.
+            bar_scale = 0.50
+            usable_plot_w = plot_w * bar_scale
+
             max_capacity = max((point.get("capacity", point["value"]) for point in points), default=1.0)
             max_capacity = max(max_capacity, 1.0)
 
             axis_color = "#666666" if self.current_theme_name == "light" else "#d7dde8"
-            grid_color = "#d9d9d9" if self.current_theme_name == "light" else "#4b5a73"
-            row_h = plot_h / max(len(points), 1)
+            row_h = max(28, plot_h / max(len(points), 1))
+            value_col_x = max(left_pad + usable_plot_w + 10, left_pad + 10)
+
+            canvas.create_text(
+                left_pad,
+                top_pad - 12,
+                text="Stock Level",
+                fill=axis_color,
+                font=(UI_FONT, 9, "bold"),
+                anchor="w",
+            )
+            canvas.create_text(
+                value_col_x,
+                top_pad - 12,
+                text="Qty",
+                fill=axis_color,
+                font=(UI_FONT, 9, "bold"),
+                anchor="w",
+            )
 
             for idx, point in enumerate(points):
                 y = top_pad + (idx * row_h) + (row_h / 2)
+                stock_value = float(point.get("value", 0) or 0)
+                capacity_value = float(point.get("capacity", stock_value) or stock_value)
+                stock_int = int(round(stock_value))
+                capacity_int = int(round(capacity_value))
+                label_text = str(point.get("label", ""))
+
                 canvas.create_text(
                     left_pad - 8,
                     y,
-                    text=point["label"],
+                    text=label_text,
                     fill=axis_color,
-                    font=(UI_FONT, 8),
+                    font=(UI_FONT, 9),
                     anchor="e",
                 )
-                canvas.create_line(left_pad, y + 12, width - right_pad, y + 12, fill=grid_color)
-                capacity_w = (point.get("capacity", point["value"]) / max_capacity) * plot_w
-                stock_w = (point["value"] / max_capacity) * plot_w
+                capacity_w = (capacity_value / max_capacity) * usable_plot_w
+                stock_w = (stock_value / max_capacity) * usable_plot_w
                 canvas.create_rectangle(
                     left_pad,
                     y - 8,
@@ -309,11 +358,11 @@ class AdminMixin:
                     outline="",
                 )
                 canvas.create_text(
-                    left_pad + capacity_w + 8,
+                    value_col_x,
                     y,
-                    text=f"{int(point['value'])}/{int(point.get('capacity', point['value']))}",
+                    text=f"{stock_int} / {capacity_int}",
                     fill=axis_color,
-                    font=(UI_FONT, 8, "bold"),
+                    font=(UI_FONT, 10, "bold"),
                     anchor="w",
                 )
 
@@ -429,8 +478,8 @@ class AdminMixin:
         stats = self.get_admin_overview_stats_data()
         trend_points = self.get_sales_trend_data_points(15)
         monthly_points = self.get_monthly_sales_data_points(6)
-        top_products = self.get_top_selling_products_data(5)
-        low_stock_points = self.get_low_stock_chart_data_points(5)
+        top_products = self.get_top_selling_products_data()
+        low_stock_points = self.get_low_stock_chart_data_points(10)
 
         container = ctk.CTkFrame(self.content_holder, fg_color=self.current_theme["bg"])
 
@@ -537,11 +586,13 @@ class AdminMixin:
         self.create_bar_chart(
             body,
             "Top-selling Products",
-            "By quantity sold",
+            "All products by quantity sold",
             top_products if top_products else [{"label": "No sales yet", "value": 0}],
             color="#7E57C2",
+            left_pad=28,
+            right_pad=34,
         )
-        self.create_low_stock_chart(body, "Low-stock Products", "Current stock vs capacity", low_stock_points)
+        self.create_low_stock_chart(body, "Low-stock Products", "Items with fewer than 4 stocks left (current/capacity)", low_stock_points)
 
         # -----------------------------
         # Prediction Analysis (runtime)
