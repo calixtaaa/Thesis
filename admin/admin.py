@@ -519,6 +519,9 @@ class AdminMixin:
             return b
 
         nav_btn("Overview", lambda: self.show_admin_dashboard(staff_user))
+        nav_btn("RFID Roles", self.show_rfid_roles_screen)
+        nav_btn("Cash Pulse Settings", self.show_cash_pulse_settings_screen)
+        nav_btn("Hardware Diagnostics", self.show_hardware_diagnostics_screen)
         nav_btn("Sales Reports", self.show_sales_reports_screen)
         nav_btn("Generate Excel Report", self.export_sales_report_ui)
         nav_btn("Change Credentials", self.change_admin_credentials_screen)
@@ -777,6 +780,291 @@ class AdminMixin:
                     corner_radius=8,
                     width=80,
                 ).pack(side=tk.RIGHT, padx=8)
+
+        ctk.CTkButton(
+            frame,
+            text="Back to Admin Dashboard",
+            font=UI_FONT_BODY,
+            command=lambda: self.show_admin_dashboard(getattr(self, "_current_admin_user", {"name": "admin", "rfid_uid": ""})),
+            fg_color=self.current_theme["button_bg"],
+            hover_color=self.current_theme.get("accent", "#1A948E"),
+            text_color=self.current_theme["button_fg"],
+            corner_radius=8,
+            height=38,
+        ).pack(pady=12)
+
+        self.add_theme_toggle_footer()
+
+    def show_rfid_roles_screen(self):
+        """Manage RFID user roles for door access control."""
+        self._current_screen_builder = self.show_rfid_roles_screen
+        self.clear_screen()
+
+        frame = ctk.CTkFrame(self.content_holder, fg_color=self.current_theme["bg"])
+        frame.pack(expand=True, fill=tk.BOTH, padx=20, pady=16)
+
+        ctk.CTkLabel(
+            frame,
+            text="RFID Role Management",
+            font=(UI_FONT, 20, "bold"),
+            text_color=self.current_theme["fg"],
+        ).pack(pady=(0, 6))
+
+        ctk.CTkLabel(
+            frame,
+            text="Roles: customer, restocker, researcher, troubleshooter, admin",
+            font=UI_FONT_SMALL,
+            text_color=self.current_theme.get("muted", self.current_theme["fg"]),
+        ).pack(pady=(0, 10))
+
+        table = ctk.CTkScrollableFrame(frame, fg_color=self.current_theme["bg"])
+        table.pack(expand=True, fill=tk.BOTH)
+
+        users = self.get_all_rfid_users_data()
+        role_values = ["customer", "restocker", "researcher", "troubleshooter", "admin"]
+
+        for user in users:
+            row = ctk.CTkFrame(
+                table,
+                fg_color=self.current_theme.get("card_bg", self.current_theme["button_bg"]),
+                border_width=1,
+                border_color=self.current_theme.get("card_border", "#e2e8f0"),
+                corner_radius=8,
+            )
+            row.pack(fill=tk.X, pady=6)
+
+            name_text = user["name"] or "(no name)"
+            ctk.CTkLabel(
+                row,
+                text=f"UID: {user['rfid_uid']}  |  {name_text}  |  Bal: ₱{float(user['balance']):.2f}",
+                font=UI_FONT_BODY,
+                text_color=self.current_theme["button_fg"],
+                anchor="w",
+            ).pack(side=tk.LEFT, padx=10, pady=10, expand=True, fill=tk.X)
+
+            role_var = tk.StringVar(value=(user["role"] or "customer"))
+            picker = ctk.CTkOptionMenu(
+                row,
+                variable=role_var,
+                values=role_values,
+                width=150,
+                fg_color=self.current_theme.get("accent", "#1A948E"),
+                button_color=self.current_theme.get("accent_hover", "#15857B"),
+                button_hover_color=self.current_theme.get("accent_hover", "#15857B"),
+                text_color="#ffffff",
+            )
+            picker.pack(side=tk.LEFT, padx=(0, 8), pady=8)
+
+            def make_save(uid=user["id"], rvar=role_var):
+                def _save():
+                    try:
+                        self.update_rfid_user_role_data(uid, rvar.get())
+                        messagebox.showinfo("Saved", "RFID role updated successfully.")
+                    except Exception as exc:
+                        messagebox.showerror("Error", str(exc))
+                return _save
+
+            ctk.CTkButton(
+                row,
+                text="Save",
+                font=(UI_FONT, 11, "bold"),
+                command=make_save(),
+                fg_color=self.current_theme.get("accent", "#1A948E"),
+                hover_color=self.current_theme.get("accent_hover", "#15857B"),
+                text_color="#ffffff",
+                corner_radius=8,
+                width=72,
+            ).pack(side=tk.LEFT, padx=(0, 10), pady=8)
+
+        ctk.CTkButton(
+            frame,
+            text="Back to Admin Dashboard",
+            font=UI_FONT_BODY,
+            command=lambda: self.show_admin_dashboard(getattr(self, "_current_admin_user", {"name": "admin", "rfid_uid": ""})),
+            fg_color=self.current_theme["button_bg"],
+            hover_color=self.current_theme.get("accent", "#1A948E"),
+            text_color=self.current_theme["button_fg"],
+            corner_radius=8,
+            height=38,
+        ).pack(pady=12)
+
+        self.add_theme_toggle_footer()
+
+    def show_cash_pulse_settings_screen(self):
+        """Configure bill/coin acceptor pulse-to-value mappings."""
+        self._current_screen_builder = self.show_cash_pulse_settings_screen
+        self.clear_screen()
+
+        frame = ctk.CTkFrame(self.content_holder, fg_color=self.current_theme["bg"])
+        frame.pack(expand=True, fill=tk.BOTH, padx=20, pady=16)
+
+        ctk.CTkLabel(
+            frame,
+            text="Cash Pulse Settings",
+            font=(UI_FONT, 20, "bold"),
+            text_color=self.current_theme["fg"],
+        ).pack(pady=(0, 8))
+
+        ctk.CTkLabel(
+            frame,
+            text="Set how much peso value each input pulse represents.",
+            font=UI_FONT_SMALL,
+            text_color=self.current_theme.get("muted", self.current_theme["fg"]),
+        ).pack(pady=(0, 12))
+
+        card = ctk.CTkFrame(
+            frame,
+            fg_color=self.current_theme.get("card_bg", self.current_theme["button_bg"]),
+            border_width=1,
+            border_color=self.current_theme.get("card_border", "#e2e8f0"),
+            corner_radius=10,
+        )
+        card.pack(fill=tk.X, padx=8, pady=6)
+
+        inner = ctk.CTkFrame(card, fg_color=self.current_theme.get("card_bg", self.current_theme["button_bg"]))
+        inner.pack(fill=tk.X, padx=14, pady=14)
+
+        coin_var = tk.StringVar(value=str(getattr(self, "coin_pulse_value", 1.0)))
+        bill_var = tk.StringVar(value=str(getattr(self, "bill_pulse_value", 20.0)))
+
+        ctk.CTkLabel(inner, text="Coin acceptor pulse value (PHP):", font=UI_FONT_BODY, text_color=self.current_theme["fg"]).pack(anchor="w")
+        coin_entry = ctk.CTkEntry(inner, textvariable=coin_var, width=220)
+        coin_entry.pack(anchor="w", pady=(4, 10))
+
+        ctk.CTkLabel(inner, text="Bill acceptor pulse value (PHP):", font=UI_FONT_BODY, text_color=self.current_theme["fg"]).pack(anchor="w")
+        bill_entry = ctk.CTkEntry(inner, textvariable=bill_var, width=220)
+        bill_entry.pack(anchor="w", pady=(4, 10))
+
+        status_lbl = ctk.CTkLabel(inner, text="", font=UI_FONT_SMALL, text_color="#b91c1c")
+        status_lbl.pack(anchor="w", pady=(0, 8))
+
+        def save_values():
+            try:
+                coin_val = float((coin_var.get() or "").strip())
+                bill_val = float((bill_var.get() or "").strip())
+                if coin_val <= 0 or bill_val <= 0:
+                    raise ValueError("Values must be positive numbers.")
+
+                self.coin_pulse_value = coin_val
+                self.bill_pulse_value = bill_val
+                self.set_hardware_setting_data("coin_pulse_value", str(coin_val))
+                self.set_hardware_setting_data("bill_pulse_value", str(bill_val))
+                status_lbl.configure(text="Saved.", text_color="#065f46")
+            except Exception as exc:
+                status_lbl.configure(text=f"Invalid values: {exc}", text_color="#b91c1c")
+
+        ctk.CTkButton(
+            inner,
+            text="Save Settings",
+            font=(UI_FONT, 11, "bold"),
+            command=save_values,
+            fg_color=self.current_theme.get("accent", "#1A948E"),
+            hover_color=self.current_theme.get("accent_hover", "#15857B"),
+            text_color="#ffffff",
+            corner_radius=8,
+            width=150,
+        ).pack(anchor="w")
+
+        ctk.CTkButton(
+            frame,
+            text="Back to Admin Dashboard",
+            font=UI_FONT_BODY,
+            command=lambda: self.show_admin_dashboard(getattr(self, "_current_admin_user", {"name": "admin", "rfid_uid": ""})),
+            fg_color=self.current_theme["button_bg"],
+            hover_color=self.current_theme.get("accent", "#1A948E"),
+            text_color=self.current_theme["button_fg"],
+            corner_radius=8,
+            height=38,
+        ).pack(pady=12)
+
+        self.add_theme_toggle_footer()
+
+    def show_hardware_diagnostics_screen(self):
+        """Show real-time pulse counters and quick RFID read diagnostics."""
+        self._current_screen_builder = self.show_hardware_diagnostics_screen
+        self.clear_screen()
+
+        frame = ctk.CTkFrame(self.content_holder, fg_color=self.current_theme["bg"])
+        frame.pack(expand=True, fill=tk.BOTH, padx=20, pady=16)
+
+        ctk.CTkLabel(
+            frame,
+            text="Hardware Diagnostics",
+            font=(UI_FONT, 20, "bold"),
+            text_color=self.current_theme["fg"],
+        ).pack(pady=(0, 8))
+
+        card = ctk.CTkFrame(
+            frame,
+            fg_color=self.current_theme.get("card_bg", self.current_theme["button_bg"]),
+            border_width=1,
+            border_color=self.current_theme.get("card_border", "#e2e8f0"),
+            corner_radius=10,
+        )
+        card.pack(fill=tk.X, padx=8, pady=6)
+
+        coin_lbl = ctk.CTkLabel(card, text="Coin pulses: 0", font=UI_FONT_BODY, text_color=self.current_theme["fg"])
+        coin_lbl.pack(anchor="w", padx=14, pady=(12, 4))
+
+        bill_lbl = ctk.CTkLabel(card, text="Bill pulses: 0", font=UI_FONT_BODY, text_color=self.current_theme["fg"])
+        bill_lbl.pack(anchor="w", padx=14, pady=4)
+
+        uid_lbl = ctk.CTkLabel(card, text="Last RFID UID: (none)", font=UI_FONT_BODY, text_color=self.current_theme["fg"])
+        uid_lbl.pack(anchor="w", padx=14, pady=4)
+
+        result_lbl = ctk.CTkLabel(card, text="", font=UI_FONT_SMALL, text_color=self.current_theme.get("muted", self.current_theme["fg"]))
+        result_lbl.pack(anchor="w", padx=14, pady=(0, 8))
+
+        btn_row = ctk.CTkFrame(card, fg_color=self.current_theme.get("card_bg", self.current_theme["button_bg"]))
+        btn_row.pack(fill=tk.X, padx=14, pady=(0, 12))
+
+        def tap_payment():
+            uid = self.read_rfid_uid("payment")
+            if uid:
+                uid_lbl.configure(text=f"Last RFID UID: {uid}")
+                result_lbl.configure(text="Payment reader tap detected.")
+            else:
+                result_lbl.configure(text="No payment RFID tap detected.")
+
+        def tap_door():
+            uid = self.read_rfid_uid("door")
+            if uid:
+                uid_lbl.configure(text=f"Last RFID UID: {uid}")
+                result_lbl.configure(text="Door reader tap detected.")
+            else:
+                result_lbl.configure(text="No door RFID tap detected.")
+
+        ctk.CTkButton(
+            btn_row,
+            text="Read Payment RFID",
+            command=tap_payment,
+            fg_color=self.current_theme.get("accent", "#1A948E"),
+            hover_color=self.current_theme.get("accent_hover", "#15857B"),
+            text_color="#ffffff",
+            corner_radius=8,
+            width=150,
+        ).pack(side=tk.LEFT, padx=(0, 8))
+
+        ctk.CTkButton(
+            btn_row,
+            text="Read Door RFID",
+            command=tap_door,
+            fg_color=self.current_theme.get("accent", "#1A948E"),
+            hover_color=self.current_theme.get("accent_hover", "#15857B"),
+            text_color="#ffffff",
+            corner_radius=8,
+            width=150,
+        ).pack(side=tk.LEFT)
+
+        def refresh_counts():
+            if not frame.winfo_exists():
+                return
+            counts = self.get_payment_pulse_counts_data()
+            coin_lbl.configure(text=f"Coin pulses: {counts['coin_acceptor']}")
+            bill_lbl.configure(text=f"Bill pulses: {counts['bill_acceptor']}")
+            frame.after(500, refresh_counts)
+
+        refresh_counts()
 
         ctk.CTkButton(
             frame,

@@ -29,6 +29,10 @@ from database import (
     create_user,
     update_user_balance,
     adjust_user_balance,
+    get_all_rfid_users,
+    update_rfid_user_role,
+    get_hardware_setting,
+    set_hardware_setting,
     restock_product,
     export_sales_report,
     get_admin_overview_stats,
@@ -38,6 +42,12 @@ from database import (
     get_low_stock_chart_data,
 )
 from patchNotes import get_patch_notes_text, VERSION
+
+try:
+    from mfrc522 import SimpleMFRC522, MFRC522  # type: ignore
+except Exception:
+    SimpleMFRC522 = None
+    MFRC522 = None
 
 # ======================
 #  ENV & GPIO HANDLING
@@ -62,6 +72,7 @@ except ImportError:
         def setwarnings(self, *_a, **_k): pass
         def setup(self, *_a, **_k): pass
         def output(self, *_a, **_k): pass
+        def input(self, *_a, **_k): return self.HIGH
         def cleanup(self): pass
         def add_event_detect(self, *_a, **_k): pass
 
@@ -127,15 +138,98 @@ def _hover_scale_btn(btn, normal_padx=10, normal_pady=6, hover_padx=14, hover_pa
     btn.bind("<Enter>", on_enter)
     btn.bind("<Leave>", on_leave)
 
-# Simple pin assignments (adjust on real Pi)
-PRODUCT_STEPPER_PINS = {
-    1: {"step": 17, "dir": 27},   # Slot 1
-    2: {"step": 22, "dir": 23},   # Slot 2
+# Raspberry Pi 5 (BCM numbering) pin map.
+# NOTE: MFRC522 readers share SPI0 and use separate CS + RST lines.
+RFID_PINS = {
+    "spi_sclk": 11,              # Physical pin 23
+    "spi_mosi": 10,              # Physical pin 19
+    "spi_miso": 9,               # Physical pin 21
+    "payment_reader_cs": 8,      # Physical pin 24 (CE0)
+    "door_reader_cs": 7,         # Physical pin 26 (CE1)
+    "payment_reader_rst": 5,     # Physical pin 29
+    "door_reader_rst": 19,       # Physical pin 35
 }
-COIN_HOPPER_PIN = 24
-STEPS_PER_PRODUCT = 200  # adjust per mechanism
-COINS_PER_SECOND = 5     # for hopper simulation
-COIN_VALUE = 1.0         # 1 peso per coin (example)
+
+# ULN2003 IN1..IN4 mapping per tray motor (28BYJ-48).
+# Extend this dictionary with more trays as hardware is added.
+PRODUCT_STEPPER_PINS = {
+    1: {"in1": 17, "in2": 27, "in3": 22, "in4": 23},
+    2: {"in1": 4, "in2": 18, "in3": 15, "in4": 14},
+}
+
+SOLENOID_PINS = {
+    "restock": 16,          # Physical pin 36
+    "troubleshoot": 20,     # Physical pin 38
+}
+
+PAYMENT_INPUT_PINS = {
+    "bill_acceptor": 6,     # Physical pin 31
+    "coin_acceptor": 13,    # Physical pin 33
+}
+
+COIN_HOPPER_PINS = {
+    1: 12,                    # 1-peso hopper motor control, physical pin 32
+    5: 21,                    # 5-peso hopper motor control, physical pin 40
+}
+
+HOPPER_FEEDBACK_PINS = {
+    1: 24,                    # 1-peso hopper pulse out, physical pin 18
+    5: 25,                    # 5-peso hopper pulse out, physical pin 22
+}
+
+IR_BREAK_BEAM_PIN = 26        # Physical pin 37
+STEPS_PER_PRODUCT = 512       # 28BYJ-48 full revolution in full-step mode
+STEP_DELAY = 0.002
+SOLENOID_UNLOCK_SECONDS = 3.0
+COINS_PER_SECOND = {
+    1: 5,                     # 1-peso hopper fallback rate when no pulse feedback
+    5: 5,                     # 5-peso hopper fallback rate when no pulse feedback
+}
+
+COIN_ACCEPTOR_PULSE_VALUE = 1.0
+BILL_ACCEPTOR_PULSE_VALUE = 20.0
+PAYMENT_PULSE_BOUNCETIME_MS = 50
+HOPPER_PULSE_BOUNCETIME_MS = 20
+HOPPER_DISPENSE_TIMEOUT_PER_COIN_S = 0.5
+
+_payment_pulse_counts = {
+    "coin_acceptor": 0,
+    "bill_acceptor": 0,
+}
+
+_hopper_pulse_counts = {
+    1: 0,
+    5: 0,
+}
+
+
+def get_payment_pulse_counts() -> dict:
+    return {
+        "coin_acceptor": int(_payment_pulse_counts["coin_acceptor"]),
+        "bill_acceptor": int(_payment_pulse_counts["bill_acceptor"]),
+    }
+
+
+def _payment_pulse_callback(channel: int):
+    if channel == PAYMENT_INPUT_PINS["coin_acceptor"]:
+        _payment_pulse_counts["coin_acceptor"] += 1
+    elif channel == PAYMENT_INPUT_PINS["bill_acceptor"]:
+        _payment_pulse_counts["bill_acceptor"] += 1
+
+
+def _hopper_pulse_callback(channel: int):
+    if channel == HOPPER_FEEDBACK_PINS[1]:
+        _hopper_pulse_counts[1] += 1
+    elif channel == HOPPER_FEEDBACK_PINS[5]:
+        _hopper_pulse_counts[5] += 1
+
+
+def consume_payment_pulse_amount() -> float:
+    coin_pulses = _payment_pulse_counts["coin_acceptor"]
+    bill_pulses = _payment_pulse_counts["bill_acceptor"]
+    _payment_pulse_counts["coin_acceptor"] = 0
+    _payment_pulse_counts["bill_acceptor"] = 0
+    return (coin_pulses * COIN_ACCEPTOR_PULSE_VALUE) + (bill_pulses * BILL_ACCEPTOR_PULSE_VALUE)
 
 
 # ======================
@@ -146,13 +240,75 @@ def gpio_init():
     GPIO.setwarnings(False)
     GPIO.setmode(GPIO.BCM)
 
-    # Stepper pins
+    # Stepper pins (ULN2003 inputs)
     for cfg in PRODUCT_STEPPER_PINS.values():
-        GPIO.setup(cfg["step"], GPIO.OUT)
-        GPIO.setup(cfg["dir"], GPIO.OUT)
+        for pin in cfg.values():
+            GPIO.setup(pin, GPIO.OUT)
+            GPIO.output(pin, GPIO.LOW)
 
-    # Hopper
-    GPIO.setup(COIN_HOPPER_PIN, GPIO.OUT)
+    # Solenoid outputs (through relay or MOSFET driver)
+    for pin in SOLENOID_PINS.values():
+        GPIO.setup(pin, GPIO.OUT)
+        GPIO.output(pin, GPIO.LOW)
+
+    # RFID reader reset lines
+    GPIO.setup(RFID_PINS["payment_reader_rst"], GPIO.OUT)
+    GPIO.setup(RFID_PINS["door_reader_rst"], GPIO.OUT)
+    GPIO.output(RFID_PINS["payment_reader_rst"], GPIO.HIGH)
+    GPIO.output(RFID_PINS["door_reader_rst"], GPIO.HIGH)
+
+    # Coin hopper outputs
+    for pin in COIN_HOPPER_PINS.values():
+        GPIO.setup(pin, GPIO.OUT)
+        GPIO.output(pin, GPIO.LOW)
+
+    # Pulse inputs from bill/coin acceptors
+    for pin in PAYMENT_INPUT_PINS.values():
+        GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+        try:
+            GPIO.add_event_detect(
+                pin,
+                GPIO.FALLING,
+                callback=_payment_pulse_callback,
+                bouncetime=PAYMENT_PULSE_BOUNCETIME_MS,
+            )
+        except Exception:
+            pass
+
+    # Hopper coin-out pulse feedback lines.
+    for pin in HOPPER_FEEDBACK_PINS.values():
+        GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+        try:
+            GPIO.add_event_detect(
+                pin,
+                GPIO.FALLING,
+                callback=_hopper_pulse_callback,
+                bouncetime=HOPPER_PULSE_BOUNCETIME_MS,
+            )
+        except Exception:
+            pass
+
+    # IR break-beam receiver output (usually active-low)
+    GPIO.setup(IR_BREAK_BEAM_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+
+
+ULN2003_SEQUENCE = [
+    (1, 0, 0, 0),
+    (1, 1, 0, 0),
+    (0, 1, 0, 0),
+    (0, 1, 1, 0),
+    (0, 0, 1, 0),
+    (0, 0, 1, 1),
+    (0, 0, 0, 1),
+    (1, 0, 0, 1),
+]
+
+
+def _set_stepper_phase(pins: dict, phase: tuple[int, int, int, int]):
+    GPIO.output(pins["in1"], GPIO.HIGH if phase[0] else GPIO.LOW)
+    GPIO.output(pins["in2"], GPIO.HIGH if phase[1] else GPIO.LOW)
+    GPIO.output(pins["in3"], GPIO.HIGH if phase[2] else GPIO.LOW)
+    GPIO.output(pins["in4"], GPIO.HIGH if phase[3] else GPIO.LOW)
 
 def dispense_from_slot(slot_number: int, quantity: int = 1):
     pins = PRODUCT_STEPPER_PINS.get(slot_number)
@@ -165,24 +321,74 @@ def dispense_from_slot(slot_number: int, quantity: int = 1):
         return
 
     steps = STEPS_PER_PRODUCT * quantity
-    delay = 0.001  # 1ms
+    for i in range(steps):
+        _set_stepper_phase(pins, ULN2003_SEQUENCE[i % len(ULN2003_SEQUENCE)])
+        time.sleep(STEP_DELAY)
 
-    GPIO.output(pins["dir"], GPIO.HIGH)
-    for _ in range(steps):
-        GPIO.output(pins["step"], GPIO.HIGH)
-        time.sleep(delay)
-        GPIO.output(pins["step"], GPIO.LOW)
-        time.sleep(delay)
+    # De-energize coils at end to reduce heat.
+    _set_stepper_phase(pins, (0, 0, 0, 0))
+
+
+def wait_for_vend_confirmation(timeout_s: float = 3.0) -> bool:
+    """Return True when IR beam is broken within timeout (active-low sensor)."""
+    if not ON_RPI:
+        return True
+
+    deadline = time.time() + max(0.1, timeout_s)
+    while time.time() < deadline:
+        if GPIO.input(IR_BREAK_BEAM_PIN) == GPIO.LOW:
+            return True
+        time.sleep(0.01)
+    return False
+
+
+def unlock_access_door(door: str):
+    pin = SOLENOID_PINS.get(door)
+    if pin is None:
+        raise ValueError(f"Unknown door '{door}'")
+
+    print(f"[HW] Unlocking {door} door for {SOLENOID_UNLOCK_SECONDS:.1f}s")
+    GPIO.output(pin, GPIO.HIGH)
+    time.sleep(SOLENOID_UNLOCK_SECONDS)
+    GPIO.output(pin, GPIO.LOW)
 
 def dispense_change(amount: float):
-    coins_to_dispense = int(amount // COIN_VALUE)
-    if coins_to_dispense <= 0:
+    amount = int(round(amount))
+    if amount <= 0:
         return
-    print(f"[HW] Dispensing change: {coins_to_dispense} coins (₱{amount:.2f})")
-    duration = coins_to_dispense / COINS_PER_SECOND
-    GPIO.output(COIN_HOPPER_PIN, GPIO.HIGH)
-    time.sleep(duration)
-    GPIO.output(COIN_HOPPER_PIN, GPIO.LOW)
+
+    five_count = amount // 5
+    one_count = amount % 5
+
+    def dispense_with_feedback(coin_value: int, target_count: int):
+        if target_count <= 0:
+            return
+
+        ctrl_pin = COIN_HOPPER_PINS[coin_value]
+        print(f"[HW] Dispensing {target_count} x ₱{coin_value} coins")
+
+        # Development fallback when running off Pi.
+        if not ON_RPI:
+            rate = max(1, COINS_PER_SECOND.get(coin_value, 5))
+            time.sleep(target_count / rate)
+            return
+
+        _hopper_pulse_counts[coin_value] = 0
+        deadline = time.time() + max(2.0, target_count * HOPPER_DISPENSE_TIMEOUT_PER_COIN_S)
+        GPIO.output(ctrl_pin, GPIO.HIGH)
+        try:
+            while _hopper_pulse_counts[coin_value] < target_count and time.time() < deadline:
+                time.sleep(0.005)
+        finally:
+            GPIO.output(ctrl_pin, GPIO.LOW)
+
+        emitted = _hopper_pulse_counts[coin_value]
+        if emitted < target_count:
+            print(f"[HW] WARNING: Hopper ₱{coin_value} emitted {emitted}/{target_count} pulses")
+
+    # Use higher denomination first to minimize total coins dispensed.
+    dispense_with_feedback(5, five_count)
+    dispense_with_feedback(1, one_count)
 
 
 # ======================
@@ -254,6 +460,18 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         self._ui_font_small = UI_FONT_SMALL
         self._ui_font_button = UI_FONT_BUTTON
         self.cash_session = cash_session
+        self._cash_poll_after_id = None
+        self.coin_pulse_value = COIN_ACCEPTOR_PULSE_VALUE
+        self.bill_pulse_value = BILL_ACCEPTOR_PULSE_VALUE
+
+        try:
+            self.coin_pulse_value = float(self.get_hardware_setting_data("coin_pulse_value", str(COIN_ACCEPTOR_PULSE_VALUE)))
+        except Exception:
+            self.coin_pulse_value = COIN_ACCEPTOR_PULSE_VALUE
+        try:
+            self.bill_pulse_value = float(self.get_hardware_setting_data("bill_pulse_value", str(BILL_ACCEPTOR_PULSE_VALUE)))
+        except Exception:
+            self.bill_pulse_value = BILL_ACCEPTOR_PULSE_VALUE
 
         # Icon images (loaded lazily if files exist)
         self.staff_icon = None
@@ -436,6 +654,12 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             except Exception:
                 pass
         self._pending_focus_ids = []
+        if getattr(self, "_cash_poll_after_id", None):
+            try:
+                self.after_cancel(self._cash_poll_after_id)
+            except Exception:
+                pass
+            self._cash_poll_after_id = None
         for w in self.content_holder.winfo_children():
             w.destroy()
         # Reset any per-screen background colour changes (e.g. LOGIN_PAGE_BG)
@@ -470,6 +694,150 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
 
     def restock_product_data(self, product_id: int, amount: int, new_price: float | None = None):
         return restock_product(product_id, amount, new_price)
+
+    def get_all_rfid_users_data(self):
+        return get_all_rfid_users()
+
+    def update_rfid_user_role_data(self, user_id: int, role: str):
+        return update_rfid_user_role(user_id, role)
+
+    def get_hardware_setting_data(self, key: str, default: str | None = None):
+        return get_hardware_setting(key, default)
+
+    def set_hardware_setting_data(self, key: str, value: str):
+        return set_hardware_setting(key, value)
+
+    def get_payment_pulse_counts_data(self):
+        return get_payment_pulse_counts()
+
+    def _read_rfid_uid_from_hardware(self, reader_name: str) -> str | None:
+        if not ON_RPI:
+            return None
+
+        uid = self._read_rfid_uid_dual_backend(reader_name)
+        if uid:
+            return uid
+
+        if SimpleMFRC522 is None:
+            return None
+
+        # Most SimpleMFRC522 setups map to CE0; this still enables live tap reads.
+        # Kept as fallback when low-level dual backend is unavailable.
+        _ = reader_name
+        try:
+            reader = SimpleMFRC522()
+            uid_int, _text = reader.read_no_block()
+            if uid_int:
+                return str(uid_int).strip().upper()
+        except Exception:
+            return None
+        return None
+
+    def _read_rfid_uid_dual_backend(self, reader_name: str) -> str | None:
+        """Read RFID UID from selected SPI CE device (payment=CE0, door=CE1)."""
+        if MFRC522 is None:
+            return None
+
+        spi_device = 0 if reader_name == "payment" else 1
+        rst_pin = RFID_PINS["payment_reader_rst"] if reader_name == "payment" else RFID_PINS["door_reader_rst"]
+
+        try:
+            # Reset only the selected reader before a poll.
+            GPIO.output(rst_pin, GPIO.LOW)
+            time.sleep(0.01)
+            GPIO.output(rst_pin, GPIO.HIGH)
+            time.sleep(0.01)
+        except Exception:
+            pass
+
+        reader = None
+        ctor_attempts = (
+            {"bus": 0, "device": spi_device},
+            {"dev": spi_device},
+            {"device": spi_device},
+            {"bus": 0, "dev": spi_device},
+            {},
+        )
+        for kwargs in ctor_attempts:
+            try:
+                reader = MFRC522(**kwargs)
+                break
+            except TypeError:
+                continue
+            except Exception:
+                continue
+
+        if reader is None:
+            return None
+
+        try:
+            # Common MFRC522 low-level API used by several Python wrappers.
+            if hasattr(reader, "MFRC522_Request") and hasattr(reader, "MFRC522_Anticoll"):
+                req_cmd = getattr(reader, "PICC_REQIDL", 0x26)
+                mi_ok = getattr(reader, "MI_OK", 0)
+                status, _tag_type = reader.MFRC522_Request(req_cmd)
+                if status != mi_ok:
+                    return None
+                status, uid = reader.MFRC522_Anticoll()
+                if status == mi_ok and uid:
+                    return "".join(f"{int(part) & 0xFF:02X}" for part in uid[:4])
+
+            # Alternate API shape fallback.
+            if hasattr(reader, "read_id_no_block"):
+                uid_int = reader.read_id_no_block()
+                if uid_int:
+                    return str(uid_int).strip().upper()
+        except Exception:
+            return None
+        finally:
+            # Close SPI if the backend exposes it.
+            try:
+                spi_obj = getattr(reader, "spi", None)
+                if spi_obj is not None and hasattr(spi_obj, "close"):
+                    spi_obj.close()
+            except Exception:
+                pass
+
+        return None
+
+    def read_rfid_uid(self, reader_name: str) -> str | None:
+        return self._read_rfid_uid_from_hardware(reader_name)
+
+    def start_cash_pulse_monitor(self, amount_var, remaining_var, total_amount: float):
+        def tick():
+            if not self.winfo_exists():
+                return
+            delta = self.consume_payment_pulse_amount_with_values(self.coin_pulse_value, self.bill_pulse_value)
+            if delta > 0:
+                self.cash_session.add(delta)
+                current = self.cash_session.get_amount()
+                amount_var.set(current)
+                remaining_var.set(max(0.0, total_amount - current))
+            self._cash_poll_after_id = self.after(120, tick)
+
+        self._cash_poll_after_id = self.after(120, tick)
+
+    def consume_payment_pulse_amount_with_values(self, coin_value: float, bill_value: float) -> float:
+        coin_pulses = _payment_pulse_counts["coin_acceptor"]
+        bill_pulses = _payment_pulse_counts["bill_acceptor"]
+        _payment_pulse_counts["coin_acceptor"] = 0
+        _payment_pulse_counts["bill_acceptor"] = 0
+        return (coin_pulses * float(coin_value)) + (bill_pulses * float(bill_value))
+
+    def is_user_authorized_for_door(self, user, door: str) -> bool:
+        role = (user["role"] or "").strip().lower() if "role" in user.keys() else ""
+        is_staff = bool(user["is_staff"]) if "is_staff" in user.keys() else False
+
+        if role == "admin":
+            return True
+        if door == "restock":
+            return is_staff or role in {"restocker", "staff"}
+        if door == "troubleshoot":
+            return role in {"researcher", "troubleshooter", "technician", "admin"}
+        return False
+
+    def unlock_access_door(self, door: str):
+        unlock_access_door(door)
 
     def get_admin_credentials_data(self):
         return get_admin_credentials()
@@ -1586,6 +1954,8 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                 line_total = float(p["price"]) * q
                 decrement_stock(p["id"], q)
                 dispense_from_slot(p["slot_number"], q)
+                if not wait_for_vend_confirmation(timeout_s=3.0):
+                    print(f"[HW] WARNING: No IR vend confirmation for slot {p['slot_number']}")
                 record_transaction(p["id"], q, line_total, "cash")
             if change > 0:
                 dispense_change(change)
@@ -1637,6 +2007,8 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                 line_total = float(p["price"]) * q
                 decrement_stock(p["id"], q)
                 dispense_from_slot(p["slot_number"], q)
+                if not wait_for_vend_confirmation(timeout_s=3.0):
+                    print(f"[HW] WARNING: No IR vend confirmation for slot {p['slot_number']}")
                 record_transaction(
                     product_id=p["id"],
                     quantity=q,
@@ -1739,6 +2111,8 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                 corner_radius=8,
             ).pack(side=tk.LEFT, padx=10)
 
+            self.start_cash_pulse_monitor(amount_var, remaining_var, card_price)
+
         def confirm_purchase():
             inserted = cash_session.get_amount()
             if inserted < card_price:
@@ -1793,6 +2167,28 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
 
         uid_entry = ctk.CTkEntry(inner, font=UI_FONT_BODY, width=280, fg_color=theme["search_bg"], text_color=theme["fg"], border_color=theme["search_border"], corner_radius=8, height=40)
         uid_entry.pack(pady=(0, 8))
+
+        def read_from_reader():
+            uid = self.read_rfid_uid("payment")
+            if not uid:
+                error_lbl.configure(text="No RFID tap detected. You can type card ID manually.")
+                return
+            uid_entry.delete(0, tk.END)
+            uid_entry.insert(0, uid)
+            error_lbl.configure(text="")
+
+        ctk.CTkButton(
+            inner,
+            text="Read from RFID Reader",
+            font=UI_FONT_SMALL,
+            command=read_from_reader,
+            fg_color=theme["accent"],
+            hover_color=theme["accent_hover"],
+            text_color="#ffffff",
+            corner_radius=8,
+            height=32,
+            width=180,
+        ).pack(anchor="w", pady=(0, 8))
 
         error_lbl = ctk.CTkLabel(inner, text="", font=UI_FONT_SMALL, text_color="#b91c1c")
         error_lbl.pack(pady=(0, 4))
@@ -1855,6 +2251,9 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         for text, value in [("+₱1", 1), ("+₱5", 5), ("+₱10", 10), ("+₱20", 20)]:
             ctk.CTkButton(btn_frame, text=text, width=70, font=UI_FONT_BODY, command=lambda v=value: add_money(v), fg_color=theme["accent"], hover_color=theme["accent_hover"], text_color="#ffffff", corner_radius=8).pack(side=tk.LEFT, padx=5)
 
+        # Monitor cash pulses from bill/coin acceptors while this screen is open.
+        self.start_cash_pulse_monitor(amount_var, tk.DoubleVar(value=0.0), 0.0)
+
         def confirm_reload():
             amount = cash_session.get_amount()
             if amount <= 0:
@@ -1904,6 +2303,28 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
 
         uid_entry = ctk.CTkEntry(inner, font=UI_FONT_BODY, width=280, fg_color=theme["search_bg"], text_color=theme["fg"], border_color=theme["search_border"], corner_radius=8, height=40)
         uid_entry.pack(pady=(0, 8))
+
+        def read_from_reader():
+            uid = self.read_rfid_uid("payment")
+            if not uid:
+                error_lbl.configure(text="No RFID tap detected. You can type card ID manually.")
+                return
+            uid_entry.delete(0, tk.END)
+            uid_entry.insert(0, uid)
+            error_lbl.configure(text="")
+
+        ctk.CTkButton(
+            inner,
+            text="Read from RFID Reader",
+            font=UI_FONT_SMALL,
+            command=read_from_reader,
+            fg_color=theme["accent"],
+            hover_color=theme["accent_hover"],
+            text_color="#ffffff",
+            corner_radius=8,
+            height=32,
+            width=180,
+        ).pack(anchor="w", pady=(0, 8))
         error_lbl = ctk.CTkLabel(inner, text="", font=UI_FONT_SMALL, text_color="#b91c1c")
         error_lbl.pack(pady=(0, 4))
 

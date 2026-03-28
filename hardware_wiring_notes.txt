@@ -1,0 +1,43 @@
+Hardware Wiring Notes and Electrical Safety
+
+1) Power Distribution
+- Raspberry Pi 5 runs on its own regulated 5V supply.
+- 12V devices (solenoids, hoppers, some acceptors) need a separate 12V PSU.
+- Stepper motors with ULN2003 commonly use 5V motor supply.
+- Tie all grounds together: Pi GND, 12V driver board GND, ULN2003 GND, sensor GND.
+
+2) Solenoid and Hopper Driving
+- Solenoid locks and coin hoppers are inductive loads.
+- Drive these through relay modules or logic-level MOSFET driver boards.
+- Add flyback diode protection if your driver board does not include it.
+- Never wire Pi GPIO directly to 12V loads.
+- Hopper motor-control input and hopper pulse-feedback output are separate signals.
+
+3) MFRC522 Reader Notes
+- MFRC522 is 3.3V logic. Do not feed 5V logic into Pi SPI lines.
+- Two readers share SPI SCK/MOSI/MISO.
+- Give each reader unique chip select (CS) and reset pins.
+
+4) Bill/Coin Acceptor Pulse Inputs
+- Verify pulse output voltage from TB74 and WEIYU modules.
+- If pulse output is above 3.3V, use level shifter or divider before Pi GPIO input.
+- Inputs in code are configured with pull-up, expecting pulse-to-ground style signaling.
+
+4.1) Coin Hopper Pulse Feedback Inputs
+- Wire each hopper coin-out pulse line to its dedicated Pi GPIO input.
+- Hopper pulse output is often open-collector; use correct pull-up and common ground.
+- Confirm pulse-per-coin ratio on your hopper controller board (usually 1 pulse per coin).
+- Software now dispenses change by counting hopper pulses, not only by time.
+
+5) IR Break-Beam Sensor
+- Code expects active-low trigger on GPIO26 for vend confirmation.
+- Adjust logic in software if your sensor outputs active-high.
+
+6) Stepper Motion Parameters
+- Current software uses ULN2003 half-step sequence and 512 steps per vend revolution.
+- Tune STEP_DELAY and STEPS_PER_PRODUCT in main.py based on your mechanical dispenser.
+
+7) Expansion for Many Trays
+- Direct GPIO wiring is limited for many ULN2003 channels.
+- For full multi-tray deployments, consider GPIO expanders or dedicated motor controllers.
+- Keep one tray-per-slot software mapping aligned with database slot_number.

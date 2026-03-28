@@ -63,10 +63,25 @@ class StaffMixin:
 
         ctk.CTkLabel(
             inner,
-            text="Enter Staff RFID Card ID (simulate tap):",
+            text="Select door and tap staff/research RFID card:",
             font=UI_FONT_SMALL,
             text_color="#134e4a",
         ).pack(anchor="w", pady=(0, 6))
+
+        door_var = tk.StringVar(value="restock")
+        ctk.CTkOptionMenu(
+            inner,
+            variable=door_var,
+            values=["restock", "troubleshoot"],
+            width=280,
+            fg_color=LOGIN_BTN_BG,
+            button_color=LOGIN_BTN_HOVER,
+            button_hover_color="#5eead4",
+            text_color="#ffffff",
+            dropdown_fg_color="#ffffff",
+            dropdown_text_color="#0f172a",
+            dropdown_hover_color="#ccfbf1",
+        ).pack(pady=(0, 12))
 
         entry = ctk.CTkEntry(
             inner,
@@ -80,6 +95,27 @@ class StaffMixin:
         )
         entry.pack(pady=(0, 20))
         entry.focus_set()
+
+        def read_from_door_reader():
+            uid = self.read_rfid_uid("door")
+            if not uid:
+                error_lbl.configure(text="No RFID tap detected. You can type card ID manually.")
+                return
+            entry.delete(0, tk.END)
+            entry.insert(0, uid)
+            error_lbl.configure(text="")
+
+        ctk.CTkButton(
+            inner,
+            text="Read from Door RFID Reader",
+            font=(UI_FONT, 10, "bold"),
+            command=read_from_door_reader,
+            fg_color=LOGIN_BTN_BG,
+            hover_color=LOGIN_BTN_HOVER,
+            text_color="#ffffff",
+            corner_radius=8,
+            height=34,
+        ).pack(anchor="w", pady=(0, 12))
 
         error_lbl = ctk.CTkLabel(
             inner,
@@ -97,16 +133,34 @@ class StaffMixin:
             if not uid:
                 error_lbl.configure(text="Please enter a staff RFID card ID.")
                 return
+
+            selected_door = door_var.get().strip().lower()
             user = self.get_user_by_uid_data(uid)
-            if not user or not user["is_staff"]:
-                error_lbl.configure(text="Invalid staff card.")
+            if not user:
+                error_lbl.configure(text="RFID card not found.")
                 return
+            if not self.is_user_authorized_for_door(user, selected_door):
+                error_lbl.configure(text=f"Card role is not allowed to open {selected_door} door.")
+                return
+
+            try:
+                self.unlock_access_door(selected_door)
+            except Exception as exc:
+                error_lbl.configure(text=f"Failed to unlock door: {exc}")
+                return
+
             error_lbl.configure(text="")
-            self.show_restock_screen(user)
+            if selected_door == "restock":
+                self.show_restock_screen(user)
+            else:
+                messagebox.showinfo(
+                    "Door Unlocked",
+                    "Troubleshooting door unlocked successfully.\nProceed with maintenance.",
+                )
 
         ctk.CTkButton(
             btn_frame,
-            text="OK",
+            text="Unlock",
             font=(UI_FONT, 11, "bold"),
             command=submit,
             fg_color=LOGIN_BTN_BG,

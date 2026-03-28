@@ -1,0 +1,83 @@
+Raspberry Pi 5 GPIO Pin Connections (BCM numbering)
+
+IMPORTANT:
+- Use a common GND between Raspberry Pi and all external 12V driver supplies.
+- Do NOT drive motors/solenoids directly from Pi GPIO.
+- Use ULN2003 boards for 28BYJ-48 steppers and relay/MOSFET drivers for solenoids/hoppers.
+
+========================================
+1) MFRC522 RFID Readers (2 modules, SPI shared)
+========================================
+Shared SPI lines:
+- SCK  -> GPIO11 (Physical pin 23)
+- MOSI -> GPIO10 (Physical pin 19)
+- MISO -> GPIO9  (Physical pin 21)
+- VCC  -> 3.3V
+- GND  -> GND
+
+Reader #1 (Payment RFID):
+- SDA/SS -> GPIO8  (Physical pin 24, CE0)
+- RST    -> GPIO5  (Physical pin 29)
+
+Reader #2 (Door Access RFID):
+- SDA/SS -> GPIO7  (Physical pin 26, CE1)
+- RST    -> GPIO19 (Physical pin 35)
+
+========================================
+2) Tray Stepper Motors (28BYJ-48 + ULN2003)
+========================================
+Tray/Slot 1 ULN2003 inputs:
+- IN1 -> GPIO17 (Physical pin 11)
+- IN2 -> GPIO27 (Physical pin 13)
+- IN3 -> GPIO22 (Physical pin 15)
+- IN4 -> GPIO23 (Physical pin 16)
+
+Tray/Slot 2 ULN2003 inputs:
+- IN1 -> GPIO4  (Physical pin 7)
+- IN2 -> GPIO18 (Physical pin 12)
+- IN3 -> GPIO15 (Physical pin 10)
+- IN4 -> GPIO14 (Physical pin 8)
+
+Note:
+- Current code maps slots 1-2 directly.
+- For >2 trays, add GPIO expanders or additional controller hardware.
+
+========================================
+3) Solenoid Locks (12V Solenoid Model 102)
+========================================
+Through relay/MOSFET driver board:
+- Restock door unlock control       -> GPIO16 (Physical pin 36)
+- Troubleshooting door unlock control -> GPIO20 (Physical pin 38)
+
+========================================
+4) Cash Inputs
+========================================
+TB74 Bill Acceptor pulse output:
+- Pulse OUT -> GPIO6  (Physical pin 31)
+
+WEIYU Coin Acceptor pulse output:
+- Pulse OUT -> GPIO13 (Physical pin 33)
+
+========================================
+5) Change Dispensing Coin Hoppers
+========================================
+Through relay/MOSFET driver board (motor control outputs):
+- Hopper A (1 peso coins) motor ctrl -> GPIO12 (Physical pin 32)
+- Hopper B (5 peso coins) motor ctrl -> GPIO21 (Physical pin 40)
+
+Hopper pulse feedback inputs (coin-out sensor pulse lines):
+- Hopper A (1 peso) pulse OUT -> GPIO24 (Physical pin 18)
+- Hopper B (5 peso) pulse OUT -> GPIO25 (Physical pin 22)
+
+========================================
+6) IR Break-Beam Sensor (vend confirm)
+========================================
+- Sensor digital OUT -> GPIO26 (Physical pin 37)
+- VCC based on module spec (most are 3.3V/5V compatible; check your model)
+- GND -> GND
+
+========================================
+GPIO Reserved Summary
+========================================
+GPIO used in this project now:
+4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27

@@ -51,7 +51,8 @@ def init_db():
         rfid_uid TEXT NOT NULL UNIQUE,
         name TEXT,
         balance REAL NOT NULL DEFAULT 0,
-        is_staff INTEGER NOT NULL DEFAULT 0
+        is_staff INTEGER NOT NULL DEFAULT 0,
+        role TEXT NOT NULL DEFAULT 'customer'
     );
     """)
     conn.commit()
@@ -62,6 +63,21 @@ def init_db():
     if "rfid_user_id" not in cols:
         cur.execute("ALTER TABLE transactions ADD COLUMN rfid_user_id INTEGER")
         conn.commit()
+
+    # Ensure RFID role column exists for door-based access control.
+    cur.execute("PRAGMA table_info(rfid_users)")
+    user_cols = [row["name"] for row in cur.fetchall()]
+    if "role" not in user_cols:
+        cur.execute("ALTER TABLE rfid_users ADD COLUMN role TEXT NOT NULL DEFAULT 'customer'")
+        conn.commit()
+
+    # Backfill legacy staff cards to a restock-access role.
+    cur.execute("""
+        UPDATE rfid_users
+        SET role = 'restocker'
+        WHERE is_staff = 1 AND (role IS NULL OR role = '' OR role = 'customer')
+    """)
+    conn.commit()
 
     # Seed sample data if empty
     cur.execute("SELECT COUNT(*) AS c FROM products")
@@ -91,9 +107,9 @@ def init_db():
     cur.execute("SELECT COUNT(*) AS c FROM rfid_users")
     if cur.fetchone()["c"] == 0:
         cur.execute("""
-            INSERT INTO rfid_users (rfid_uid, name, balance, is_staff)
-            VALUES (?, ?, ?, ?)
-        """, ("STAFF001", "Default Staff", 0.0, 1))
+            INSERT INTO rfid_users (rfid_uid, name, balance, is_staff, role)
+            VALUES (?, ?, ?, ?, ?)
+        """, ("STAFF001", "Default Staff", 0.0, 1, "restocker"))
         conn.commit()
 
     # Admin credentials table (single row) with hashed password
@@ -114,6 +130,25 @@ def init_db():
         cur.execute(
             "INSERT INTO admin_settings (id, username, password_hash) VALUES (1, ?, ?)",
             (default_user, pwd_hash),
+        )
+        conn.commit()
+
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS hardware_settings (
+            setting_key TEXT PRIMARY KEY,
+            setting_value TEXT NOT NULL
+        );
+        """
+    )
+    cur.execute("SELECT COUNT(*) AS c FROM hardware_settings")
+    if cur.fetchone()["c"] == 0:
+        cur.executemany(
+            "INSERT INTO hardware_settings (setting_key, setting_value) VALUES (?, ?)",
+            [
+                ("coin_pulse_value", "1.0"),
+                ("bill_pulse_value", "20.0"),
+            ],
         )
         conn.commit()
 
@@ -203,13 +238,19 @@ def get_user_by_uid(rfid_uid: str):
     return row
 
 
-def create_user(rfid_uid: str, name: str | None = None, is_staff: int = 0, initial_balance: float = 0.0):
+def create_user(
+    rfid_uid: str,
+    name: str | None = None,
+    is_staff: int = 0,
+    initial_balance: float = 0.0,
+    role: str = "customer",
+):
     conn = get_connection()
     cur = conn.cursor()
     cur.execute("""
-        INSERT INTO rfid_users (rfid_uid, name, balance, is_staff)
-        VALUES (?, ?, ?, ?)
-    """, (rfid_uid, name, initial_balance, is_staff))
+        INSERT INTO rfid_users (rfid_uid, name, balance, is_staff, role)
+        VALUES (?, ?, ?, ?, ?)
+    """, (rfid_uid, name, initial_balance, is_staff, role))
     conn.commit()
     user_id = cur.lastrowid
     conn.close()
@@ -228,6 +269,60 @@ def adjust_user_balance(user_id: int, delta: float):
     conn = get_connection()
     cur = conn.cursor()
     cur.execute("UPDATE rfid_users SET balance = balance + ? WHERE id = ?", (delta, user_id))
+    conn.commit()
+    conn.close()
+
+
+def get_all_rfid_users():
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT id, rfid_uid, name, balance, is_staff, role
+        FROM rfid_users
+        ORDER BY id
+        """
+    )
+    rows = cur.fetchall()
+    conn.close()
+    return rows
+
+
+def update_rfid_user_role(user_id: int, role: str):
+    clean_role = (role or "customer").strip().lower()
+    is_staff = 1 if clean_role in {"staff", "restocker", "admin"} else 0
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE rfid_users SET role = ?, is_staff = ? WHERE id = ?",
+        (clean_role, is_staff, user_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_hardware_setting(key: str, default: str | None = None):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT setting_value FROM hardware_settings WHERE setting_key = ?", (key,))
+    row = cur.fetchone()
+    conn.close()
+    if not row:
+        return default
+    return row["setting_value"]
+
+
+def set_hardware_setting(key: str, value: str):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        INSERT INTO hardware_settings (setting_key, setting_value)
+        VALUES (?, ?)
+        ON CONFLICT(setting_key) DO UPDATE SET setting_value = excluded.setting_value
+        """,
+        (key, value),
+    )
     conn.commit()
     conn.close()
 

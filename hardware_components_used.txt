@@ -1,0 +1,39 @@
+Components Context Checklist
+
+Core Controller
+- Raspberry Pi 5
+
+Vending Motors
+- 28BYJ-48 stepper motor (12V stated in your setup)
+- ULN2003 stepper motor driver board (one per tray)
+
+RFID Modules
+- 2x MFRC522 13.56 MHz RFID readers
+  - Reader 1: card payment/reload (cashless flow)
+  - Reader 2: access door authentication/unlock flow
+
+Door Access Hardware
+- 2x 12V solenoid locks (Model 102)
+  - Restock door
+  - Troubleshooting/wiring door
+
+Cash Inputs
+- TB74 bill acceptor
+- WEIYU Universal Coin Slot (1239/1239A)
+
+Change Dispensing
+- 2x Allan coin hopper (blue plastic)
+  - Hopper for 1 peso coins
+  - Hopper for 5 peso coins
+  - Hopper pulse-out feedback lines wired to Pi for pulse-counted dispensing
+
+Vend Confirmation
+- IR Break-Beam sensor at product drop path
+
+Software/Database Context Added
+- RFID users now support role-based door access via rfid_users.role:
+  - customer
+  - restocker/staff
+  - researcher/troubleshooter
+  - admin
+- Staff screen now lets operator choose door (restock or troubleshoot) and unlock via RFID role validation.
