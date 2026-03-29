@@ -1,9 +1,31 @@
 import hashlib
+import hmac as _hmac
 import tkinter as tk
 from tkinter import messagebox, simpledialog
 import customtkinter as ctk
 
 from admin.reports import list_sales_reports, open_sales_report
+from pathlib import Path as _Path
+import secrets as _secrets
+
+_SALT_FILE = _Path(__file__).resolve().parent.parent / ".secret_salt"
+if _SALT_FILE.exists():
+    _PASSWORD_SALT = _SALT_FILE.read_text(encoding="utf-8").strip()
+else:
+    _PASSWORD_SALT = _secrets.token_hex(16)
+    try:
+        _SALT_FILE.write_text(_PASSWORD_SALT, encoding="utf-8")
+    except Exception:
+        pass
+
+
+def _verify_password(password: str, stored_hash: str) -> bool:
+    """Verify password against stored hash (salted HMAC-SHA256 or legacy SHA-256)."""
+    salted = _hmac.new(_PASSWORD_SALT.encode("utf-8"), password.encode("utf-8"), hashlib.sha256).hexdigest()
+    if _hmac.compare_digest(salted, stored_hash):
+        return True
+    legacy = hashlib.sha256(password.encode("utf-8")).hexdigest()
+    return _hmac.compare_digest(legacy, stored_hash)
 
 
 UI_FONT = "Segoe UI"
@@ -439,8 +461,7 @@ class AdminMixin:
             if not username or not password:
                 status_lbl.configure(text="Please enter both username and password.")
                 return
-            pwd_hash = hashlib.sha256(password.encode("utf-8")).hexdigest()
-            if username != stored_username or pwd_hash != stored_hash:
+            if username != stored_username or not _verify_password(password, stored_hash):
                 status_lbl.configure(text="Invalid admin credentials.")
                 return
             status_lbl.configure(text="")
@@ -1019,18 +1040,37 @@ class AdminMixin:
         btn_row = ctk.CTkFrame(card, fg_color=self.current_theme.get("card_bg", self.current_theme["button_bg"]))
         btn_row.pack(fill=tk.X, padx=14, pady=(0, 12))
 
-        def tap_reader():
-            uid = self.read_rfid_uid("shared")
+        def tap_payment():
+            uid = self.read_rfid_uid("payment")
             if uid:
                 uid_lbl.configure(text=f"Last RFID UID: {uid}")
-                result_lbl.configure(text="RFID tap detected.")
+                result_lbl.configure(text="Payment reader tap detected.")
             else:
-                result_lbl.configure(text="No RFID tap detected.")
+                result_lbl.configure(text="No payment RFID tap detected.")
+
+        def tap_door():
+            uid = self.read_rfid_uid("door")
+            if uid:
+                uid_lbl.configure(text=f"Last RFID UID: {uid}")
+                result_lbl.configure(text="Door reader tap detected.")
+            else:
+                result_lbl.configure(text="No door RFID tap detected.")
 
         ctk.CTkButton(
             btn_row,
-            text="Read RFID",
-            command=tap_reader,
+            text="Read Payment RFID",
+            command=tap_payment,
+            fg_color=self.current_theme.get("accent", "#10b981"),
+            hover_color=self.current_theme.get("accent_hover", "#059669"),
+            text_color="#ffffff",
+            corner_radius=8,
+            width=150,
+        ).pack(side=tk.LEFT, padx=(0, 8))
+
+        ctk.CTkButton(
+            btn_row,
+            text="Read Door RFID",
+            command=tap_door,
             fg_color=self.current_theme.get("accent", "#10b981"),
             hover_color=self.current_theme.get("accent_hover", "#059669"),
             text_color="#ffffff",

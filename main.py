@@ -165,13 +165,15 @@ def _hover_scale_btn(btn, normal_padx=10, normal_pady=6, hover_padx=14, hover_pa
     btn.bind("<Leave>", on_leave)
 
 # Raspberry Pi 5 (BCM numbering) pin map.
-# NOTE: Single MFRC522 reader is shared across all flows (payment, reload, staff access).
+# NOTE: MFRC522 readers share SPI0 and use separate CS + RST lines.
 RFID_PINS = {
     "spi_sclk": 11,              # Physical pin 23
     "spi_mosi": 10,              # Physical pin 19
     "spi_miso": 9,               # Physical pin 21
-    "shared_reader_cs": 8,       # Physical pin 24 (CE0)
-    "shared_reader_rst": 5,      # Physical pin 29
+    "payment_reader_cs": 8,      # Physical pin 24 (CE0)
+    "door_reader_cs": 7,         # Physical pin 26 (CE1)
+    "payment_reader_rst": 5,     # Physical pin 29
+    "door_reader_rst": 19,       # Physical pin 35
 }
 
 # ULN2003 IN1..IN4 mapping per tray motor (28BYJ-48).
@@ -275,9 +277,11 @@ def gpio_init():
         GPIO.setup(pin, GPIO.OUT)
         GPIO.output(pin, GPIO.LOW)
 
-    # Shared RFID reader reset line
-    GPIO.setup(RFID_PINS["shared_reader_rst"], GPIO.OUT)
-    GPIO.output(RFID_PINS["shared_reader_rst"], GPIO.HIGH)
+    # RFID reader reset lines
+    GPIO.setup(RFID_PINS["payment_reader_rst"], GPIO.OUT)
+    GPIO.setup(RFID_PINS["door_reader_rst"], GPIO.OUT)
+    GPIO.output(RFID_PINS["payment_reader_rst"], GPIO.HIGH)
+    GPIO.output(RFID_PINS["door_reader_rst"], GPIO.HIGH)
 
     # Coin hopper outputs
     for pin in COIN_HOPPER_PINS.values():
@@ -730,11 +734,11 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
     def get_payment_pulse_counts_data(self):
         return get_payment_pulse_counts()
 
-    def _read_rfid_uid_from_hardware(self, reader_name: str = "shared") -> str | None:
+    def _read_rfid_uid_from_hardware(self, reader_name: str) -> str | None:
         if not ON_RPI:
             return None
 
-        uid = self._read_rfid_uid_single_backend(reader_name)
+        uid = self._read_rfid_uid_dual_backend(reader_name)
         if uid:
             return uid
 
@@ -742,7 +746,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             return None
 
         # Most SimpleMFRC522 setups map to CE0; this still enables live tap reads.
-        # Kept as fallback when low-level backend is unavailable.
+        # Kept as fallback when low-level dual backend is unavailable.
         _ = reader_name
         try:
             reader = SimpleMFRC522()
@@ -753,14 +757,13 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             return None
         return None
 
-    def _read_rfid_uid_single_backend(self, reader_name: str = "shared") -> str | None:
-        """Read RFID UID from the shared SPI CE0 device used by all app flows."""
+    def _read_rfid_uid_dual_backend(self, reader_name: str) -> str | None:
+        """Read RFID UID from selected SPI CE device (payment=CE0, door=CE1)."""
         if MFRC522 is None:
             return None
 
-        _ = reader_name
-        spi_device = 0
-        rst_pin = RFID_PINS["shared_reader_rst"]
+        spi_device = 0 if reader_name == "payment" else 1
+        rst_pin = RFID_PINS["payment_reader_rst"] if reader_name == "payment" else RFID_PINS["door_reader_rst"]
 
         try:
             # Reset only the selected reader before a poll.
@@ -821,7 +824,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
 
         return None
 
-    def read_rfid_uid(self, reader_name: str = "shared") -> str | None:
+    def read_rfid_uid(self, reader_name: str) -> str | None:
         return self._read_rfid_uid_from_hardware(reader_name)
 
     def start_cash_pulse_monitor(self, amount_var, remaining_var, total_amount: float):
@@ -1766,21 +1769,12 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             command=self._cancel_cart,
         ).pack(side=tk.TOP, fill=tk.X, padx=10, pady=(10, 8))
 
-        items_frame = ctk.CTkScrollableFrame(
-            order_panel,
-            fg_color=panel_bg,
-            corner_radius=0,
-            scrollbar_button_color=self.current_theme.get("nav_hover", "#4f46e5"),
-            scrollbar_button_hover_color=self.current_theme.get("accent", "#10b981"),
-        )
-        items_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=0, pady=0)
-
         for entry in self.cart:
             prod = entry["product"]
             qty_var = tk.IntVar(value=entry["quantity"])
             self._order_qty_vars[prod["id"]] = qty_var
 
-            row = ctk.CTkFrame(items_frame, fg_color=panel_bg, corner_radius=0)
+            row = ctk.CTkFrame(order_panel, fg_color=panel_bg, corner_radius=0)
             row.pack(side=tk.TOP, fill=tk.X, padx=10, pady=4)
 
             ctk.CTkLabel(
@@ -1923,6 +1917,12 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
 
         frame = ctk.CTkFrame(self.content_holder, fg_color=self.current_theme["bg"], corner_radius=0)
         frame.pack(expand=True, fill=tk.BOTH)
+
+        self._build_checkout_back_bar(
+            frame,
+            text="Back to products",
+            command=lambda: (self.checkout_items.clear(), self.build_main_menu()),
+        )
         self._build_order_review_content(frame, items, total, accent, accent_hover)
         self.add_theme_toggle_footer()
 
@@ -1984,26 +1984,6 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
     def _build_payment_method_content(self, parent, items, total):
         """Payment method chooser with order summary."""
         checkout_ui.build_payment_method_content(self, parent, items, total)
-
-    def go_back_from_payment_method(self):
-        """Navigate to the previous quantity-adjustment step from payment selection."""
-        items = self._get_checkout_items()
-        if not items:
-            self.build_main_menu()
-            return
-
-        if len(items) > 1:
-            self.show_order_review_screen()
-            return
-
-        item = items[0]
-        qty = max(1, int(item.get("quantity", 1) or 1))
-        self.current_product = item["product"]
-        self.current_quantity = qty
-        # Rebuild cart so the right order panel (sidebar quantity controls) is shown.
-        self.cart = [{"product": item["product"], "quantity": qty}]
-        self.checkout_items = []
-        self.build_main_menu()
 
     # ---------- Cash Payment Flow ----------
 
@@ -2257,7 +2237,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         uid_entry.pack(pady=(0, 8))
 
         def read_from_reader():
-            uid = self.read_rfid_uid("shared")
+            uid = self.read_rfid_uid("payment")
             if not uid:
                 error_lbl.configure(text="No RFID tap detected. You can type card ID manually.")
                 return
@@ -2317,11 +2297,8 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
 
     def _build_reload_amount_content(self, parent, uid, user, theme):
         """RFID reload amount entry screen."""
-        content = ctk.CTkFrame(parent, fg_color=theme["bg"], corner_radius=0)
-        content.pack(expand=True, fill=tk.BOTH)
-
-        ctk.CTkLabel(content, text="Reload RFID Card", font=UI_FONT_BOLD, text_color=theme["fg"]).pack(pady=10)
-        card = ctk.CTkFrame(content, fg_color=theme["button_bg"], corner_radius=12, border_width=1, border_color="#94a3b8")
+        ctk.CTkLabel(parent, text="Reload RFID Card", font=UI_FONT_BOLD, text_color=theme["fg"]).pack(pady=10)
+        card = ctk.CTkFrame(parent, fg_color=theme["button_bg"], corner_radius=12, border_width=1, border_color="#94a3b8")
         card.pack(padx=24, pady=10)
         card_inner = ctk.CTkFrame(card, fg_color=theme["button_bg"])
         card_inner.pack(padx=20, pady=18)
@@ -2356,7 +2333,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             self.show_success_screen("Reload Successful", f"New balance: ₱{new_balance:.2f}", on_ok=self.build_main_menu)
 
         ctk.CTkButton(card_inner, text="Add balance", font=UI_FONT_BUTTON, command=confirm_reload, fg_color=theme["accent"], hover_color=theme["accent_hover"], text_color="#ffffff", corner_radius=8, height=44).pack(pady=(10, 8), fill=tk.X)
-        checkout_ui.build_checkout_back_bar(self, parent, "Cancel and go back", self.build_main_menu)
+        ctk.CTkButton(parent, text="Cancel and go back", font=UI_FONT_BODY, command=self.build_main_menu, fg_color=theme["button_bg"], hover_color=theme["card_border"], text_color=theme["button_fg"], corner_radius=8, height=36).pack(pady=5)
 
     # ---------- RFID Purchase Payment ----------
 
@@ -2396,7 +2373,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         uid_entry.pack(pady=(0, 8))
 
         def read_from_reader():
-            uid = self.read_rfid_uid("shared")
+            uid = self.read_rfid_uid("payment")
             if not uid:
                 error_lbl.configure(text="No RFID tap detected. You can type card ID manually.")
                 return
@@ -2443,7 +2420,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         btn_row = ctk.CTkFrame(inner, fg_color=theme["card_bg"])
         btn_row.pack(fill=tk.X, pady=(8, 0))
         ctk.CTkButton(btn_row, text="Pay Now", font=(UI_FONT, 11, "bold"), command=process_rfid, fg_color=theme["accent"], hover_color=theme["accent_hover"], text_color="#ffffff", corner_radius=8, height=38).pack(side=tk.LEFT, padx=(0, 10))
-        ctk.CTkButton(btn_row, text="Cancel", font=(UI_FONT, 11, "bold"), command=self.show_payment_method_screen, fg_color=theme["button_bg"], hover_color=theme["card_border"], text_color=theme["button_fg"], corner_radius=8, height=38).pack(side=tk.LEFT)
+        ctk.CTkButton(btn_row, text="Cancel", font=(UI_FONT, 11, "bold"), command=lambda: (self._reset_checkout_state(), self.build_main_menu()), fg_color=theme["button_bg"], hover_color=theme["card_border"], text_color=theme["button_fg"], corner_radius=8, height=38).pack(side=tk.LEFT)
         uid_entry.bind("<Return>", lambda _e: process_rfid())
 
     # ---------- Sales Report Export ----------

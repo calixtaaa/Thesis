@@ -8,13 +8,19 @@ const { useState, useEffect, useRef, useCallback, useMemo } = React;
 
 const POLL_MS = 5000;
 
-// ── API helper ─────────────────────────────────────────────────────
+// ── API helper (includes CSRF token for state-changing requests) ──
 async function api(path, opts = {}) {
-    const res = await fetch(path, {
-        headers: { "Content-Type": "application/json" },
-        ...opts,
-    });
+    const headers = { "Content-Type": "application/json" };
+    const csrfToken = window.__CSRF_TOKEN__;
+    if (csrfToken && opts.method && opts.method !== "GET") {
+        headers["X-CSRF-Token"] = csrfToken;
+    }
+    const res = await fetch(path, { headers, ...opts });
     if (res.status === 401) {
+        window.location.href = "/login";
+        return null;
+    }
+    if (res.status === 403) {
         window.location.href = "/login";
         return null;
     }

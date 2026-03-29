@@ -3,6 +3,8 @@ Database layer for the Hygiene Vending Machine.
 Handles SQLite connection, schema, seeding, and all product/transaction/RFID/admin queries.
 """
 import hashlib
+import hmac as _hmac
+import secrets
 import sqlite3
 from pathlib import Path
 from datetime import datetime as dt, timedelta
@@ -14,6 +16,26 @@ from admin.reports import get_reports_dir
 
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "vending.db"
+
+# ── SHA-256 HMAC salt (shared with server.py) ──────────────────────
+_SALT_FILE = BASE_DIR / ".secret_salt"
+if _SALT_FILE.exists():
+    _PASSWORD_SALT = _SALT_FILE.read_text(encoding="utf-8").strip()
+else:
+    _PASSWORD_SALT = secrets.token_hex(16)
+    try:
+        _SALT_FILE.write_text(_PASSWORD_SALT, encoding="utf-8")
+    except Exception:
+        pass
+
+
+def _hash_password(password: str) -> str:
+    """Create a salted SHA-256 HMAC hash."""
+    return _hmac.new(
+        _PASSWORD_SALT.encode("utf-8"),
+        password.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
 
 
 def get_connection():
@@ -126,7 +148,7 @@ def init_db():
     if cur.fetchone()["c"] == 0:
         default_user = "admin"
         default_pass = "admin"
-        pwd_hash = hashlib.sha256(default_pass.encode("utf-8")).hexdigest()
+        pwd_hash = _hash_password(default_pass)
         cur.execute(
             "INSERT INTO admin_settings (id, username, password_hash) VALUES (1, ?, ?)",
             (default_user, pwd_hash),
@@ -168,8 +190,8 @@ def get_admin_credentials():
 
 
 def update_admin_credentials(new_username: str, new_password: str):
-    """Update the single admin username and password (stored as SHA-256 hash)."""
-    pwd_hash = hashlib.sha256(new_password.encode("utf-8")).hexdigest()
+    """Update the single admin username and password (stored as salted HMAC-SHA256)."""
+    pwd_hash = _hash_password(new_password)
     conn = get_connection()
     cur = conn.cursor()
     cur.execute(
