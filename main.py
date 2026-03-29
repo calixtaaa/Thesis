@@ -1982,6 +1982,26 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         """Payment method chooser with order summary."""
         checkout_ui.build_payment_method_content(self, parent, items, total)
 
+    def go_back_from_payment_method(self):
+        """Navigate to the previous quantity-adjustment step from payment selection."""
+        items = self._get_checkout_items()
+        if not items:
+            self.build_main_menu()
+            return
+
+        if len(items) > 1:
+            self.show_order_review_screen()
+            return
+
+        item = items[0]
+        qty = max(1, int(item.get("quantity", 1) or 1))
+        self.current_product = item["product"]
+        self.current_quantity = qty
+        # Rebuild cart so the right order panel (sidebar quantity controls) is shown.
+        self.cart = [{"product": item["product"], "quantity": qty}]
+        self.checkout_items = []
+        self.build_main_menu()
+
     # ---------- Cash Payment Flow ----------
 
     def cash_payment_flow(self, total_amount: float):
@@ -2294,8 +2314,11 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
 
     def _build_reload_amount_content(self, parent, uid, user, theme):
         """RFID reload amount entry screen."""
-        ctk.CTkLabel(parent, text="Reload RFID Card", font=UI_FONT_BOLD, text_color=theme["fg"]).pack(pady=10)
-        card = ctk.CTkFrame(parent, fg_color=theme["button_bg"], corner_radius=12, border_width=1, border_color="#94a3b8")
+        content = ctk.CTkFrame(parent, fg_color=theme["bg"], corner_radius=0)
+        content.pack(expand=True, fill=tk.BOTH)
+
+        ctk.CTkLabel(content, text="Reload RFID Card", font=UI_FONT_BOLD, text_color=theme["fg"]).pack(pady=10)
+        card = ctk.CTkFrame(content, fg_color=theme["button_bg"], corner_radius=12, border_width=1, border_color="#94a3b8")
         card.pack(padx=24, pady=10)
         card_inner = ctk.CTkFrame(card, fg_color=theme["button_bg"])
         card_inner.pack(padx=20, pady=18)
@@ -2330,7 +2353,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             self.show_success_screen("Reload Successful", f"New balance: ₱{new_balance:.2f}", on_ok=self.build_main_menu)
 
         ctk.CTkButton(card_inner, text="Add balance", font=UI_FONT_BUTTON, command=confirm_reload, fg_color=theme["accent"], hover_color=theme["accent_hover"], text_color="#ffffff", corner_radius=8, height=44).pack(pady=(10, 8), fill=tk.X)
-        ctk.CTkButton(parent, text="Cancel and go back", font=UI_FONT_BODY, command=self.build_main_menu, fg_color=theme["button_bg"], hover_color=theme["card_border"], text_color=theme["button_fg"], corner_radius=8, height=36).pack(pady=5)
+        checkout_ui.build_checkout_back_bar(self, parent, "Cancel and go back", self.build_main_menu)
 
     # ---------- RFID Purchase Payment ----------
 
@@ -2417,7 +2440,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         btn_row = ctk.CTkFrame(inner, fg_color=theme["card_bg"])
         btn_row.pack(fill=tk.X, pady=(8, 0))
         ctk.CTkButton(btn_row, text="Pay Now", font=(UI_FONT, 11, "bold"), command=process_rfid, fg_color=theme["accent"], hover_color=theme["accent_hover"], text_color="#ffffff", corner_radius=8, height=38).pack(side=tk.LEFT, padx=(0, 10))
-        ctk.CTkButton(btn_row, text="Cancel", font=(UI_FONT, 11, "bold"), command=lambda: (self._reset_checkout_state(), self.build_main_menu()), fg_color=theme["button_bg"], hover_color=theme["card_border"], text_color=theme["button_fg"], corner_radius=8, height=38).pack(side=tk.LEFT)
+        ctk.CTkButton(btn_row, text="Cancel", font=(UI_FONT, 11, "bold"), command=self.show_payment_method_screen, fg_color=theme["button_bg"], hover_color=theme["card_border"], text_color=theme["button_fg"], corner_radius=8, height=38).pack(side=tk.LEFT)
         uid_entry.bind("<Return>", lambda _e: process_rfid())
 
     # ---------- Sales Report Export ----------

@@ -165,16 +165,19 @@ def build_payment_method_content(app, parent, items, total):
 
     ctk.CTkButton(card, text="Pay with Cash\nInsert coins or bills", font=app._ui_font_button, fg_color=app.current_theme.get("accent", "#1A948E"), hover_color=app.current_theme.get("accent_hover", "#15857B"), text_color="#ffffff", corner_radius=10, height=60, command=lambda: app.cash_payment_flow(total)).pack(pady=8, padx=20, fill=tk.X)
     ctk.CTkButton(card, text="Pay with RFID Card\nCashless payment", font=app._ui_font_button, fg_color=app.current_theme.get("accent", "#1A948E"), hover_color=app.current_theme.get("accent_hover", "#15857B"), text_color="#ffffff", corner_radius=10, height=60, command=lambda: app.rfid_payment_flow(total)).pack(pady=(8, 20), padx=20, fill=tk.X)
-    ctk.CTkButton(parent, text="Back", font=app._ui_font_body, fg_color=app.current_theme["button_bg"], hover_color=app.current_theme.get("accent", "#1A948E"), text_color=app.current_theme["button_fg"], corner_radius=8, height=36, command=(app.show_order_review_screen if app.checkout_items and len(app.checkout_items) > 1 else app.show_quantity_screen)).pack(pady=10)
+    ctk.CTkButton(parent, text="Back", font=app._ui_font_body, fg_color=app.current_theme["button_bg"], hover_color=app.current_theme.get("accent", "#1A948E"), text_color=app.current_theme["button_fg"], corner_radius=8, height=36, command=app.go_back_from_payment_method).pack(pady=10)
 
 
 def build_cash_payment_content(app, parent, total_amount: float):
-    ctk.CTkLabel(parent, text="Pay with Cash", font=app._ui_font_bold, text_color=app.current_theme["fg"]).pack(pady=(10, 6))
-    ctk.CTkLabel(parent, text="Cash pulses from bill/coin acceptors are read from GPIO. Buttons below remain for simulation.", font=app._ui_font_small, text_color=app.current_theme["fg"]).pack(pady=2)
+    content = ctk.CTkFrame(parent, fg_color=app.current_theme["bg"], corner_radius=0)
+    content.pack(expand=True, fill=tk.BOTH)
 
-    card = ctk.CTkFrame(parent, fg_color=app.current_theme["button_bg"], border_width=1, border_color=app.current_theme.get("card_border", "#e2e8f0"), corner_radius=12)
-    card.pack(padx=24, pady=10)
-    ctk.CTkLabel(card, text=f"Total to Pay: ₱{total_amount:.2f}", font=app._ui_font_title, text_color=app.current_theme["button_fg"]).pack(pady=(20, 12), padx=20)
+    ctk.CTkLabel(content, text="Pay with Cash", font=app._ui_font_bold, text_color=app.current_theme["fg"]).pack(pady=(8, 4))
+    ctk.CTkLabel(content, text="Cash pulses from bill/coin acceptors are read from GPIO. Buttons below remain for simulation.", font=app._ui_font_small, text_color=app.current_theme["fg"]).pack(pady=(0, 2))
+
+    card = ctk.CTkFrame(content, fg_color=app.current_theme["button_bg"], border_width=1, border_color=app.current_theme.get("card_border", "#e2e8f0"), corner_radius=12)
+    card.pack(padx=24, pady=8)
+    ctk.CTkLabel(card, text=f"Total to Pay: ₱{total_amount:.2f}", font=app._ui_font_title, text_color=app.current_theme["button_fg"]).pack(pady=(16, 10), padx=20)
 
     amount_var = tk.DoubleVar(value=0.0)
     remaining_var = tk.DoubleVar(value=total_amount)
@@ -184,7 +187,7 @@ def build_cash_payment_content(app, parent, total_amount: float):
     tk.Label(card, textvariable=remaining_var, font=(app._ui_font_name, 22, "bold"), bg=app.current_theme["button_bg"], fg=app.current_theme["button_fg"]).pack()
 
     btn_frame = ctk.CTkFrame(card, fg_color=app.current_theme["button_bg"], corner_radius=0)
-    btn_frame.pack(pady=15, padx=20)
+    btn_frame.pack(pady=10, padx=20)
 
     def add_money(value):
         app.cash_session.add(value)
@@ -203,7 +206,7 @@ def build_cash_payment_content(app, parent, total_amount: float):
             return
         app.complete_purchase_cash(total_amount, current)
 
-    ctk.CTkButton(card, text="Dispense product", font=app._ui_font_button, command=finish_if_enough, fg_color="#4CAF50", hover_color="#388E3C", text_color="#ffffff", corner_radius=10, height=44).pack(pady=(10, 20), padx=20, fill=tk.X)
-    ctk.CTkButton(parent, text="Cancel and go back", font=app._ui_font_body, command=app.build_main_menu, fg_color="#E53935", hover_color="#C62828", text_color="#ffffff", corner_radius=8, height=36).pack(pady=5)
+    ctk.CTkButton(card, text="Dispense product", font=app._ui_font_button, command=finish_if_enough, fg_color="#4CAF50", hover_color="#388E3C", text_color="#ffffff", corner_radius=10, height=44).pack(pady=(8, 14), padx=20, fill=tk.X)
+    build_checkout_back_bar(app, parent, "Cancel and go back", app.show_payment_method_screen)
 
     app.start_cash_pulse_monitor(amount_var, remaining_var, total_amount)
