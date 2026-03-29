@@ -1,28 +1,8 @@
-# ══════════════════════════════════════════════════════════════════
-#  Netlify Deployment — Hygiene Vending Machine
-#  Static site build: renders Flask/Jinja2 templates into HTML
-#  during build, then serves everything from CDN.
-# ══════════════════════════════════════════════════════════════════
+# Netlify — Hygiene Vending Machine
+# All files pre-built in public/ — no build step needed.
 
 [build]
-  command = "bash build_netlify.sh"
   publish = "public"
-
-[build.environment]
-  PYTHON_VERSION = "3.11"
-
-# ── Redirects ────────────────────────────────────────────────────
-
-[[redirects]]
-  from   = "/favicon.ico"
-  to     = "/static/images/vendingMachineIcon.jpg"
-  status = 200
-
-# SPA-style: if a page isn't found, show the home page
-[[redirects]]
-  from   = "/*"
-  to     = "/index.html"
-  status = 200
 
 # ── Security & Cache Headers ────────────────────────────────────
 
