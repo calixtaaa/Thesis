@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # ══════════════════════════════════════════════════════════════════
-#  Netlify Build Script — Hygiene Vending Machine
-#  Copies static assets to CDN dir + bundles Flask into the
-#  serverless function directory.
+#  Netlify Build — Hygiene Vending Machine
+#  1. Installs Flask (for Jinja2 template rendering)
+#  2. Renders all templates into static HTML  →  public/
+#  3. Copies static assets (CSS, JS, images)  →  public/static/
 # ══════════════════════════════════════════════════════════════════
 set -e
 
@@ -10,42 +11,28 @@ echo "════════════════════════�
 echo "  Hygiene Vending — Netlify Build"
 echo "══════════════════════════════════════════"
 
-# ── 1. CDN-served static assets ──────────────────────────────────
+# ── 1. Install Flask (for Jinja2 rendering) ──────────────────────
 echo ""
-echo "→ Copying static assets to public/"
+echo "→ Installing build dependencies..."
+pip install --quiet flask
+
+# ── 2. Render Jinja2 templates to static HTML ────────────────────
+echo "→ Rendering templates to public/"
+python build_static.py
+
+# ── 3. Copy static assets to CDN directory ───────────────────────
+echo "→ Copying static assets..."
 mkdir -p public/static/css public/static/js public/static/images
 
-cp WebPages/static/css/*    public/static/css/    2>/dev/null || true
-cp WebPages/static/js/*     public/static/js/     2>/dev/null || true
-[ -d WebPages/static/images ] && cp -r WebPages/static/images/* public/static/images/ || true
+cp WebPages/static/css/*  public/static/css/  2>/dev/null || true
+cp WebPages/static/js/*   public/static/js/   2>/dev/null || true
 
-# ── 2. Bundle Python files into the function directory ───────────
-FDIR="netlify/functions/app"
-echo "→ Bundling Flask app → $FDIR/"
+if [ -d "WebPages/static/images" ]; then
+    cp -r WebPages/static/images/* public/static/images/ 2>/dev/null || true
+fi
 
-# Flask app + Jinja2 templates
-mkdir -p "$FDIR/WebPages/templates" "$FDIR/WebPages/static"
-cp    WebPages/server.py          "$FDIR/WebPages/"
-cp -r WebPages/templates/*        "$FDIR/WebPages/templates/"
-cp -r WebPages/static/*           "$FDIR/WebPages/static/"
-
-# Core Python modules
-cp database.py             "$FDIR/"
-cp prediction_runtime.py   "$FDIR/"  2>/dev/null || true
-
-# Admin package
-mkdir -p "$FDIR/admin"
-cp -r admin/* "$FDIR/admin/"
-
-# Prediction analysis package
-mkdir -p "$FDIR/predictionAnalysis"
-cp -r predictionAnalysis/* "$FDIR/predictionAnalysis/" 2>/dev/null || true
-
-# Database + salt (if present)
-cp vending.db    "$FDIR/"  2>/dev/null || echo "  ⚠ vending.db not found — will create empty DB"
-cp .secret_salt  "$FDIR/"  2>/dev/null || echo "  ⚠ .secret_salt not found — will generate at runtime"
-
-# ── 3. Done ──────────────────────────────────────────────────────
+# ── Done ─────────────────────────────────────────────────────────
 echo ""
-echo "✔ Build complete — ready to deploy"
+FILE_COUNT=$(find public -type f | wc -l)
+echo "✔ Build complete — $FILE_COUNT files ready to deploy"
 echo "══════════════════════════════════════════"

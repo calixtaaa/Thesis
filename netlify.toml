@@ -1,42 +1,35 @@
 # ══════════════════════════════════════════════════════════════════
-#  Netlify Deployment Configuration
-#  Hygiene Vending Machine — Admin Dashboard
+#  Netlify Deployment — Hygiene Vending Machine
+#  Static site build: renders Flask/Jinja2 templates into HTML
+#  during build, then serves everything from CDN.
 # ══════════════════════════════════════════════════════════════════
 
 [build]
-  command   = "bash build_netlify.sh"
-  publish   = "public"
-  functions = "netlify/functions"
+  command = "bash build_netlify.sh"
+  publish = "public"
 
 [build.environment]
   PYTHON_VERSION = "3.11"
 
-# ── Redirects (processed top-to-bottom, first match wins) ────────
+# ── Redirects ────────────────────────────────────────────────────
 
-# Serve static assets directly from CDN (fast, immutable cache)
-[[redirects]]
-  from   = "/static/*"
-  to     = "/static/:splat"
-  status = 200
-
-# Favicon
 [[redirects]]
   from   = "/favicon.ico"
   to     = "/static/images/vendingMachineIcon.jpg"
   status = 200
 
-# Everything else proxied through the Flask serverless function
+# SPA-style: if a page isn't found, show the home page
 [[redirects]]
   from   = "/*"
-  to     = "/.netlify/functions/app"
+  to     = "/index.html"
   status = 200
 
-# ── Headers ──────────────────────────────────────────────────────
+# ── Security & Cache Headers ────────────────────────────────────
 
 [[headers]]
   for = "/static/*"
   [headers.values]
-    Cache-Control       = "public, max-age=31536000, immutable"
+    Cache-Control          = "public, max-age=31536000, immutable"
     X-Content-Type-Options = "nosniff"
 
 [[headers]]
