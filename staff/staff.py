@@ -220,24 +220,6 @@ class StaffMixin:
         inner = ctk.CTkFrame(frame, fg_color=theme["bg"])
         inner.pack(expand=True, fill=tk.BOTH, padx=20, pady=16)
 
-        nav_bg = theme.get("nav_bg", "#1c1c1e")
-        nav_fg = theme.get("nav_fg", "#ffffff")
-        nav_hover = theme.get("nav_hover", "#333333")
-
-        top_bar = ctk.CTkFrame(inner, fg_color=theme["bg"])
-        top_bar.pack(fill=tk.X, pady=(0, 12))
-        ctk.CTkButton(
-            top_bar,
-            text="← Back to Dashboard",
-            font=(UI_FONT, 12, "bold"),
-            command=self.build_main_menu,
-            fg_color=nav_bg,
-            hover_color=nav_hover,
-            text_color=nav_fg,
-            corner_radius=980,
-            height=36,
-        ).pack(side=tk.LEFT)
-
         ctk.CTkLabel(
             inner,
             text=f"Restock Mode — {staff_user['name'] or staff_user['rfid_uid']}",
@@ -248,6 +230,23 @@ class StaffMixin:
         products = self.get_all_products_data()
         card_bg = theme.get("card_bg", theme["button_bg"])
         accent = theme.get("accent", "#22c55e")
+
+        action_bar = ctk.CTkFrame(inner, fg_color=theme["bg"], corner_radius=0)
+        # Keep this above the global footer/theme bar on compact displays.
+        action_bar.pack(side=tk.BOTTOM, fill=tk.X, pady=(8, 52))
+        ctk.CTkButton(
+            action_bar,
+            text="Exit Restock Mode",
+            font=(UI_FONT, 13, "bold"),
+            command=self.build_main_menu,
+            fg_color=theme.get("button_bg", "#ffffff"),
+            hover_color=theme.get("card_border", "#d1d1d6"),
+            text_color=theme.get("button_fg", "#1c1c1e"),
+            corner_radius=980,
+            height=40,
+            border_width=1,
+            border_color=theme.get("card_border", "#d1d1d6"),
+        ).pack(fill=tk.X, padx=8)
 
         list_frame = ctk.CTkScrollableFrame(inner, fg_color=theme["bg"])
         list_frame.pack(expand=True, fill=tk.BOTH)
@@ -282,20 +281,6 @@ class StaffMixin:
                 corner_radius=980,
                 width=100,
             ).pack(side=tk.RIGHT, padx=12, pady=8)
-
-        ctk.CTkButton(
-            inner,
-            text="Exit Restock Mode",
-            font=(UI_FONT, 13, "bold"),
-            command=self.build_main_menu,
-            fg_color=theme.get("button_bg", "#ffffff"),
-            hover_color=theme.get("card_border", "#d1d1d6"),
-            text_color=theme.get("button_fg", "#1c1c1e"),
-            corner_radius=980,
-            height=40,
-            border_width=1,
-            border_color=theme.get("card_border", "#d1d1d6"),
-        ).pack(pady=12)
 
         self._slide_in(frame)
         self.add_theme_toggle_footer()

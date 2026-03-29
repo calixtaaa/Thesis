@@ -1769,12 +1769,21 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             command=self._cancel_cart,
         ).pack(side=tk.TOP, fill=tk.X, padx=10, pady=(10, 8))
 
+        items_frame = ctk.CTkScrollableFrame(
+            order_panel,
+            fg_color=panel_bg,
+            corner_radius=0,
+            scrollbar_button_color=self.current_theme.get("search_border", "#cbd5e1"),
+            scrollbar_button_hover_color=self.current_theme.get("accent", "#10b981"),
+        )
+        items_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=6, pady=(0, 6))
+
         for entry in self.cart:
             prod = entry["product"]
             qty_var = tk.IntVar(value=entry["quantity"])
             self._order_qty_vars[prod["id"]] = qty_var
 
-            row = ctk.CTkFrame(order_panel, fg_color=panel_bg, corner_radius=0)
+            row = ctk.CTkFrame(items_frame, fg_color=panel_bg, corner_radius=0)
             row.pack(side=tk.TOP, fill=tk.X, padx=10, pady=4)
 
             ctk.CTkLabel(
@@ -1917,12 +1926,6 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
 
         frame = ctk.CTkFrame(self.content_holder, fg_color=self.current_theme["bg"], corner_radius=0)
         frame.pack(expand=True, fill=tk.BOTH)
-
-        self._build_checkout_back_bar(
-            frame,
-            text="Back to products",
-            command=lambda: (self.checkout_items.clear(), self.build_main_menu()),
-        )
         self._build_order_review_content(frame, items, total, accent, accent_hover)
         self.add_theme_toggle_footer()
 
@@ -1984,6 +1987,31 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
     def _build_payment_method_content(self, parent, items, total):
         """Payment method chooser with order summary."""
         checkout_ui.build_payment_method_content(self, parent, items, total)
+
+    def go_back_from_payment_method(self):
+        """Back action for payment method screen.
+
+        Multi-item checkout returns to order review.
+        Single-item checkout returns to main menu with the order panel quantity editor.
+        """
+        items = self._get_checkout_items()
+        if not items:
+            self.build_main_menu()
+            return
+
+        if len(items) > 1:
+            self.show_order_review_screen()
+            return
+
+        single = items[0]
+        product = single["product"]
+        qty = int(single.get("quantity", 1) or 1)
+
+        self.current_product = product
+        self.current_quantity = qty
+        self.checkout_items = [{"product": product, "quantity": qty}]
+        self.cart = [{"product": product, "quantity": qty}]
+        self.build_main_menu()
 
     # ---------- Cash Payment Flow ----------
 
@@ -2420,7 +2448,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         btn_row = ctk.CTkFrame(inner, fg_color=theme["card_bg"])
         btn_row.pack(fill=tk.X, pady=(8, 0))
         ctk.CTkButton(btn_row, text="Pay Now", font=(UI_FONT, 11, "bold"), command=process_rfid, fg_color=theme["accent"], hover_color=theme["accent_hover"], text_color="#ffffff", corner_radius=8, height=38).pack(side=tk.LEFT, padx=(0, 10))
-        ctk.CTkButton(btn_row, text="Cancel", font=(UI_FONT, 11, "bold"), command=lambda: (self._reset_checkout_state(), self.build_main_menu()), fg_color=theme["button_bg"], hover_color=theme["card_border"], text_color=theme["button_fg"], corner_radius=8, height=38).pack(side=tk.LEFT)
+        ctk.CTkButton(btn_row, text="Cancel", font=(UI_FONT, 11, "bold"), command=self.show_payment_method_screen, fg_color=theme["button_bg"], hover_color=theme["card_border"], text_color=theme["button_fg"], corner_radius=8, height=38).pack(side=tk.LEFT)
         uid_entry.bind("<Return>", lambda _e: process_rfid())
 
     # ---------- Sales Report Export ----------
