@@ -425,7 +425,7 @@ class AdminMixin:
                 inner,
                 text="Admin credentials are not configured.\nPlease contact the system owner.",
                 font=UI_FONT_BODY,
-                text_color="#ef4444",
+                text_color=theme.get("status_error", "#ef4444"),
                 justify="center",
                 wraplength=360,
             ).pack(pady=(8, 0))
@@ -451,7 +451,7 @@ class AdminMixin:
             inner,
             text="",
             font=UI_FONT_SMALL,
-            text_color="#ef4444",
+            text_color=theme.get("status_error", "#ef4444"),
         )
         status_lbl.pack(fill=tk.X, pady=(0, 8))
 
@@ -957,7 +957,7 @@ class AdminMixin:
         bill_entry = ctk.CTkEntry(inner, textvariable=bill_var, width=220)
         bill_entry.pack(anchor="w", pady=(4, 10))
 
-        status_lbl = ctk.CTkLabel(inner, text="", font=UI_FONT_SMALL, text_color="#b91c1c")
+        status_lbl = ctk.CTkLabel(inner, text="", font=UI_FONT_SMALL, text_color=self.current_theme.get("status_error", "#b91c1c"))
         status_lbl.pack(anchor="w", pady=(0, 8))
 
         def save_values():
@@ -971,9 +971,9 @@ class AdminMixin:
                 self.bill_pulse_value = bill_val
                 self.set_hardware_setting_data("coin_pulse_value", str(coin_val))
                 self.set_hardware_setting_data("bill_pulse_value", str(bill_val))
-                status_lbl.configure(text="Saved.", text_color="#065f46")
+                status_lbl.configure(text="Saved.", text_color=self.current_theme.get("status_success", "#065f46"))
             except Exception as exc:
-                status_lbl.configure(text=f"Invalid values: {exc}", text_color="#b91c1c")
+                status_lbl.configure(text=f"Invalid values: {exc}", text_color=self.current_theme.get("status_error", "#b91c1c"))
 
         ctk.CTkButton(
             inner,
@@ -1152,7 +1152,7 @@ class AdminMixin:
         confirm_entry = ctk.CTkEntry(card_inner, show="*", font=UI_FONT_BODY, width=280, fg_color=theme.get("search_bg", "#f2f2f7"), text_color=theme["fg"], border_color=theme.get("search_border", "#d1d1d6"), corner_radius=12, height=42)
         confirm_entry.pack(fill=tk.X, pady=(0, 12))
 
-        status_lbl = ctk.CTkLabel(card_inner, text="", font=UI_FONT_SMALL, text_color="#ef4444")
+        status_lbl = ctk.CTkLabel(card_inner, text="", font=UI_FONT_SMALL, text_color=theme.get("status_error", "#ef4444"))
         status_lbl.pack(pady=(0, 10))
 
         def save():

@@ -129,7 +129,7 @@ class StaffMixin:
             inner,
             text="",
             font=UI_FONT_SMALL,
-            text_color="#ef4444",
+            text_color=theme.get("status_error", "#ef4444"),
         )
         error_lbl.pack(fill=tk.X, pady=(0, 6))
 
@@ -277,7 +277,7 @@ class StaffMixin:
                 command=lambda prod=p: self.restock_product_dialog(prod),
                 fg_color=accent,
                 hover_color=theme.get("accent_hover", "#16a34a"),
-                text_color="#ffffff",
+                text_color=theme.get("on_accent", "#ffffff"),
                 corner_radius=980,
                 width=100,
             ).pack(side=tk.RIGHT, padx=12, pady=8)

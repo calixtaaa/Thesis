@@ -106,6 +106,11 @@ THEMES = {
         "nav_bg": "#6366f1",
         "nav_fg": "#ffffff",
         "nav_hover": "#4f46e5",
+        "on_accent": "#ffffff",
+        "status_error": "#b91c1c",
+        "status_success": "#065f46",
+        "success_bg": "#10b981",
+        "success_hover": "#059669",
         "chart_line": "#10b981",
         "chart_fill": "#d1fae5",
         "chart_grid": "#e2e8f0",
@@ -132,6 +137,11 @@ THEMES = {
         "nav_bg": "#8b5cf6",
         "nav_fg": "#ffffff",
         "nav_hover": "#7c3aed",
+        "on_accent": "#082f49",
+        "status_error": "#fca5a5",
+        "status_success": "#86efac",
+        "success_bg": "#22c55e",
+        "success_hover": "#16a34a",
         "chart_line": "#22d3ee",
         "chart_fill": "#164e63",
         "chart_grid": "#334155",
@@ -827,7 +837,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
     def read_rfid_uid(self, reader_name: str) -> str | None:
         return self._read_rfid_uid_from_hardware(reader_name)
 
-    def start_cash_pulse_monitor(self, amount_var, remaining_var, total_amount: float):
+    def start_cash_pulse_monitor(self, amount_var, remaining_var, total_amount: float, change_var=None, on_update=None):
         def tick():
             if not self.winfo_exists():
                 return
@@ -837,6 +847,13 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                 current = self.cash_session.get_amount()
                 amount_var.set(current)
                 remaining_var.set(max(0.0, total_amount - current))
+                if change_var is not None:
+                    change_var.set(max(0.0, current - total_amount))
+                if callable(on_update):
+                    try:
+                        on_update()
+                    except Exception:
+                        pass
             self._cash_poll_after_id = self.after(120, tick)
 
         self._cash_poll_after_id = self.after(120, tick)
@@ -915,15 +932,15 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                             child.image = None
                     elif getattr(child, "_restock_btn", False):
                         acc = self.current_theme.get("accent", "#10b981")
-                        child.configure(bg=acc, fg="#ffffff")
+                        child.configure(bg=acc, fg=self.current_theme.get("on_accent", "#ffffff"))
                         child._hover_normal = acc
                         child._hover_hover = self.current_theme.get("accent_hover", "#059669")
                     elif getattr(child, "_product_add_btn", False):
                         acc = self.current_theme.get("btn_add", self.current_theme.get("accent", "#10b981"))
                         child.configure(
-                            fg="#ffffff",
+                            fg=self.current_theme.get("on_accent", "#ffffff"),
                             bg=acc,
-                            activeforeground="#ffffff",
+                            activeforeground=self.current_theme.get("on_accent", "#ffffff"),
                             activebackground=self.current_theme.get("btn_add_hover", self.current_theme.get("accent_hover", "#059669")),
                         )
                     else:
@@ -1781,7 +1798,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             order_panel,
             text="Cancel",
             font=(UI_FONT, 11, "bold"),
-            text_color="#ffffff",
+            text_color=self.current_theme.get("nav_fg", "#ffffff"),
             fg_color=panel_bg,
             hover_color=self.current_theme.get("nav_hover", "#4f46e5"),
             corner_radius=8,
@@ -1810,7 +1827,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                 row,
                 text=prod["name"][:18] + ("…" if len(prod["name"]) > 18 else ""),
                 font=UI_FONT_SMALL,
-                text_color="#ffffff",
+                text_color=self.current_theme.get("nav_fg", "#ffffff"),
             ).pack(anchor="center")
 
             ctrl = ctk.CTkFrame(row, fg_color=panel_bg, corner_radius=0)
@@ -1820,7 +1837,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                 ctrl,
                 text="-",
                 font=(UI_FONT, 12, "bold"),
-                text_color="#ffffff",
+                text_color=self.current_theme.get("nav_fg", "#ffffff"),
                 fg_color=panel_bg,
                 hover_color=self.current_theme.get("nav_hover", "#4f46e5"),
                 width=32,
@@ -1828,12 +1845,12 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                 corner_radius=6,
                 command=lambda pid=prod["id"]: self._change_cart_quantity(pid, -1),
             ).pack(side=tk.LEFT, padx=(0, 6))
-            tk.Label(ctrl, textvariable=qty_var, font=(UI_FONT, 12, "bold"), bg=panel_bg, fg="#ffffff", width=3).pack(side=tk.LEFT, padx=(0, 6))
+            tk.Label(ctrl, textvariable=qty_var, font=(UI_FONT, 12, "bold"), bg=panel_bg, fg=self.current_theme.get("nav_fg", "#ffffff"), width=3).pack(side=tk.LEFT, padx=(0, 6))
             ctk.CTkButton(
                 ctrl,
                 text="+",
                 font=(UI_FONT, 12, "bold"),
-                text_color="#ffffff",
+                text_color=self.current_theme.get("nav_fg", "#ffffff"),
                 fg_color=panel_bg,
                 hover_color=self.current_theme.get("nav_hover", "#4f46e5"),
                 width=32,
@@ -1846,7 +1863,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             order_panel,
             text="Confirm Order",
             font=(UI_FONT, 12, "bold"),
-            text_color="#ffffff",
+            text_color=self.current_theme.get("on_accent", "#ffffff"),
             fg_color=self.current_theme.get("accent", "#10b981"),
             hover_color=self.current_theme.get("accent_hover", "#059669"),
             corner_radius=10,
@@ -2144,7 +2161,8 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
 
     def show_success_screen(self, title: str, message: str, on_ok=None):
         """In-app success screen (no messagebox pop-up)."""
-        # Don't update _current_screen_builder for transient screens
+        # Keep this screen active so theme toggles do not revert to the previous flow.
+        self._current_screen_builder = lambda: self.show_success_screen(title, message, on_ok)
         if self.sidebar_holder is not None and self.sidebar_holder.winfo_exists():
             self.sidebar_holder.destroy()
             self.sidebar_holder = None
@@ -2223,7 +2241,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                 command=lambda v=value: add_money(v),
                 fg_color=theme["accent"],
                 hover_color=theme["accent_hover"],
-                text_color="#ffffff",
+                text_color=theme.get("on_accent", "#ffffff"),
                 corner_radius=8,
             ).pack(side=tk.LEFT, padx=10)
 
@@ -2245,7 +2263,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
 
         action_frame = ctk.CTkFrame(inner, fg_color=theme["card_bg"])
         action_frame.pack(pady=(8, 0), fill=tk.X)
-        ctk.CTkButton(action_frame, text="Confirm and issue card", font=UI_FONT_BUTTON, command=confirm_purchase, fg_color=theme["accent"], hover_color=theme["accent_hover"], text_color="#ffffff", corner_radius=8, height=40).pack(side=tk.LEFT, padx=(0, 10))
+        ctk.CTkButton(action_frame, text="Confirm and issue card", font=UI_FONT_BUTTON, command=confirm_purchase, fg_color=theme["accent"], hover_color=theme["accent_hover"], text_color=theme.get("on_accent", "#ffffff"), corner_radius=8, height=40).pack(side=tk.LEFT, padx=(0, 10))
         ctk.CTkButton(action_frame, text="Cancel and go back", font=UI_FONT_BODY, command=self.build_main_menu, fg_color=theme["button_bg"], hover_color=theme["card_border"], text_color=theme["button_fg"], corner_radius=8, height=36).pack(side=tk.LEFT)
 
     # ---------- RFID Reload ----------
@@ -2300,13 +2318,13 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             command=read_from_reader,
             fg_color=theme["accent"],
             hover_color=theme["accent_hover"],
-            text_color="#ffffff",
+            text_color=theme.get("on_accent", "#ffffff"),
             corner_radius=8,
             height=32,
             width=180,
         ).pack(anchor="w", pady=(0, 8))
 
-        error_lbl = ctk.CTkLabel(inner, text="", font=UI_FONT_SMALL, text_color="#b91c1c")
+        error_lbl = ctk.CTkLabel(inner, text="", font=UI_FONT_SMALL, text_color=theme.get("status_error", "#b91c1c"))
         error_lbl.pack(pady=(0, 4))
 
         def proceed_to_amount():
@@ -2322,7 +2340,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
 
         btn_row = ctk.CTkFrame(inner, fg_color=theme["card_bg"])
         btn_row.pack(fill=tk.X, pady=(8, 0))
-        ctk.CTkButton(btn_row, text="OK", font=(UI_FONT, 11, "bold"), command=proceed_to_amount, fg_color=theme["accent"], hover_color=theme["accent_hover"], text_color="#ffffff", corner_radius=8, height=38).pack(side=tk.LEFT, padx=(0, 10))
+        ctk.CTkButton(btn_row, text="OK", font=(UI_FONT, 11, "bold"), command=proceed_to_amount, fg_color=theme["accent"], hover_color=theme["accent_hover"], text_color=theme.get("on_accent", "#ffffff"), corner_radius=8, height=38).pack(side=tk.LEFT, padx=(0, 10))
         ctk.CTkButton(btn_row, text="Cancel", font=(UI_FONT, 11, "bold"), command=self.build_main_menu, fg_color=theme["button_bg"], hover_color=theme["card_border"], text_color=theme["button_fg"], corner_radius=8, height=38).pack(side=tk.LEFT)
         uid_entry.bind("<Return>", lambda _e: proceed_to_amount())
 
@@ -2346,7 +2364,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
     def _build_reload_amount_content(self, parent, uid, user, theme):
         """RFID reload amount entry screen."""
         ctk.CTkLabel(parent, text="Reload RFID Card", font=UI_FONT_BOLD, text_color=theme["fg"]).pack(pady=10)
-        card = ctk.CTkFrame(parent, fg_color=theme["button_bg"], corner_radius=12, border_width=1, border_color="#94a3b8")
+        card = ctk.CTkFrame(parent, fg_color=theme["button_bg"], corner_radius=12, border_width=1, border_color=theme.get("card_border", "#94a3b8"))
         card.pack(padx=24, pady=10)
         card_inner = ctk.CTkFrame(card, fg_color=theme["button_bg"])
         card_inner.pack(padx=20, pady=18)
@@ -2365,7 +2383,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             amount_var.set(cash_session.get_amount())
 
         for text, value in [("+₱1", 1), ("+₱5", 5), ("+₱10", 10), ("+₱20", 20)]:
-            ctk.CTkButton(btn_frame, text=text, width=70, font=UI_FONT_BODY, command=lambda v=value: add_money(v), fg_color=theme["accent"], hover_color=theme["accent_hover"], text_color="#ffffff", corner_radius=8).pack(side=tk.LEFT, padx=5)
+            ctk.CTkButton(btn_frame, text=text, width=70, font=UI_FONT_BODY, command=lambda v=value: add_money(v), fg_color=theme["accent"], hover_color=theme["accent_hover"], text_color=theme.get("on_accent", "#ffffff"), corner_radius=8).pack(side=tk.LEFT, padx=5)
 
         # Monitor cash pulses from bill/coin acceptors while this screen is open.
         self.start_cash_pulse_monitor(amount_var, tk.DoubleVar(value=0.0), 0.0)
@@ -2380,7 +2398,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             record_transaction(product_id=None, quantity=None, total_amount=amount, payment_method="rfid_reload", rfid_user_id=user["id"])
             self.show_success_screen("Reload Successful", f"New balance: ₱{new_balance:.2f}", on_ok=self.build_main_menu)
 
-        ctk.CTkButton(card_inner, text="Add balance", font=UI_FONT_BUTTON, command=confirm_reload, fg_color=theme["accent"], hover_color=theme["accent_hover"], text_color="#ffffff", corner_radius=8, height=44).pack(pady=(10, 8), fill=tk.X)
+        ctk.CTkButton(card_inner, text="Add balance", font=UI_FONT_BUTTON, command=confirm_reload, fg_color=theme["accent"], hover_color=theme["accent_hover"], text_color=theme.get("on_accent", "#ffffff"), corner_radius=8, height=44).pack(pady=(10, 8), fill=tk.X)
         ctk.CTkButton(parent, text="Cancel and go back", font=UI_FONT_BODY, command=self.build_main_menu, fg_color=theme["button_bg"], hover_color=theme["card_border"], text_color=theme["button_fg"], corner_radius=8, height=36).pack(pady=5)
 
     # ---------- RFID Purchase Payment ----------
@@ -2436,12 +2454,12 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             command=read_from_reader,
             fg_color=theme["accent"],
             hover_color=theme["accent_hover"],
-            text_color="#ffffff",
+            text_color=theme.get("on_accent", "#ffffff"),
             corner_radius=8,
             height=32,
             width=180,
         ).pack(anchor="w", pady=(0, 8))
-        error_lbl = ctk.CTkLabel(inner, text="", font=UI_FONT_SMALL, text_color="#b91c1c")
+        error_lbl = ctk.CTkLabel(inner, text="", font=UI_FONT_SMALL, text_color=theme.get("status_error", "#b91c1c"))
         error_lbl.pack(pady=(0, 4))
 
         def process_rfid():
@@ -2467,7 +2485,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
 
         btn_row = ctk.CTkFrame(inner, fg_color=theme["card_bg"])
         btn_row.pack(fill=tk.X, pady=(8, 0))
-        ctk.CTkButton(btn_row, text="Pay Now", font=(UI_FONT, 11, "bold"), command=process_rfid, fg_color=theme["accent"], hover_color=theme["accent_hover"], text_color="#ffffff", corner_radius=8, height=38).pack(side=tk.LEFT, padx=(0, 10))
+        ctk.CTkButton(btn_row, text="Pay Now", font=(UI_FONT, 11, "bold"), command=process_rfid, fg_color=theme["accent"], hover_color=theme["accent_hover"], text_color=theme.get("on_accent", "#ffffff"), corner_radius=8, height=38).pack(side=tk.LEFT, padx=(0, 10))
         ctk.CTkButton(btn_row, text="Cancel", font=(UI_FONT, 11, "bold"), command=self.show_payment_method_screen, fg_color=theme["button_bg"], hover_color=theme["card_border"], text_color=theme["button_fg"], corner_radius=8, height=38).pack(side=tk.LEFT)
         uid_entry.bind("<Return>", lambda _e: process_rfid())
 
