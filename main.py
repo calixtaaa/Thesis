@@ -995,6 +995,24 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         except Exception:
             pass
 
+    def _rebuild_current_screen_after_theme_change(self):
+        """Rebuild active screen after a theme toggle to avoid stale widget colors."""
+        builder = getattr(self, "_current_screen_builder", None)
+        if not callable(builder):
+            return
+        try:
+            self.clear_screen()
+        except Exception:
+            return
+        try:
+            builder()
+        except Exception:
+            # Fallback: keep app usable even if a specific screen rebuild fails.
+            try:
+                self.apply_theme_to_widget(self)
+            except Exception:
+                pass
+
     def _translate_theme_color(self, value, old_theme, new_theme):
         """Map known old-theme color values to their new-theme equivalents."""
         if isinstance(value, str):
@@ -1060,7 +1078,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             pass
 
     def toggle_theme(self):
-        """Switch between light and dark modes without rebuilding the active screen."""
+        """Switch between light and dark modes and rebuild the active screen."""
         if getattr(self, "theme_animating", False):
             return
         self.theme_animating = True
@@ -1088,6 +1106,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                 self.apply_theme_to_widget(self)
             except Exception:
                 pass
+            self._rebuild_current_screen_after_theme_change()
         finally:
             self.theme_animating = False
 
@@ -1193,6 +1212,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                 self.apply_theme_to_widget(self)
             except Exception:
                 pass
+            self._rebuild_current_screen_after_theme_change()
 
         def animate_toggle(_event=None):
             if self.theme_animating:
