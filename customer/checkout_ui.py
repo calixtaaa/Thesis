@@ -20,12 +20,39 @@ def build_checkout_back_bar(app, parent, text, command):
 
 
 def build_order_review_content(app, parent, items, total, accent, accent_hover):
+    nav_bar = ctk.CTkFrame(parent, fg_color=app.current_theme["bg"], corner_radius=0)
+    nav_bar.pack(side=tk.BOTTOM, fill=tk.X, pady=(0, 6))
+
+    ctk.CTkButton(
+        nav_bar,
+        text="Back to products",
+        font=app._ui_font_body,
+        command=lambda: (app.checkout_items.clear(), app.build_main_menu()),
+        fg_color=app.current_theme["button_bg"],
+        hover_color=app.current_theme.get("accent", "#1A948E"),
+        text_color=app.current_theme["button_fg"],
+        corner_radius=8,
+        height=38,
+    ).pack(side=tk.LEFT, padx=(24, 8), pady=8, expand=True, fill=tk.X)
+
+    ctk.CTkButton(
+        nav_bar,
+        text="Continue to payment",
+        font=app._ui_font_button,
+        command=app.show_payment_method_screen,
+        fg_color=accent,
+        hover_color=accent_hover,
+        text_color="#ffffff",
+        corner_radius=10,
+        height=38,
+    ).pack(side=tk.LEFT, padx=(8, 24), pady=8, expand=True, fill=tk.X)
+
     ctk.CTkLabel(
         parent,
         text="Step 2 of 3 – Review order",
         font=app._ui_font_small,
         text_color=app.current_theme.get("muted", app.current_theme["fg"]),
-    ).pack(pady=(16, 0))
+    ).pack(pady=(10, 0))
     ctk.CTkLabel(
         parent,
         text="Order Summary",
@@ -40,11 +67,18 @@ def build_order_review_content(app, parent, items, total, accent, accent_hover):
         border_color=app.current_theme.get("card_border", "#e2e8f0"),
         corner_radius=12,
     )
-    card.pack(padx=40, pady=18)
+    card.pack(padx=24, pady=10)
 
     card_bg_color = app.current_theme.get("card_bg", app.current_theme["button_bg"])
-    list_frame = ctk.CTkFrame(card, fg_color=card_bg_color, corner_radius=0)
-    list_frame.pack(fill=tk.BOTH, expand=True, padx=30, pady=(22, 0))
+    list_frame = ctk.CTkScrollableFrame(
+        card,
+        fg_color=card_bg_color,
+        corner_radius=0,
+        height=150,
+        scrollbar_button_color=app.current_theme.get("search_border", "#cbd5e1"),
+        scrollbar_button_hover_color=app.current_theme.get("accent", "#10b981"),
+    )
+    list_frame.pack(fill=tk.BOTH, expand=False, padx=30, pady=(22, 0))
     for col in range(3):
         list_frame.grid_columnconfigure(col, weight=1 if col == 0 else 0)
 
@@ -82,18 +116,6 @@ def build_order_review_content(app, parent, items, total, accent, accent_hover):
         font=(app._ui_font_name, 16, "bold"),
         text_color=app.current_theme["button_fg"],
     ).pack(pady=(14, 10), padx=30)
-
-    ctk.CTkButton(
-        card,
-        text="Continue to payment",
-        font=app._ui_font_button,
-        command=app.show_payment_method_screen,
-        fg_color=accent,
-        hover_color=accent_hover,
-        text_color="#ffffff",
-        corner_radius=10,
-        height=44,
-    ).pack(fill=tk.X, padx=30, pady=(6, 22))
 
 
 def build_quantity_content(app, parent, product, accent, accent_hover):

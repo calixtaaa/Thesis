@@ -1766,12 +1766,21 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             command=self._cancel_cart,
         ).pack(side=tk.TOP, fill=tk.X, padx=10, pady=(10, 8))
 
+        items_frame = ctk.CTkScrollableFrame(
+            order_panel,
+            fg_color=panel_bg,
+            corner_radius=0,
+            scrollbar_button_color=self.current_theme.get("nav_hover", "#4f46e5"),
+            scrollbar_button_hover_color=self.current_theme.get("accent", "#10b981"),
+        )
+        items_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=0, pady=0)
+
         for entry in self.cart:
             prod = entry["product"]
             qty_var = tk.IntVar(value=entry["quantity"])
             self._order_qty_vars[prod["id"]] = qty_var
 
-            row = ctk.CTkFrame(order_panel, fg_color=panel_bg, corner_radius=0)
+            row = ctk.CTkFrame(items_frame, fg_color=panel_bg, corner_radius=0)
             row.pack(side=tk.TOP, fill=tk.X, padx=10, pady=4)
 
             ctk.CTkLabel(
@@ -1914,12 +1923,6 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
 
         frame = ctk.CTkFrame(self.content_holder, fg_color=self.current_theme["bg"], corner_radius=0)
         frame.pack(expand=True, fill=tk.BOTH)
-
-        self._build_checkout_back_bar(
-            frame,
-            text="Back to products",
-            command=lambda: (self.checkout_items.clear(), self.build_main_menu()),
-        )
         self._build_order_review_content(frame, items, total, accent, accent_hover)
         self.add_theme_toggle_footer()
 
