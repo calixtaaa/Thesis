@@ -6,56 +6,62 @@
 /* ── CSS Custom Properties ──────────────────────────────────────── */
 :root {
     --bg-primary:     #ffffff;
-    --bg-secondary:   #f2f2f7;
-    --bg-page:        #f2f2f7;
-    --text-primary:   #1c1c1e;
-    --text-secondary: #8e8e93;
-    --border-color:   #d1d1d6;
-    --border-light:   #f5f5f5;
+    --bg-secondary:   #f1f5f9;
+    --bg-page:        #f8fafc;
+    --text-primary:   #0f172a;
+    --text-secondary: #64748b;
+    --border-color:   #e2e8f0;
+    --border-light:   #f1f5f9;
     --card-bg:        #ffffff;
-    --card-shadow1:   rgba(0, 0, 0, 0.06);
+    --card-shadow1:   rgba(99, 102, 241, 0.08);
     --card-shadow2:   rgba(0, 0, 0, 0.04);
-    --input-bg:       #f2f2f7;
-    --input-border:   #d1d1d6;
-    --table-hover:    #f2f2f7;
-    --table-head-bg:  #f2f2f7;
-    --scrollbar:      #c7c7cc;
-    --scrollbar-hover:#8e8e93;
-    --frosted:        rgba(255, 255, 255, 0.85);
-    --modal-overlay:  rgba(0, 0, 0, 0.35);
-    --pill-green-bg:  #e8f5e9;
-    --pill-green-fg:  #2e7d32;
-    --pill-orange-bg: #fff3e0;
-    --pill-orange-fg: #e65100;
-    --pill-red-bg:    #ffebee;
-    --pill-red-fg:    #c62828;
+    --input-bg:       #f1f5f9;
+    --input-border:   #cbd5e1;
+    --table-hover:    #f1f5f9;
+    --table-head-bg:  #f1f5f9;
+    --scrollbar:      #cbd5e1;
+    --scrollbar-hover:#94a3b8;
+    --frosted:        rgba(248, 250, 252, 0.85);
+    --modal-overlay:  rgba(15, 23, 42, 0.35);
+    --pill-green-bg:  #d1fae5;
+    --pill-green-fg:  #059669;
+    --pill-orange-bg: #ffedd5;
+    --pill-orange-fg: #c2410c;
+    --pill-red-bg:    #fee2e2;
+    --pill-red-fg:    #dc2626;
+    --accent:         #6366f1;
+    --accent-hover:   #4f46e5;
+    --accent-success: #10b981;
 }
 
 html.dark {
-    --bg-primary:     #1c1c1e;
-    --bg-secondary:   #2c2c2e;
-    --bg-page:        #000000;
-    --text-primary:   #f5f5f7;
-    --text-secondary: #aeaeb2;
-    --border-color:   #3a3a3c;
-    --border-light:   #2c2c2e;
-    --card-bg:        #1c1c1e;
-    --card-shadow1:   rgba(0, 0, 0, 0.3);
+    --bg-primary:     #1e293b;
+    --bg-secondary:   #1e293b;
+    --bg-page:        #0f172a;
+    --text-primary:   #f1f5f9;
+    --text-secondary: #94a3b8;
+    --border-color:   #334155;
+    --border-light:   #1e293b;
+    --card-bg:        #1e293b;
+    --card-shadow1:   rgba(139, 92, 246, 0.12);
     --card-shadow2:   rgba(0, 0, 0, 0.2);
-    --input-bg:       #2c2c2e;
-    --input-border:   #3a3a3c;
-    --table-hover:    #2c2c2e;
-    --table-head-bg:  #2c2c2e;
-    --scrollbar:      #3a3a3c;
-    --scrollbar-hover:#636366;
-    --frosted:        rgba(28, 28, 30, 0.85);
+    --input-bg:       #1e293b;
+    --input-border:   #475569;
+    --table-hover:    #334155;
+    --table-head-bg:  #1e293b;
+    --scrollbar:      #475569;
+    --scrollbar-hover:#64748b;
+    --frosted:        rgba(30, 41, 59, 0.85);
     --modal-overlay:  rgba(0, 0, 0, 0.6);
-    --pill-green-bg:  rgba(46, 125, 50, 0.2);
-    --pill-green-fg:  #66bb6a;
-    --pill-orange-bg: rgba(230, 81, 0, 0.2);
-    --pill-orange-fg: #ffb74d;
-    --pill-red-bg:    rgba(198, 40, 40, 0.2);
-    --pill-red-fg:    #ef5350;
+    --pill-green-bg:  rgba(16, 185, 129, 0.15);
+    --pill-green-fg:  #34d399;
+    --pill-orange-bg: rgba(251, 146, 60, 0.15);
+    --pill-orange-fg: #fb923c;
+    --pill-red-bg:    rgba(244, 63, 94, 0.15);
+    --pill-red-fg:    #fb7185;
+    --accent:         #8b5cf6;
+    --accent-hover:   #7c3aed;
+    --accent-success: #22d3ee;
 }
 
 /* ── Base Reset ──────────────────────────────────────────────────── */
@@ -173,44 +179,40 @@ body {
 }
 
 .ios-input:focus {
-    border-color: var(--text-primary);
-    box-shadow: 0 0 0 3px var(--card-shadow1);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
 }
 
 .ios-input::placeholder {
     color: var(--text-secondary);
 }
 
-/* ── Black pill button ───────────────────────────────────────────── */
+/* ── Primary pill button (indigo / violet) ───────────────────────── */
 .btn-black {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 6px;
     padding: 10px 20px;
-    background: #1c1c1e;
+    background: var(--accent);
     color: #ffffff;
     border-radius: 980px;
     font-size: 14px;
-    font-weight: 500;
+    font-weight: 600;
     letter-spacing: -0.01em;
     border: none;
     cursor: pointer;
     transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-html.dark .btn-black {
-    background: #f5f5f7;
-    color: #1c1c1e;
-}
-
 .btn-black:hover {
-    background: #333333;
+    background: var(--accent-hover);
     transform: scale(1.02);
+    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.25);
 }
 
 html.dark .btn-black:hover {
-    background: #e5e5ea;
+    box-shadow: 0 4px 14px rgba(139, 92, 246, 0.3);
 }
 
 .btn-black:active {
@@ -223,37 +225,27 @@ html.dark .btn-black:hover {
     transform: none;
 }
 
-/* ── White pill button ───────────────────────────────────────────── */
+/* ── Secondary pill button (outlined) ───────────────────────────── */
 .btn-white {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 6px;
     padding: 10px 20px;
-    background: #ffffff;
-    color: #1c1c1e;
+    background: var(--card-bg);
+    color: var(--accent);
     border-radius: 980px;
     font-size: 14px;
-    font-weight: 500;
+    font-weight: 600;
     letter-spacing: -0.01em;
-    border: 1px solid #d1d1d6;
+    border: 1px solid var(--accent);
     cursor: pointer;
     transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-html.dark .btn-white {
-    background: #2c2c2e;
-    color: #f5f5f7;
-    border-color: #3a3a3c;
-}
-
 .btn-white:hover {
-    background: #f5f5f5;
+    background: var(--bg-secondary);
     transform: scale(1.02);
-}
-
-html.dark .btn-white:hover {
-    background: #3a3a3c;
 }
 
 .btn-white:active {
@@ -389,11 +381,12 @@ html.dark .btn-white:hover {
 
 /* ── Nav item inactive ───────────────────────────────────────────── */
 .nav-item-inactive {
-    color: var(--text-primary);
+    color: var(--text-secondary);
 }
 
 .nav-item-inactive:hover {
     background: var(--bg-secondary);
+    color: var(--accent);
 }
 
 /* ── Scrollbar (Webkit) ──────────────────────────────────────────── */

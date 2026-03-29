@@ -19,29 +19,29 @@ class AdminMixin:
             fg_color=self.current_theme["button_bg"],
             corner_radius=10,
             border_width=1,
-            border_color="#94a3b8",
+            border_color=self.current_theme.get("card_border", "#d1d1d6"),
         )
         chart_card.pack(fill=tk.BOTH, expand=True, pady=(6, 0))
-        chart_inner = ctk.CTkFrame(chart_card, fg_color=self.current_theme["button_bg"])
+        chart_inner = ctk.CTkFrame(chart_card, fg_color=self.current_theme.get("card_bg", self.current_theme["button_bg"]))
         chart_inner.pack(fill=tk.BOTH, expand=True, padx=12, pady=12)
 
         ctk.CTkLabel(
             chart_inner,
             text=title,
             font=(UI_FONT, 14, "bold"),
-            text_color=self.current_theme["button_fg"],
+            text_color=self.current_theme["fg"],
         ).pack(anchor="w")
         ctk.CTkLabel(
             chart_inner,
             text=subtitle,
             font=UI_FONT_SMALL,
-            text_color=self.current_theme["button_fg"],
+            text_color=self.current_theme.get("muted", self.current_theme["fg"]),
         ).pack(anchor="w", pady=(0, 8))
 
         canvas = tk.Canvas(
             chart_inner,
             height=180,
-            bg="#ffffff" if self.current_theme_name == "light" else "#253041",
+            bg=self.current_theme.get("card_bg", "#ffffff"),
             highlightthickness=0,
             bd=0,
         )
@@ -65,10 +65,10 @@ class AdminMixin:
             max_value = max(max_value, 1.0)
             y_steps = 5
 
-            grid_color = "#d9d9d9" if self.current_theme_name == "light" else "#4b5a73"
-            axis_color = "#666666" if self.current_theme_name == "light" else "#d7dde8"
-            line_color = "#c2185b"
-            point_fill = "#d81b60"
+            grid_color = self.current_theme.get("chart_grid", "#e5e5ea")
+            axis_color = self.current_theme.get("muted", "#8e8e93")
+            line_color = self.current_theme.get("chart_line", "#22c55e")
+            point_fill = self.current_theme.get("accent", "#22c55e")
 
             for step in range(y_steps + 1):
                 y = top_pad + (plot_h * step / y_steps)
@@ -136,7 +136,7 @@ class AdminMixin:
             fg_color=self.current_theme["button_bg"],
             corner_radius=10,
             border_width=1,
-            border_color="#94a3b8",
+            border_color=self.current_theme.get("card_border", "#d1d1d6"),
         )
         chart_card.pack(fill=tk.BOTH, expand=True, pady=(6, 0))
         chart_inner = ctk.CTkFrame(chart_card, fg_color=self.current_theme["button_bg"])
@@ -158,7 +158,7 @@ class AdminMixin:
         canvas = tk.Canvas(
             chart_inner,
             height=240,
-            bg="#ffffff" if self.current_theme_name == "light" else "#253041",
+            bg=self.current_theme.get("card_bg", "#ffffff"),
             highlightthickness=0,
             bd=0,
         )
@@ -180,8 +180,8 @@ class AdminMixin:
             max_value = max(max_value, 1.0)
             y_steps = 5
 
-            grid_color = "#d9d9d9" if self.current_theme_name == "light" else "#4b5a73"
-            axis_color = "#666666" if self.current_theme_name == "light" else "#d7dde8"
+            grid_color = self.current_theme.get("chart_grid", "#e5e5ea")
+            axis_color = self.current_theme.get("muted", "#8e8e93")
 
             for step in range(y_steps + 1):
                 y = top_pad + (plot_h * step / y_steps)
@@ -237,7 +237,7 @@ class AdminMixin:
             fg_color=self.current_theme["button_bg"],
             corner_radius=10,
             border_width=1,
-            border_color="#94a3b8",
+            border_color=self.current_theme.get("card_border", "#d1d1d6"),
         )
         chart_card.pack(fill=tk.BOTH, expand=True, pady=(6, 0))
         chart_inner = ctk.CTkFrame(chart_card, fg_color=self.current_theme["button_bg"])
@@ -259,7 +259,7 @@ class AdminMixin:
         canvas = tk.Canvas(
             chart_inner,
             height=240,
-            bg="#ffffff" if self.current_theme_name == "light" else "#253041",
+            bg=self.current_theme.get("card_bg", "#ffffff"),
             highlightthickness=0,
             bd=0,
         )
@@ -382,18 +382,19 @@ class AdminMixin:
             self.sidebar_holder.destroy()
             self.sidebar_holder = None
         self.clear_screen()
-        page_bg = "#1e293b"
-        self.content_holder.configure(fg_color=page_bg)
+        theme = self.current_theme
+        self.content_holder.configure(fg_color=theme["bg"])
 
-        center = ctk.CTkFrame(self.content_holder, fg_color=page_bg)
+        center = ctk.CTkFrame(self.content_holder, fg_color=theme["bg"])
         center.place(relx=0.5, rely=0.5, anchor="center")
 
-        panel_bg = "#99f6e4"
-        btn_bg = "#1A948E"
-        btn_hover = "#2dd4bf"
-        panel = ctk.CTkFrame(center, fg_color=panel_bg, corner_radius=16)
+        nav_bg = theme.get("nav_bg", "#1c1c1e")
+        nav_fg = theme.get("nav_fg", "#ffffff")
+        nav_hover = theme.get("nav_hover", "#333333")
+
+        panel = ctk.CTkFrame(center, fg_color=theme["card_bg"], corner_radius=20, border_width=1, border_color=theme["card_border"])
         panel.pack()
-        inner = ctk.CTkFrame(panel, fg_color=panel_bg)
+        inner = ctk.CTkFrame(panel, fg_color=theme["card_bg"])
         inner.pack(padx=40, pady=28)
 
         stored_username, stored_hash = self.get_admin_credentials_data()
@@ -402,7 +403,7 @@ class AdminMixin:
                 inner,
                 text="Admin credentials are not configured.\nPlease contact the system owner.",
                 font=UI_FONT_BODY,
-                text_color="#b91c1c",
+                text_color="#ef4444",
                 justify="center",
                 wraplength=360,
             ).pack(pady=(8, 0))
@@ -411,24 +412,24 @@ class AdminMixin:
         ctk.CTkLabel(
             inner,
             text="Admin Login",
-            font=(UI_FONT, 18, "bold"),
-            text_color="#0f766e",
+            font=(UI_FONT, 20, "bold"),
+            text_color=theme["fg"],
         ).pack(pady=(0, 20))
 
-        ctk.CTkLabel(inner, text="Username:", font=UI_FONT_SMALL, text_color="#134e4a").pack(anchor="w", pady=(0, 4))
-        un_entry = ctk.CTkEntry(inner, font=UI_FONT_BODY, width=280, fg_color="#ffffff", text_color="#1e293b", border_color="#94a3b8", corner_radius=8, height=40)
+        ctk.CTkLabel(inner, text="Username:", font=UI_FONT_SMALL, text_color=theme.get("muted", "#8e8e93")).pack(anchor="w", pady=(0, 4))
+        un_entry = ctk.CTkEntry(inner, font=UI_FONT_BODY, width=280, fg_color=theme.get("search_bg", "#f2f2f7"), text_color=theme["fg"], border_color=theme.get("search_border", "#d1d1d6"), corner_radius=12, height=42)
         un_entry.pack(pady=(0, 14))
         un_entry.focus_set()
 
-        ctk.CTkLabel(inner, text="Password:", font=UI_FONT_SMALL, text_color="#134e4a").pack(anchor="w", pady=(0, 4))
-        pw_entry = ctk.CTkEntry(inner, font=UI_FONT_BODY, width=280, fg_color="#ffffff", text_color="#1e293b", border_color="#94a3b8", corner_radius=8, height=40, show="*")
+        ctk.CTkLabel(inner, text="Password:", font=UI_FONT_SMALL, text_color=theme.get("muted", "#8e8e93")).pack(anchor="w", pady=(0, 4))
+        pw_entry = ctk.CTkEntry(inner, font=UI_FONT_BODY, width=280, fg_color=theme.get("search_bg", "#f2f2f7"), text_color=theme["fg"], border_color=theme.get("search_border", "#d1d1d6"), corner_radius=12, height=42, show="*")
         pw_entry.pack(pady=(0, 14))
 
         status_lbl = ctk.CTkLabel(
             inner,
             text="",
             font=UI_FONT_SMALL,
-            text_color="#b91c1c",
+            text_color="#ef4444",
         )
         status_lbl.pack(fill=tk.X, pady=(0, 8))
 
@@ -445,10 +446,10 @@ class AdminMixin:
             status_lbl.configure(text="")
             self.show_admin_dashboard({"name": username, "rfid_uid": ""})
 
-        btn_frame = ctk.CTkFrame(inner, fg_color=panel_bg)
+        btn_frame = ctk.CTkFrame(inner, fg_color=theme["card_bg"])
         btn_frame.pack(fill=tk.X)
-        ctk.CTkButton(btn_frame, text="OK", font=(UI_FONT, 11, "bold"), command=submit, fg_color=btn_bg, hover_color=btn_hover, text_color="#ffffff", corner_radius=8, height=38).pack(side=tk.LEFT, padx=(0, 10))
-        ctk.CTkButton(btn_frame, text="Cancel", font=(UI_FONT, 11, "bold"), command=self.build_main_menu, fg_color=btn_bg, hover_color=btn_hover, text_color="#ffffff", corner_radius=8, height=38).pack(side=tk.LEFT)
+        ctk.CTkButton(btn_frame, text="OK", font=(UI_FONT, 12, "bold"), command=submit, fg_color=nav_bg, hover_color=nav_hover, text_color=nav_fg, corner_radius=980, height=40).pack(side=tk.LEFT, padx=(0, 10))
+        ctk.CTkButton(btn_frame, text="Cancel", font=(UI_FONT, 12, "bold"), command=self.build_main_menu, fg_color=theme["button_bg"], hover_color=theme.get("card_border", "#d1d1d6"), text_color=theme["button_fg"], corner_radius=980, height=40, border_width=1, border_color=theme.get("card_border", "#d1d1d6")).pack(side=tk.LEFT)
 
         def on_return(_):
             submit()
@@ -498,24 +499,24 @@ class AdminMixin:
             text_color=self.current_theme["fg"],
         ).pack(pady=(16, 12), padx=12)
 
-        accent = self.current_theme.get("accent", "#1A948E")
-        hover_bg = "#2dd4bf" if self.current_theme_name == "light" else "#5eead4"
-        nav_fg = "#ffffff"
+        nav_bg = self.current_theme.get("nav_bg", "#1c1c1e")
+        nav_fg = self.current_theme.get("nav_fg", "#ffffff")
+        nav_hover = self.current_theme.get("nav_hover", "#333333")
 
         def nav_btn(text, cmd):
             b = ctk.CTkButton(
                 sidebar,
                 text=text,
-                font=(UI_FONT, 11),
+                font=(UI_FONT, 12),
                 anchor="w",
                 command=cmd,
-                fg_color=accent,
-                hover_color=hover_bg,
+                fg_color=nav_bg,
+                hover_color=nav_hover,
                 text_color=nav_fg,
-                corner_radius=8,
+                corner_radius=980,
                 height=38,
             )
-            b.pack(fill=tk.X, padx=8, pady=4)
+            b.pack(fill=tk.X, padx=8, pady=3)
             return b
 
         nav_btn("Overview", lambda: self.show_admin_dashboard(staff_user))
@@ -565,7 +566,7 @@ class AdminMixin:
                 card,
                 text=value_text,
                 font=(UI_FONT, 18, "bold"),
-                text_color=self.current_theme.get("accent", "#1A948E"),
+                text_color=self.current_theme.get("accent", "#10b981"),
             ).pack(anchor="w", padx=12, pady=(0, 12))
 
         metric_card(metrics_frame, "Total Sales", f"₱{stats['total_sales']:.2f}")
@@ -641,8 +642,8 @@ class AdminMixin:
             font=(UI_FONT, 11, "bold"),
             command=_run_pred if not ran else None,
             state="normal" if not ran else "disabled",
-            fg_color=self.current_theme.get("accent", "#1A948E"),
-            hover_color=self.current_theme.get("accent_hover", "#15857B"),
+            fg_color=self.current_theme.get("accent", "#10b981"),
+            hover_color=self.current_theme.get("accent_hover", "#059669"),
             text_color="#ffffff",
             corner_radius=8,
             height=38,
@@ -703,7 +704,7 @@ class AdminMixin:
                     row,
                     text=need,
                     font=UI_FONT_SMALL,
-                    text_color=self.current_theme.get("accent", "#1A948E") if need == "Yes" else self.current_theme.get("muted", self.current_theme["fg"]),
+                    text_color=self.current_theme.get("accent", "#10b981") if need == "Yes" else self.current_theme.get("muted", self.current_theme["fg"]),
                     anchor="w",
                 ).pack(side=tk.LEFT, fill=tk.X, expand=True)
 
@@ -712,8 +713,8 @@ class AdminMixin:
             text="Generate Excel Report",
             font=(UI_FONT, 12, "bold"),
             command=self.export_sales_report_ui,
-            fg_color=self.current_theme.get("accent", "#1A948E"),
-            hover_color=self.current_theme.get("accent_hover", "#15857B"),
+            fg_color=self.current_theme.get("accent", "#10b981"),
+            hover_color=self.current_theme.get("accent_hover", "#059669"),
             text_color="#ffffff",
             corner_radius=8,
             height=42,
@@ -774,8 +775,8 @@ class AdminMixin:
                     text="Open",
                     font=UI_FONT_BODY,
                     command=make_open_cmd(),
-                    fg_color=self.current_theme.get("accent", "#1A948E"),
-                    hover_color=self.current_theme.get("accent_hover", "#15857B"),
+                    fg_color=self.current_theme.get("accent", "#10b981"),
+                    hover_color=self.current_theme.get("accent_hover", "#059669"),
                     text_color="#ffffff",
                     corner_radius=8,
                     width=80,
@@ -787,7 +788,7 @@ class AdminMixin:
             font=UI_FONT_BODY,
             command=lambda: self.show_admin_dashboard(getattr(self, "_current_admin_user", {"name": "admin", "rfid_uid": ""})),
             fg_color=self.current_theme["button_bg"],
-            hover_color=self.current_theme.get("accent", "#1A948E"),
+            hover_color=self.current_theme.get("accent", "#10b981"),
             text_color=self.current_theme["button_fg"],
             corner_radius=8,
             height=38,
@@ -848,9 +849,9 @@ class AdminMixin:
                 variable=role_var,
                 values=role_values,
                 width=150,
-                fg_color=self.current_theme.get("accent", "#1A948E"),
-                button_color=self.current_theme.get("accent_hover", "#15857B"),
-                button_hover_color=self.current_theme.get("accent_hover", "#15857B"),
+                fg_color=self.current_theme.get("accent", "#10b981"),
+                button_color=self.current_theme.get("accent_hover", "#059669"),
+                button_hover_color=self.current_theme.get("accent_hover", "#059669"),
                 text_color="#ffffff",
             )
             picker.pack(side=tk.LEFT, padx=(0, 8), pady=8)
@@ -869,8 +870,8 @@ class AdminMixin:
                 text="Save",
                 font=(UI_FONT, 11, "bold"),
                 command=make_save(),
-                fg_color=self.current_theme.get("accent", "#1A948E"),
-                hover_color=self.current_theme.get("accent_hover", "#15857B"),
+                fg_color=self.current_theme.get("accent", "#10b981"),
+                hover_color=self.current_theme.get("accent_hover", "#059669"),
                 text_color="#ffffff",
                 corner_radius=8,
                 width=72,
@@ -882,7 +883,7 @@ class AdminMixin:
             font=UI_FONT_BODY,
             command=lambda: self.show_admin_dashboard(getattr(self, "_current_admin_user", {"name": "admin", "rfid_uid": ""})),
             fg_color=self.current_theme["button_bg"],
-            hover_color=self.current_theme.get("accent", "#1A948E"),
+            hover_color=self.current_theme.get("accent", "#10b981"),
             text_color=self.current_theme["button_fg"],
             corner_radius=8,
             height=38,
@@ -958,8 +959,8 @@ class AdminMixin:
             text="Save Settings",
             font=(UI_FONT, 11, "bold"),
             command=save_values,
-            fg_color=self.current_theme.get("accent", "#1A948E"),
-            hover_color=self.current_theme.get("accent_hover", "#15857B"),
+            fg_color=self.current_theme.get("accent", "#10b981"),
+            hover_color=self.current_theme.get("accent_hover", "#059669"),
             text_color="#ffffff",
             corner_radius=8,
             width=150,
@@ -971,7 +972,7 @@ class AdminMixin:
             font=UI_FONT_BODY,
             command=lambda: self.show_admin_dashboard(getattr(self, "_current_admin_user", {"name": "admin", "rfid_uid": ""})),
             fg_color=self.current_theme["button_bg"],
-            hover_color=self.current_theme.get("accent", "#1A948E"),
+            hover_color=self.current_theme.get("accent", "#10b981"),
             text_color=self.current_theme["button_fg"],
             corner_radius=8,
             height=38,
@@ -1038,8 +1039,8 @@ class AdminMixin:
             btn_row,
             text="Read Payment RFID",
             command=tap_payment,
-            fg_color=self.current_theme.get("accent", "#1A948E"),
-            hover_color=self.current_theme.get("accent_hover", "#15857B"),
+            fg_color=self.current_theme.get("accent", "#10b981"),
+            hover_color=self.current_theme.get("accent_hover", "#059669"),
             text_color="#ffffff",
             corner_radius=8,
             width=150,
@@ -1049,8 +1050,8 @@ class AdminMixin:
             btn_row,
             text="Read Door RFID",
             command=tap_door,
-            fg_color=self.current_theme.get("accent", "#1A948E"),
-            hover_color=self.current_theme.get("accent_hover", "#15857B"),
+            fg_color=self.current_theme.get("accent", "#10b981"),
+            hover_color=self.current_theme.get("accent_hover", "#059669"),
             text_color="#ffffff",
             corner_radius=8,
             width=150,
@@ -1072,7 +1073,7 @@ class AdminMixin:
             font=UI_FONT_BODY,
             command=lambda: self.show_admin_dashboard(getattr(self, "_current_admin_user", {"name": "admin", "rfid_uid": ""})),
             fg_color=self.current_theme["button_bg"],
-            hover_color=self.current_theme.get("accent", "#1A948E"),
+            hover_color=self.current_theme.get("accent", "#10b981"),
             text_color=self.current_theme["button_fg"],
             corner_radius=8,
             height=38,
@@ -1086,50 +1087,51 @@ class AdminMixin:
         self.clear_screen()
 
         user = getattr(self, "_current_admin_user", {"name": "admin", "rfid_uid": ""})
-        panel_bg = "#99f6e4"
-        accent = self.current_theme.get("accent", "#1A948E")
-        accent_hover = "#2dd4bf" if self.current_theme_name == "light" else "#5eead4"
+        theme = self.current_theme
+        nav_bg = theme.get("nav_bg", "#1c1c1e")
+        nav_fg = theme.get("nav_fg", "#ffffff")
+        nav_hover = theme.get("nav_hover", "#333333")
 
-        container = ctk.CTkFrame(self.content_holder, fg_color=self.current_theme["bg"])
+        container = ctk.CTkFrame(self.content_holder, fg_color=theme["bg"])
         container.pack(fill=tk.BOTH, expand=True)
 
         card = ctk.CTkFrame(
             container,
-            fg_color=panel_bg,
-            corner_radius=16,
+            fg_color=theme["card_bg"],
+            corner_radius=20,
             border_width=1,
-            border_color="#5eead4",
+            border_color=theme["card_border"],
         )
         card.place(relx=0.5, rely=0.45, anchor="center")
-        card_inner = ctk.CTkFrame(card, fg_color=panel_bg)
+        card_inner = ctk.CTkFrame(card, fg_color=theme["card_bg"])
         card_inner.pack(padx=22, pady=18)
 
         ctk.CTkLabel(
             card_inner,
             text="Change Credentials",
-            font=(UI_FONT, 18, "bold"),
-            text_color="#134e4a",
+            font=(UI_FONT, 20, "bold"),
+            text_color=theme["fg"],
         ).pack(pady=(0, 6))
         ctk.CTkLabel(
             card_inner,
             text=f"Admin: {user.get('name') or user.get('rfid_uid') or 'admin'}",
             font=UI_FONT_SMALL,
-            text_color="#0f766e",
+            text_color=theme.get("muted", "#8e8e93"),
         ).pack(pady=(0, 14))
 
-        ctk.CTkLabel(card_inner, text="New username", font=UI_FONT_SMALL, text_color="#134e4a").pack(anchor="w", pady=(0, 4))
-        username_entry = ctk.CTkEntry(card_inner, font=UI_FONT_BODY, width=280, fg_color="#ffffff", text_color="#1e293b", border_color="#94a3b8", corner_radius=8, height=40)
+        ctk.CTkLabel(card_inner, text="New username", font=UI_FONT_SMALL, text_color=theme.get("muted", "#8e8e93")).pack(anchor="w", pady=(0, 4))
+        username_entry = ctk.CTkEntry(card_inner, font=UI_FONT_BODY, width=280, fg_color=theme.get("search_bg", "#f2f2f7"), text_color=theme["fg"], border_color=theme.get("search_border", "#d1d1d6"), corner_radius=12, height=42)
         username_entry.pack(fill=tk.X, pady=(0, 10))
 
-        ctk.CTkLabel(card_inner, text="New password", font=UI_FONT_SMALL, text_color="#134e4a").pack(anchor="w", pady=(0, 4))
-        pw_entry = ctk.CTkEntry(card_inner, show="*", font=UI_FONT_BODY, width=280, fg_color="#ffffff", text_color="#1e293b", border_color="#94a3b8", corner_radius=8, height=40)
+        ctk.CTkLabel(card_inner, text="New password", font=UI_FONT_SMALL, text_color=theme.get("muted", "#8e8e93")).pack(anchor="w", pady=(0, 4))
+        pw_entry = ctk.CTkEntry(card_inner, show="*", font=UI_FONT_BODY, width=280, fg_color=theme.get("search_bg", "#f2f2f7"), text_color=theme["fg"], border_color=theme.get("search_border", "#d1d1d6"), corner_radius=12, height=42)
         pw_entry.pack(fill=tk.X, pady=(0, 10))
 
-        ctk.CTkLabel(card_inner, text="Confirm password", font=UI_FONT_SMALL, text_color="#134e4a").pack(anchor="w", pady=(0, 4))
-        confirm_entry = ctk.CTkEntry(card_inner, show="*", font=UI_FONT_BODY, width=280, fg_color="#ffffff", text_color="#1e293b", border_color="#94a3b8", corner_radius=8, height=40)
+        ctk.CTkLabel(card_inner, text="Confirm password", font=UI_FONT_SMALL, text_color=theme.get("muted", "#8e8e93")).pack(anchor="w", pady=(0, 4))
+        confirm_entry = ctk.CTkEntry(card_inner, show="*", font=UI_FONT_BODY, width=280, fg_color=theme.get("search_bg", "#f2f2f7"), text_color=theme["fg"], border_color=theme.get("search_border", "#d1d1d6"), corner_radius=12, height=42)
         confirm_entry.pack(fill=tk.X, pady=(0, 12))
 
-        status_lbl = ctk.CTkLabel(card_inner, text="", font=UI_FONT_SMALL, text_color="#b91c1c")
+        status_lbl = ctk.CTkLabel(card_inner, text="", font=UI_FONT_SMALL, text_color="#ef4444")
         status_lbl.pack(pady=(0, 10))
 
         def save():
@@ -1157,7 +1159,7 @@ class AdminMixin:
             except Exception as exc:
                 status_lbl.configure(text=f"Failed to update credentials: {exc}")
 
-        btn_row = ctk.CTkFrame(card_inner, fg_color=panel_bg)
+        btn_row = ctk.CTkFrame(card_inner, fg_color=theme["card_bg"])
         btn_row.pack(fill=tk.X, pady=(4, 0))
 
         ctk.CTkButton(
@@ -1165,11 +1167,11 @@ class AdminMixin:
             text="Save",
             font=(UI_FONT, 12, "bold"),
             command=save,
-            fg_color=accent,
-            hover_color=accent_hover,
-            text_color="#ffffff",
-            corner_radius=8,
-            height=38,
+            fg_color=nav_bg,
+            hover_color=nav_hover,
+            text_color=nav_fg,
+            corner_radius=980,
+            height=40,
         ).pack(side=tk.LEFT)
 
         ctk.CTkButton(
@@ -1177,11 +1179,13 @@ class AdminMixin:
             text="Back",
             font=(UI_FONT, 12, "bold"),
             command=lambda: self.show_admin_dashboard(getattr(self, "_current_admin_user", {"name": "admin", "rfid_uid": ""})),
-            fg_color=self.current_theme["button_bg"],
-            hover_color=accent_hover,
-            text_color=self.current_theme["button_fg"],
-            corner_radius=8,
-            height=38,
+            fg_color=theme["button_bg"],
+            hover_color=theme.get("card_border", "#d1d1d6"),
+            text_color=theme["button_fg"],
+            corner_radius=980,
+            height=40,
+            border_width=1,
+            border_color=theme.get("card_border", "#d1d1d6"),
         ).pack(side=tk.LEFT, padx=(10, 0))
 
         username_entry.focus_set()

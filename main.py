@@ -89,42 +89,68 @@ DEBUG_LOGS_DIR = BASE_DIR / "debug_logs"
 BASE_APP_W = 800
 BASE_APP_H = 480
 
-# Simple theming (light / dark) – palette: teal #1A948E (Buy RFID), white plus on teal for product add
+# Vibrant theming – colorful accents with clean surfaces
 THEMES = {
     "light": {
         "bg": "#f8fafc",
-        "fg": "#1e293b",
+        "fg": "#0f172a",
         "button_bg": "#f1f5f9",
-        "button_fg": "#1e293b",
-        "accent": "#1A948E",
-        "accent_hover": "#15857B",
+        "button_fg": "#0f172a",
+        "accent": "#10b981",
+        "accent_hover": "#059669",
         "card_bg": "#ffffff",
         "card_border": "#e2e8f0",
         "search_bg": "#f1f5f9",
-        "search_border": "#e2e8f0",
+        "search_border": "#cbd5e1",
         "muted": "#64748b",
+        "nav_bg": "#6366f1",
+        "nav_fg": "#ffffff",
+        "nav_hover": "#4f46e5",
+        "chart_line": "#10b981",
+        "chart_fill": "#d1fae5",
+        "chart_grid": "#e2e8f0",
+        "btn_add": "#10b981",
+        "btn_add_hover": "#059669",
+        "btn_remove": "#ef4444",
+        "btn_remove_hover": "#dc2626",
+        "price_color": "#0f172a",
+        "selected_bg": "#d1fae5",
+        "selected_border": "#10b981",
     },
     "dark": {
         "bg": "#0f172a",
-        "fg": "#e2e8f0",
+        "fg": "#f1f5f9",
         "button_bg": "#1e293b",
-        "button_fg": "#e2e8f0",
-        "accent": "#14b8a6",
-        "accent_hover": "#2dd4bf",
+        "button_fg": "#f1f5f9",
+        "accent": "#22d3ee",
+        "accent_hover": "#06b6d4",
         "card_bg": "#1e293b",
         "card_border": "#334155",
         "search_bg": "#1e293b",
-        "search_border": "#334155",
+        "search_border": "#475569",
         "muted": "#94a3b8",
+        "nav_bg": "#8b5cf6",
+        "nav_fg": "#ffffff",
+        "nav_hover": "#7c3aed",
+        "chart_line": "#22d3ee",
+        "chart_fill": "#164e63",
+        "chart_grid": "#334155",
+        "btn_add": "#22d3ee",
+        "btn_add_hover": "#06b6d4",
+        "btn_remove": "#f43f5e",
+        "btn_remove_hover": "#e11d48",
+        "price_color": "#22d3ee",
+        "selected_bg": "#164e63",
+        "selected_border": "#22d3ee",
     },
 }
 
 UI_FONT = "Segoe UI"
-UI_FONT_BOLD = (UI_FONT, 20, "bold")
-UI_FONT_TITLE = (UI_FONT, 18, "bold")
-UI_FONT_BODY = (UI_FONT, 12)
-UI_FONT_SMALL = (UI_FONT, 10)
-UI_FONT_BUTTON = (UI_FONT, 12, "bold")
+UI_FONT_BOLD = (UI_FONT, 22, "bold")
+UI_FONT_TITLE = (UI_FONT, 20, "bold")
+UI_FONT_BODY = (UI_FONT, 13)
+UI_FONT_SMALL = (UI_FONT, 11)
+UI_FONT_BUTTON = (UI_FONT, 13, "bold")
 
 
 def _hover_scale_btn(btn, normal_padx=10, normal_pady=6, hover_padx=14, hover_pady=10):
@@ -429,16 +455,14 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         ctk.set_appearance_mode("light")
         ctk.set_default_color_theme("green")
 
-        # On the Raspberry Pi 7\" touchscreen, use fullscreen.
-        # On desktop (development), use a resizable 800x480 window.
+        # On the Raspberry Pi 7" touchscreen, use fullscreen.
+        # On desktop (development), use a resizable window.
         if ON_RPI:
             self.attributes("-fullscreen", True)
         else:
-            # Fixed-size window that matches the LCD target aspect.
             self.geometry(f"{BASE_APP_W}x{BASE_APP_H}")
-            self.minsize(BASE_APP_W, BASE_APP_H)
-            self.maxsize(BASE_APP_W, BASE_APP_H)
-            self.resizable(False, False)
+            self.minsize(640, 400)
+            self.resizable(True, True)
 
         # Auto-fit scale for different LCD resolutions (keeps layout consistent)
         try:
@@ -601,30 +625,30 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
 
     def _apply_lcd_fit(self, profile: str = "customer"):
         """
-        Fit the app window to the current display size and lock resizing.
-        On Windows dev this helps match whatever LCD resolution you're using.
+        Fit the app window to the current display size.
+        On Raspberry Pi the window is already fullscreen.
+        On Windows / LCD, centre and size to fill most of the screen.
         """
         if ON_RPI:
-            return  # fullscreen already
+            return
         try:
-            sw = int(self.winfo_screenwidth())
-            sh = int(self.winfo_screenheight())
+            screen_w = self.winfo_screenwidth()
+            screen_h = self.winfo_screenheight()
+            target_w = min(BASE_APP_W, screen_w)
+            target_h = min(BASE_APP_H, screen_h)
+            if screen_w <= 1024 or screen_h <= 600:
+                target_w = screen_w
+                target_h = screen_h
+                try:
+                    self.attributes("-fullscreen", True)
+                except Exception:
+                    self.state("zoomed")
+            else:
+                x = max(0, (screen_w - target_w) // 2)
+                y = max(0, (screen_h - target_h) // 2)
+                self.geometry(f"{target_w}x{target_h}+{x}+{y}")
         except Exception:
-            sw, sh = BASE_APP_W, BASE_APP_H
-
-        # Keep a single fixed base layout size for all profiles
-        # so that Staff/Admin screens do NOT change window scale.
-        target_w, target_h = BASE_APP_W, BASE_APP_H
-
-        # If the screen is smaller, clamp to screen size (minus a small margin for window borders)
-        margin_w, margin_h = 16, 72
-        target_w = min(target_w, max(400, sw - margin_w))
-        target_h = min(target_h, max(300, sh - margin_h))
-
-        self.geometry(f"{target_w}x{target_h}")
-        self.minsize(target_w, target_h)
-        self.maxsize(target_w, target_h)
-        self.resizable(False, False)
+            pass
 
     # ---------- Screen helpers ----------
 
@@ -868,20 +892,20 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             if not widget.winfo_exists():
                 return
             widget.configure(bg=self.current_theme["bg"])
-        except tk.TclError:
+        except Exception:
             pass
         for child in list(widget.winfo_children()):
             try:
                 if isinstance(child, tk.Button):
                     if getattr(child, "_sidebar_nav", False):
-                        nav_bg = "#e2e8f0" if self.current_theme_name == "light" else "#334155"
-                        nav_fg = "#0f172a" if self.current_theme_name == "light" else "#ffffff"
-                        child.configure(bg=nav_bg, fg=nav_fg, activebackground="#2dd4bf" if self.current_theme_name == "light" else "#5eead4", activeforeground="#0f172a")
+                        nav_bg = self.current_theme.get("nav_bg", "#6366f1")
+                        nav_fg = self.current_theme.get("nav_fg", "#ffffff")
+                        child.configure(bg=nav_bg, fg=nav_fg, activebackground=self.current_theme.get("nav_hover", "#4f46e5"), activeforeground=nav_fg)
                         child._sidebar_nav_bg = nav_bg
                         child._sidebar_nav_fg = nav_fg
                     elif getattr(child, "_staff_exit_btn", False):
-                        exit_bg = "#e2e8f0" if self.current_theme_name == "light" else "#334155"
-                        exit_fg = "#0f172a" if self.current_theme_name == "light" else "#ffffff"
+                        exit_bg = self.current_theme.get("button_bg", "#f1f5f9")
+                        exit_fg = self.current_theme.get("button_fg", "#0f172a")
                         child.configure(bg=exit_bg, fg=exit_fg)
                         child._staff_exit_bg = exit_bg
                         child._staff_exit_fg = exit_fg
@@ -890,17 +914,17 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                         if hasattr(child, "image"):
                             child.image = None
                     elif getattr(child, "_restock_btn", False):
-                        acc = self.current_theme.get("accent", "#1A948E")
+                        acc = self.current_theme.get("accent", "#10b981")
                         child.configure(bg=acc, fg="#ffffff")
                         child._hover_normal = acc
-                        child._hover_hover = "#2dd4bf" if self.current_theme_name == "light" else "#5eead4"
+                        child._hover_hover = self.current_theme.get("accent_hover", "#059669")
                     elif getattr(child, "_product_add_btn", False):
-                        acc = self.current_theme.get("accent", "#1A948E")
+                        acc = self.current_theme.get("btn_add", self.current_theme.get("accent", "#10b981"))
                         child.configure(
                             fg="#ffffff",
                             bg=acc,
                             activeforeground="#ffffff",
-                            activebackground=self.current_theme.get("accent_hover", "#15857B"),
+                            activebackground=self.current_theme.get("btn_add_hover", self.current_theme.get("accent_hover", "#059669")),
                         )
                     else:
                         child.configure(
@@ -918,7 +942,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                         fg = self.current_theme["fg"]
                         child.configure(bg=badge_bg, fg=fg)
                     elif getattr(child, "_admin_metric_value", False):
-                        acc = self.current_theme.get("accent", "#1A948E")
+                        acc = self.current_theme.get("accent", "#10b981")
                         child.configure(bg=self.current_theme.get("card_bg", "#ffffff"), fg=acc)
                     else:
                         child.configure(bg=self.current_theme["bg"], fg=self.current_theme["fg"])
@@ -957,8 +981,8 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                     self.apply_theme_to_widget(child, _depth + 1)
                 elif isinstance(child, tk.Canvas):
                     try:
-                        child.configure(bg="#ffffff" if self.current_theme_name == "light" else "#253041")
-                    except tk.TclError:
+                        child.configure(bg=self.current_theme.get("card_bg", self.current_theme["bg"]))
+                    except Exception:
                         pass
                     self.apply_theme_to_widget(child, _depth + 1)
             except tk.TclError:
@@ -1040,29 +1064,32 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         if getattr(self, "theme_animating", False):
             return
         self.theme_animating = True
-
-        old_theme = dict(self.current_theme)
-        next_theme_name = "dark" if self.current_theme_name == "light" else "light"
-        next_theme = THEMES[next_theme_name]
-
-        self.current_theme_name = next_theme_name
-        self.current_theme = next_theme
-        ctk.set_appearance_mode(self.current_theme_name)
         try:
-            self.configure(fg_color=self.current_theme["bg"])
+            old_theme = dict(self.current_theme)
+            next_theme_name = "dark" if self.current_theme_name == "light" else "light"
+            next_theme = THEMES[next_theme_name]
+
+            self.current_theme_name = next_theme_name
+            self.current_theme = next_theme
+            ctk.set_appearance_mode(self.current_theme_name)
+            try:
+                self.configure(fg_color=self.current_theme["bg"])
+            except Exception:
+                pass
             try:
                 self.content_holder.configure(fg_color=self.current_theme["bg"])
             except Exception:
                 pass
-
-            # Update explicit CustomTkinter colors that were set at build time.
-            self._apply_theme_to_ctk_widget_tree(self, old_theme, self.current_theme)
-            # Update raw tkinter widgets and special tags (datetime, bug report, etc.).
-            self.apply_theme_to_widget(self)
-        except Exception:
+            try:
+                self._apply_theme_to_ctk_widget_tree(self, old_theme, self.current_theme)
+            except Exception:
+                pass
+            try:
+                self.apply_theme_to_widget(self)
+            except Exception:
+                pass
+        finally:
             self.theme_animating = False
-            raise
-        self.theme_animating = False
 
     def animate_button_press(self, button, callback):
         """Play a quick press animation before running a button action."""
@@ -1070,7 +1097,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         normal_relief = button.cget("relief")
         normal_bd = button.cget("bd")
 
-        pressed_bg = self.current_theme.get("accent_hover", self.current_theme.get("accent", "#1A948E"))
+        pressed_bg = self.current_theme.get("accent_hover", self.current_theme.get("accent", "#10b981"))
 
         try:
             button.configure(bg=pressed_bg, relief=tk.SUNKEN, bd=3)
@@ -1095,11 +1122,11 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         padding = 3
         knob_size = height - (padding * 2)
 
-        track_light = "#DDE6F2"
-        track_dark = "#1F2A44"
+        track_light = "#e2e8f0"
+        track_dark = "#334155"
         knob_fill = "#FFFFFF"
-        border_light = "#C8D4E3"
-        border_dark = "#2F3B57"
+        border_light = "#cbd5e1"
+        border_dark = "#475569"
 
         is_dark = self.current_theme_name == "dark"
         start_x = width - padding - knob_size if is_dark else padding
@@ -1132,6 +1159,41 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
 
         # No icon inside knob – avoids black line artifacts (reference: clean white knob)
 
+        def _finish_toggle(target_dark):
+            """Apply the theme swap after the knob animation finishes."""
+            try:
+                canvas.itemconfigure(
+                    track,
+                    fill=track_dark if target_dark else track_light,
+                    outline=border_dark if target_dark else border_light,
+                )
+            except Exception:
+                pass
+            old_theme = dict(self.current_theme)
+            self.current_theme_name = "dark" if target_dark else "light"
+            self.current_theme = THEMES[self.current_theme_name]
+            ctk.set_appearance_mode(self.current_theme_name)
+            try:
+                self.configure(fg_color=self.current_theme["bg"])
+            except Exception:
+                pass
+            try:
+                self.content_holder.configure(fg_color=self.current_theme["bg"])
+            except Exception:
+                pass
+            try:
+                canvas.configure(bg=self.current_theme["bg"])
+            except Exception:
+                pass
+            try:
+                self._apply_theme_to_ctk_widget_tree(self, old_theme, self.current_theme)
+            except Exception:
+                pass
+            try:
+                self.apply_theme_to_widget(self)
+            except Exception:
+                pass
+
         def animate_toggle(_event=None):
             if self.theme_animating:
                 return
@@ -1139,43 +1201,42 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             self.theme_animating = True
             target_dark = self.current_theme_name != "dark"
             end_x = width - padding - knob_size if target_dark else padding
-            current_coords = canvas.coords(knob)
-            current_x = current_coords[0]
-            step_count = 10
+            try:
+                current_coords = canvas.coords(knob)
+                current_x = current_coords[0]
+            except Exception:
+                self.theme_animating = False
+                return
+            step_count = 8
             delta = (end_x - current_x) / step_count if step_count else 0
 
             def step(index=0):
-                if index >= step_count:
-                    self.current_theme_name = "dark" if target_dark else "light"
-                    self.current_theme = THEMES[self.current_theme_name]
-                    ctk.set_appearance_mode(self.current_theme_name)
-                    self.configure(fg_color=self.current_theme["bg"])
+                try:
+                    if not canvas.winfo_exists():
+                        raise RuntimeError("canvas gone")
+                except Exception:
+                    _finish_toggle(target_dark)
                     self.theme_animating = False
-                    # Overlay in new theme color so clear+rebuild is not visible (reduces flicker)
-                    overlay = ctk.CTkFrame(self, fg_color=self.current_theme["bg"], corner_radius=0)
-                    overlay.place(x=0, y=0, relwidth=1, relheight=1)
-                    try:
-                        if callable(self._current_screen_builder):
-                            self._current_screen_builder()
-                        else:
-                            self.build_main_menu()
-                    finally:
-                        try:
-                            if overlay.winfo_exists():
-                                overlay.destroy()
-                        except Exception:
-                            pass
                     return
 
-                canvas.move(knob, delta, 0)
-                progress = (index + 1) / step_count
-                if progress > 0.5:
-                    canvas.itemconfigure(
-                        track,
-                        fill=track_dark if target_dark else track_light,
-                        outline=border_dark if target_dark else border_light,
-                    )
-                canvas.after(18, lambda: step(index + 1))
+                if index >= step_count:
+                    _finish_toggle(target_dark)
+                    self.theme_animating = False
+                    return
+
+                try:
+                    canvas.move(knob, delta, 0)
+                    progress = (index + 1) / step_count
+                    if progress > 0.5:
+                        canvas.itemconfigure(
+                            track,
+                            fill=track_dark if target_dark else track_light,
+                            outline=border_dark if target_dark else border_light,
+                        )
+                    canvas.after(14, lambda: step(index + 1))
+                except Exception:
+                    _finish_toggle(target_dark)
+                    self.theme_animating = False
 
             step()
 
@@ -1183,29 +1244,31 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         return canvas
 
     def add_theme_toggle_footer(self):
-        """Add a bottom bar with a theme toggle button to the current screen (inside content_holder so it clears on screen change)."""
+        """Add a bottom bar with a theme toggle button to the current screen."""
         bottom = ctk.CTkFrame(self.content_holder, fg_color=self.current_theme["bg"], corner_radius=0)
-        bottom.pack(side=tk.BOTTOM, fill=tk.X, pady=4)
+        bottom.pack(side=tk.BOTTOM, fill=tk.X, pady=6)
         ctk.CTkLabel(
             bottom,
-            text=f"SyntaxError™  ·  {VERSION}",
+            text=f"SyntaxError  ·  {VERSION}",
             font=UI_FONT_SMALL,
             text_color=self.current_theme.get("muted", self.current_theme["fg"]),
-        ).pack(side=tk.LEFT, padx=10)
+        ).pack(side=tk.LEFT, padx=12)
         self.add_ph_datetime_label(bottom)
+        icon_text = "☀" if self.current_theme_name == "dark" else "☾"
+        label_text = f"{icon_text}  {self.current_theme_name.capitalize()}"
         theme_btn = ctk.CTkButton(
             bottom,
-            text=f"Theme: {self.current_theme_name.capitalize()}",
+            text=label_text,
             command=self.toggle_theme,
-            font=UI_FONT_BODY,
-            fg_color=self.current_theme["button_bg"],
-            hover_color=self.current_theme.get("accent", "#1A948E"),
-            text_color=self.current_theme["button_fg"],
-            corner_radius=8,
-            height=32,
+            font=(UI_FONT, 12, "bold"),
+            fg_color=self.current_theme.get("nav_bg", "#1c1c1e"),
+            hover_color=self.current_theme.get("nav_hover", "#333333"),
+            text_color=self.current_theme.get("nav_fg", "#ffffff"),
+            corner_radius=980,
+            height=34,
         )
         theme_btn._is_theme_toggle = True
-        theme_btn.pack(side=tk.RIGHT, padx=10)
+        theme_btn.pack(side=tk.RIGHT, padx=12)
 
     def add_ph_datetime_label(self, parent):
         """Show a live Philippine date/time label inside the given parent."""
@@ -1262,10 +1325,10 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             text="← Back to Dashboard",
             font=UI_FONT_BODY,
             command=self.build_main_menu,
-            fg_color=self.current_theme.get("button_bg", "#e5e7eb"),
-            hover_color=self.current_theme.get("accent", "#1A948E"),
-            text_color=self.current_theme["button_fg"],
-            corner_radius=8,
+            fg_color=self.current_theme.get("nav_bg", "#1c1c1e"),
+            hover_color=self.current_theme.get("nav_hover", "#333333"),
+            text_color=self.current_theme.get("nav_fg", "#ffffff"),
+            corner_radius=980,
             height=36,
         ).pack(side=tk.LEFT)
 
@@ -1348,12 +1411,12 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             text="Back to Dashboard",
             font=UI_FONT_BUTTON,
             command=self.build_main_menu,
-            fg_color=self.current_theme.get("accent", "#1A948E"),
-            hover_color=self.current_theme.get("accent_hover", "#15857B"),
-            text_color="#ffffff",
-            corner_radius=10,
-            width=200,
-            height=40,
+            fg_color=self.current_theme.get("nav_bg", "#1c1c1e"),
+            hover_color=self.current_theme.get("nav_hover", "#333333"),
+            text_color=self.current_theme.get("nav_fg", "#ffffff"),
+            corner_radius=980,
+            width=220,
+            height=42,
         ).pack(pady=(0, 20), padx=32)
 
         self.add_theme_toggle_footer()
@@ -1377,21 +1440,20 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             self.sidebar_frame = None
             return
 
-        # Teal-green sidebar on the right (fixed width, anchored right)
-        sidebar_width = 220
-        sidebar_bg = self.current_theme.get("accent", "#1A948E")
-        strip_bg = "#14b8a6" if self.current_theme_name == "light" else "#2dd4bf"  # Slightly lighter strip per button
-        sidebar = ctk.CTkFrame(self, fg_color=sidebar_bg, width=sidebar_width, corner_radius=0)
+        sidebar_width = 240
+        sidebar_bg = self.current_theme.get("card_bg", "#ffffff")
+        sidebar_border = self.current_theme.get("card_border", "#d1d1d6")
+        sidebar = ctk.CTkFrame(self, fg_color=sidebar_bg, width=sidebar_width, corner_radius=0,
+                               border_width=1, border_color=sidebar_border)
         sidebar.place(relx=1.0, x=0, y=0, anchor="ne", relheight=1.0)
 
-        # Top row: "Menu" label + close button so sidebar doesn't block the hamburger
         top_row = ctk.CTkFrame(sidebar, fg_color=sidebar_bg)
-        top_row.pack(fill=tk.X, padx=10, pady=(10, 6))
+        top_row.pack(fill=tk.X, padx=14, pady=(14, 8))
         ctk.CTkLabel(
             top_row,
             text="Menu",
-            font=(UI_FONT, 12, "bold"),
-            text_color="#ffffff",
+            font=(UI_FONT, 14, "bold"),
+            text_color=self.current_theme["fg"],
         ).pack(side=tk.LEFT, padx=4)
         ctk.CTkButton(
             top_row,
@@ -1400,26 +1462,30 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             height=32,
             font=(UI_FONT, 14, "bold"),
             fg_color="transparent",
-            hover_color=strip_bg,
-            text_color="#ffffff",
-            corner_radius=6,
+            hover_color=self.current_theme.get("search_bg", "#f2f2f7"),
+            text_color=self.current_theme["fg"],
+            corner_radius=8,
             command=self.show_role_menu,
         ).pack(side=tk.RIGHT)
+
+        nav_bg = self.current_theme.get("nav_bg", "#1c1c1e")
+        nav_fg = self.current_theme.get("nav_fg", "#ffffff")
+        nav_hover = self.current_theme.get("nav_hover", "#333333")
 
         def make_nav_button(text, command):
             btn = ctk.CTkButton(
                 sidebar,
                 text=text,
                 anchor="w",
-                font=(UI_FONT, 11, "bold"),
+                font=(UI_FONT, 12, "bold"),
                 command=command,
-                fg_color=strip_bg,
-                hover_color=sidebar_bg,
-                text_color="#ffffff",
-                corner_radius=8,
-                height=40,
+                fg_color=nav_bg,
+                hover_color=nav_hover,
+                text_color=nav_fg,
+                corner_radius=980,
+                height=42,
             )
-            btn.pack(fill=tk.X, padx=10, pady=4)
+            btn.pack(fill=tk.X, padx=14, pady=3)
             return btn
 
         # Dashboard – close sidebar and stay on current screen
@@ -1504,18 +1570,17 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             text_color=self.current_theme["fg"],
         ).pack(pady=(0, 28))
 
-        # Start Order button – accent, rounded look
-        accent = self.current_theme.get("accent", "#1A948E")
+        # Start Order button – iOS pill style
         start_btn = ctk.CTkButton(
             center,
             text="Start Order",
-            font=(UI_FONT, 14, "bold"),
-            fg_color=accent,
-            hover_color=self.current_theme.get("accent_hover", accent),
-            text_color="#ffffff",
-            corner_radius=12,
-            width=200,
-            height=48,
+            font=(UI_FONT, 15, "bold"),
+            fg_color=self.current_theme.get("nav_bg", "#1c1c1e"),
+            hover_color=self.current_theme.get("nav_hover", "#333333"),
+            text_color=self.current_theme.get("nav_fg", "#ffffff"),
+            corner_radius=980,
+            width=220,
+            height=50,
             command=self.build_main_menu,
         )
         start_btn.pack(pady=0)
@@ -1545,16 +1610,16 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         ctk.CTkButton(
             center,
             text="OK",
-            font=(UI_FONT, 12, "bold"),
+            font=(UI_FONT, 13, "bold"),
             command=go_welcome,
-            fg_color=self.current_theme.get("accent", "#1A948E"),
-            hover_color=self.current_theme.get("accent_hover", "#15857B"),
-            text_color="#ffffff",
-            corner_radius=10,
-            width=120,
-            height=40,
+            fg_color=self.current_theme.get("nav_bg", "#1c1c1e"),
+            hover_color=self.current_theme.get("nav_hover", "#333333"),
+            text_color=self.current_theme.get("nav_fg", "#ffffff"),
+            corner_radius=980,
+            width=140,
+            height=42,
         ).pack(pady=0)
-        self.after(3500, go_welcome)  # Auto-return to welcome after 3.5 s
+        self.after(3500, go_welcome)
 
     # ---------- Main Menu ----------
 
@@ -1631,7 +1696,8 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                 ref["card"].configure(fg_color=self._cart_selected_bg, border_color=self._cart_selected_border)
                 ref["btn"].configure(
                     text="✕",
-                    hover_color=self.current_theme.get("accent_hover", "#0f766e"),
+                    fg_color=self.current_theme.get("btn_remove", "#ef4444"),
+                    hover_color=self.current_theme.get("btn_remove_hover", "#dc2626"),
                     command=lambda prod=product: self._remove_product_from_cart(prod),
                 )
             except Exception:
@@ -1646,7 +1712,8 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                 ref["card"].configure(fg_color=self._cart_card_bg, border_color=self._cart_card_border)
                 ref["btn"].configure(
                     text="+",
-                    hover_color=self.current_theme.get("accent_hover", "#15857B"),
+                    fg_color=self.current_theme.get("btn_add", "#10b981"),
+                    hover_color=self.current_theme.get("btn_add_hover", "#059669"),
                     state=tk.NORMAL if product["current_stock"] > 0 else tk.DISABLED,
                     command=ref["add_cmd"],
                 )
@@ -1667,7 +1734,8 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                 if ref["btn"].winfo_exists():
                     ref["btn"].configure(
                         text="+",
-                        hover_color=self.current_theme.get("accent_hover", "#15857B"),
+                        fg_color=self.current_theme.get("btn_add", "#10b981"),
+                        hover_color=self.current_theme.get("btn_add_hover", "#059669"),
                         state=tk.NORMAL if p["current_stock"] > 0 else tk.DISABLED,
                         command=ref["add_cmd"],
                     )
@@ -1678,7 +1746,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
     def _build_order_panel(self, main_row):
         """Build (or rebuild) only the order panel inside main_row."""
         order_panel_width = 260
-        panel_bg = "#0f766e" if self.current_theme_name == "light" else "#134e4a"
+        panel_bg = self.current_theme.get("nav_bg", "#6366f1")
         if not self.cart:
             self._order_panel = None
             self._order_qty_vars = {}
@@ -1695,7 +1763,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             font=(UI_FONT, 11, "bold"),
             text_color="#ffffff",
             fg_color=panel_bg,
-            hover_color=self.current_theme.get("accent_hover", "#0f766e"),
+            hover_color=self.current_theme.get("nav_hover", "#4f46e5"),
             corner_radius=8,
             height=36,
             command=self._cancel_cart,
@@ -1725,7 +1793,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                 font=(UI_FONT, 12, "bold"),
                 text_color="#ffffff",
                 fg_color=panel_bg,
-                hover_color="#134e4a",
+                hover_color=self.current_theme.get("nav_hover", "#4f46e5"),
                 width=32,
                 height=28,
                 corner_radius=6,
@@ -1738,7 +1806,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                 font=(UI_FONT, 12, "bold"),
                 text_color="#ffffff",
                 fg_color=panel_bg,
-                hover_color="#134e4a",
+                hover_color=self.current_theme.get("nav_hover", "#4f46e5"),
                 width=32,
                 height=28,
                 corner_radius=6,
@@ -1750,8 +1818,8 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             text="Confirm Order",
             font=(UI_FONT, 12, "bold"),
             text_color="#ffffff",
-            fg_color=self.current_theme.get("accent", "#1A948E"),
-            hover_color=self.current_theme.get("accent_hover", "#0f766e"),
+            fg_color=self.current_theme.get("accent", "#10b981"),
+            hover_color=self.current_theme.get("accent_hover", "#059669"),
             corner_radius=10,
             height=44,
             command=lambda: self._confirm_cart_order(),
@@ -1843,8 +1911,8 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             self.build_main_menu()
             return
 
-        accent = self.current_theme.get("accent", "#1A948E")
-        accent_hover = self.current_theme.get("accent_hover", "#0f766e")
+        accent = self.current_theme.get("accent", "#10b981")
+        accent_hover = self.current_theme.get("accent_hover", "#059669")
         total = self._get_checkout_total(items)
 
         frame = ctk.CTkFrame(self.content_holder, fg_color=self.current_theme["bg"], corner_radius=0)
@@ -1875,8 +1943,8 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             self.sidebar_holder = None
         self.clear_screen()
         p = self.current_product
-        accent = self.current_theme.get("accent", "#1A948E")
-        accent_hover = self.current_theme.get("accent_hover", "#0f766e")
+        accent = self.current_theme.get("accent", "#10b981")
+        accent_hover = self.current_theme.get("accent_hover", "#059669")
 
         frame = ctk.CTkFrame(self.content_holder, fg_color=self.current_theme["bg"], corner_radius=0)
         frame.pack(expand=True, fill=tk.BOTH)

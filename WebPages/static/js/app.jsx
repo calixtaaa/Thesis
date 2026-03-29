@@ -69,7 +69,7 @@ function useTheme() {
 function Toast({ message, dark }) {
     if (!message) return null;
     return (
-        <div className={"fixed bottom-7 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full text-sm font-medium ios-shadow-lg z-[300] toast-enter " + (dark ? "bg-white text-black" : "bg-black text-white")}>
+        <div className="fixed bottom-7 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full text-sm font-medium ios-shadow-lg z-[300] toast-enter text-white" style={{background: "var(--accent)"}}>
             {message}
         </div>
     );
@@ -99,12 +99,12 @@ const I = {
 function chartColors() {
     const dark = document.documentElement.classList.contains("dark");
     return {
-        bar:    dark ? "#3b82f6" : "#22c55e",
-        line:   dark ? "#3b82f6" : "#22c55e",
-        fill:   dark ? "rgba(59,130,246,.12)" : "rgba(34,197,94,.10)",
-        grid:   dark ? "rgba(255,255,255,.08)" : "rgba(0,0,0,.06)",
-        text:   dark ? "#aeaeb2" : "#8e8e93",
-        point:  dark ? "#60a5fa" : "#16a34a",
+        bar:    dark ? "#22d3ee" : "#10b981",
+        line:   dark ? "#8b5cf6" : "#6366f1",
+        fill:   dark ? "rgba(34,211,238,.12)" : "rgba(16,185,129,.10)",
+        grid:   dark ? "rgba(148,163,184,.1)" : "rgba(15,23,42,.06)",
+        text:   dark ? "#94a3b8" : "#64748b",
+        point:  dark ? "#a78bfa" : "#4f46e5",
     };
 }
 
@@ -1136,9 +1136,10 @@ function App() {
                             className={
                                 "flex items-center gap-3 px-3.5 py-2.5 rounded-[10px] text-[15px] font-medium transition-colors no-underline " +
                                 (page === n.id
-                                    ? (dark ? "bg-white text-black" : "bg-black text-white")
+                                    ? "text-white"
                                     : "nav-item-inactive")
                             }
+                            style={page === n.id ? {background: "var(--accent)"} : {}}
                         >
                             <n.icon />
                             <span>{n.label}</span>
@@ -1150,7 +1151,7 @@ function App() {
 
                 <div className="p-5 border-t border-ios-separator flex flex-col gap-3">
                     <div className="flex items-center gap-2.5">
-                        <div className={"w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm " + (dark ? "bg-white text-black" : "bg-black text-white")}>
+                        <div className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm text-white" style={{background: "var(--accent)"}}>
                             {username ? username[0].toUpperCase() : "A"}
                         </div>
                         <div className="flex flex-col">

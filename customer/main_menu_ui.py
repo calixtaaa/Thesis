@@ -1,7 +1,93 @@
 import tkinter as tk
+from pathlib import Path
 
 import bugreport
 import customtkinter as ctk
+
+try:
+    from PIL import Image, ImageTk
+    _HAS_PIL = True
+except ImportError:
+    _HAS_PIL = False
+
+BASE_DIR = Path(__file__).resolve().parents[1]
+PRODUCT_IMAGES_DIR = BASE_DIR / "images" / "Products"
+
+_product_image_cache = {}
+
+PRODUCT_IMAGE_MAP = {
+    "alcohol": "GreenCross.png",
+}
+
+def _resolve_product_image_path(product_name):
+    """Return the Path to the product image file, or None."""
+    if not PRODUCT_IMAGES_DIR.exists():
+        return None
+    name_lower = product_name.strip().lower()
+    mapped = PRODUCT_IMAGE_MAP.get(name_lower)
+    if mapped:
+        p = PRODUCT_IMAGES_DIR / mapped
+        if p.exists():
+            return p
+    for img_file in PRODUCT_IMAGES_DIR.iterdir():
+        if img_file.stem.strip().lower() == name_lower and img_file.suffix.lower() in (".png", ".jpg", ".jpeg", ".gif"):
+            return img_file
+    for img_file in PRODUCT_IMAGES_DIR.iterdir():
+        if name_lower in img_file.stem.strip().lower() and img_file.suffix.lower() in (".png", ".jpg", ".jpeg", ".gif"):
+            return img_file
+    return None
+
+
+def _load_product_image(product_name, size=140):
+    """Load a product image from images/Products/ matching the product name."""
+    if not _HAS_PIL:
+        return None
+
+    cache_key = (product_name, size)
+    if cache_key in _product_image_cache:
+        return _product_image_cache[cache_key]
+
+    if not PRODUCT_IMAGES_DIR.exists():
+        return None
+
+    name_lower = product_name.strip().lower()
+
+    mapped = PRODUCT_IMAGE_MAP.get(name_lower)
+    if mapped:
+        path = PRODUCT_IMAGES_DIR / mapped
+        if path.exists():
+            try:
+                pil_img = Image.open(str(path))
+                pil_img = pil_img.resize((size, size), Image.LANCZOS)
+                tk_img = ImageTk.PhotoImage(pil_img)
+                _product_image_cache[cache_key] = tk_img
+                return tk_img
+            except Exception:
+                pass
+
+    for img_file in PRODUCT_IMAGES_DIR.iterdir():
+        if img_file.stem.strip().lower() == name_lower and img_file.suffix.lower() in (".png", ".jpg", ".jpeg", ".gif"):
+            try:
+                pil_img = Image.open(str(img_file))
+                pil_img = pil_img.resize((size, size), Image.LANCZOS)
+                tk_img = ImageTk.PhotoImage(pil_img)
+                _product_image_cache[cache_key] = tk_img
+                return tk_img
+            except Exception:
+                return None
+
+    for img_file in PRODUCT_IMAGES_DIR.iterdir():
+        if name_lower in img_file.stem.strip().lower() and img_file.suffix.lower() in (".png", ".jpg", ".jpeg", ".gif"):
+            try:
+                pil_img = Image.open(str(img_file))
+                pil_img = pil_img.resize((size, size), Image.LANCZOS)
+                tk_img = ImageTk.PhotoImage(pil_img)
+                _product_image_cache[cache_key] = tk_img
+                return tk_img
+            except Exception:
+                return None
+
+    return None
 
 
 def build_main_menu_header(app, parent, *, ui_font, ui_font_title, ui_font_small):
@@ -64,9 +150,9 @@ def build_main_menu_products(app, parent, products):
 
     app._cart_card_bg = app.current_theme.get("card_bg", app.current_theme["button_bg"])
     app._cart_card_border = app.current_theme.get("card_border", "#e2e8f0")
-    app._cart_selected_bg = "#bbf7d0" if app.current_theme_name == "light" else "#14532d"
-    app._cart_selected_border = app.current_theme.get("accent", "#1A948E")
-    app._product_placeholder_bg = "#cbd5e1" if app.current_theme_name == "light" else "#475569"
+    app._cart_selected_bg = app.current_theme.get("selected_bg", "#d1fae5")
+    app._cart_selected_border = app.current_theme.get("selected_border", app.current_theme.get("accent", "#10b981"))
+    app._product_placeholder_bg = "#e2e8f0" if app.current_theme_name == "light" else "#334155"
     app._product_placeholder_size = 160
     app._product_card_refs = {}
 
@@ -83,7 +169,7 @@ def build_product_card(app, grid, product, idx):
         fg_color=app._cart_selected_bg if in_cart else app._cart_card_bg,
         border_width=2,
         border_color=app._cart_selected_border if in_cart else app._cart_card_border,
-        corner_radius=12,
+        corner_radius=14,
     )
     card.grid(row=row_index, column=column_index, padx=10, pady=8, sticky="nsew")
 
@@ -96,6 +182,21 @@ def build_product_card(app, grid, product, idx):
     )
     placeholder.pack(pady=(10, 8), padx=10, fill=tk.NONE)
     placeholder.pack_propagate(False)
+
+    if _HAS_PIL:
+        try:
+            img_path = _resolve_product_image_path(product["name"])
+            if img_path:
+                sz = app._product_placeholder_size - 20
+                pil_img = Image.open(str(img_path))
+                ctk_img = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(sz, sz))
+                img_label = ctk.CTkLabel(
+                    placeholder, image=ctk_img, text="", fg_color="transparent",
+                )
+                img_label._ctk_img_ref = ctk_img
+                img_label.place(relx=0.5, rely=0.5, anchor="center")
+        except Exception:
+            pass
 
     name_text = product["name"]
     if len(name_text) > 18:
@@ -111,8 +212,8 @@ def build_product_card(app, grid, product, idx):
     ctk.CTkLabel(
         card,
         text=f"₱{product['price']:.2f}",
-        font=app._ui_font_small,
-        text_color=app.current_theme.get("muted", app.current_theme["fg"]),
+        font=(app._ui_font_name, 13, "bold"),
+        text_color=app.current_theme.get("price_color", app.current_theme.get("accent", "#10b981")),
     ).pack(pady=(0, 6))
 
     action_btn = build_product_card_button(app, card, product, in_cart)
@@ -132,11 +233,11 @@ def build_product_card_button(app, card, product, in_cart):
             text="✕",
             font=(app._ui_font_name, 18, "bold"),
             text_color="#ffffff",
-            fg_color=app.current_theme.get("accent", "#1A948E"),
-            hover_color=app.current_theme.get("accent_hover", "#0f766e"),
+            fg_color=app.current_theme.get("btn_remove", "#ef4444"),
+            hover_color=app.current_theme.get("btn_remove_hover", "#dc2626"),
             width=60,
             height=36,
-            corner_radius=8,
+            corner_radius=980,
             command=lambda prod=product: app._remove_product_from_cart(prod),
         )
 
@@ -145,11 +246,11 @@ def build_product_card_button(app, card, product, in_cart):
         text="+",
         font=(app._ui_font_name, 20, "bold"),
         text_color="#ffffff",
-        fg_color=app.current_theme.get("accent", "#1A948E"),
-        hover_color=app.current_theme.get("accent_hover", "#15857B"),
+        fg_color=app.current_theme.get("btn_add", "#10b981"),
+        hover_color=app.current_theme.get("btn_add_hover", "#059669"),
         width=60,
         height=36,
-        corner_radius=8,
+        corner_radius=980,
         state=tk.NORMAL if product["current_stock"] > 0 else tk.DISABLED,
         command=lambda prod=product: app._add_product_to_cart(prod),
     )
@@ -165,17 +266,20 @@ def build_main_menu_footer(app, *, version, hover_scale_btn):
     info_row = ctk.CTkFrame(bottom, fg_color=app.current_theme["bg"], corner_radius=0)
     info_row.pack(side=tk.TOP, fill=tk.X, pady=(6, 0))
 
-    accent = app.current_theme.get("accent", "#1A948E")
-    accent_hover = app.current_theme.get("accent_hover", "#0f766e")
+    nav_bg = app.current_theme.get("nav_bg", "#6366f1")
+    nav_fg = app.current_theme.get("nav_fg", "#ffffff")
+    nav_hover = app.current_theme.get("nav_hover", "#4f46e5")
+    accent = app.current_theme.get("accent", "#10b981")
+    accent_hover = app.current_theme.get("accent_hover", "#059669")
     ctk.CTkButton(
         actions_row,
         text="Reload (RFID)",
         command=app.reload_card_flow,
         font=app._ui_font_button,
-        fg_color=accent,
-        hover_color=accent_hover,
-        text_color="#ffffff",
-        corner_radius=10,
+        fg_color=nav_bg,
+        hover_color=nav_hover,
+        text_color=nav_fg,
+        corner_radius=980,
         height=36,
     ).pack(side=tk.LEFT, padx=(12, 6))
     ctk.CTkButton(
@@ -186,7 +290,7 @@ def build_main_menu_footer(app, *, version, hover_scale_btn):
         fg_color=accent,
         hover_color=accent_hover,
         text_color="#ffffff",
-        corner_radius=10,
+        corner_radius=980,
         height=36,
     ).pack(side=tk.LEFT, padx=6)
     ctk.CTkButton(
@@ -195,11 +299,11 @@ def build_main_menu_footer(app, *, version, hover_scale_btn):
         command=lambda: bugreport.show_bug_report_screen(app, version=version, hover_scale_btn=hover_scale_btn),
         font=app._ui_font_body,
         fg_color="transparent",
-        hover_color=app.current_theme["button_bg"],
-        text_color=app.current_theme["fg"],
+        hover_color=app.current_theme.get("search_bg", "#f1f5f9"),
+        text_color=app.current_theme.get("nav_bg", "#6366f1"),
         border_width=1,
-        border_color=app.current_theme.get("card_border", "#e2e8f0"),
-        corner_radius=8,
+        border_color=app.current_theme.get("nav_bg", "#6366f1"),
+        corner_radius=980,
         height=36,
     ).pack(side=tk.LEFT, padx=6)
     ctk.CTkButton(
@@ -208,11 +312,11 @@ def build_main_menu_footer(app, *, version, hover_scale_btn):
         command=app.show_help_dialog,
         font=app._ui_font_body,
         fg_color="transparent",
-        hover_color=app.current_theme["button_bg"],
-        text_color=app.current_theme["fg"],
+        hover_color=app.current_theme.get("search_bg", "#f1f5f9"),
+        text_color=app.current_theme.get("nav_bg", "#6366f1"),
         border_width=1,
-        border_color=app.current_theme.get("card_border", "#e2e8f0"),
-        corner_radius=8,
+        border_color=app.current_theme.get("nav_bg", "#6366f1"),
+        corner_radius=980,
         height=36,
     ).pack(side=tk.LEFT, padx=6)
     ctk.CTkButton(
@@ -221,11 +325,11 @@ def build_main_menu_footer(app, *, version, hover_scale_btn):
         command=app.show_patch_notes_dialog,
         font=app._ui_font_body,
         fg_color="transparent",
-        hover_color=app.current_theme["button_bg"],
-        text_color=app.current_theme["fg"],
+        hover_color=app.current_theme.get("search_bg", "#f1f5f9"),
+        text_color=app.current_theme.get("nav_bg", "#6366f1"),
         border_width=1,
-        border_color=app.current_theme.get("card_border", "#e2e8f0"),
-        corner_radius=8,
+        border_color=app.current_theme.get("nav_bg", "#6366f1"),
+        corner_radius=980,
         height=36,
     ).pack(side=tk.LEFT, padx=6)
 
