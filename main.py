@@ -165,15 +165,13 @@ def _hover_scale_btn(btn, normal_padx=10, normal_pady=6, hover_padx=14, hover_pa
     btn.bind("<Leave>", on_leave)
 
 # Raspberry Pi 5 (BCM numbering) pin map.
-# NOTE: MFRC522 readers share SPI0 and use separate CS + RST lines.
+# NOTE: Single MFRC522 reader is shared across all flows (payment, reload, staff access).
 RFID_PINS = {
     "spi_sclk": 11,              # Physical pin 23
     "spi_mosi": 10,              # Physical pin 19
     "spi_miso": 9,               # Physical pin 21
-    "payment_reader_cs": 8,      # Physical pin 24 (CE0)
-    "door_reader_cs": 7,         # Physical pin 26 (CE1)
-    "payment_reader_rst": 5,     # Physical pin 29
-    "door_reader_rst": 19,       # Physical pin 35
+    "shared_reader_cs": 8,       # Physical pin 24 (CE0)
+    "shared_reader_rst": 5,      # Physical pin 29
 }
 
 # ULN2003 IN1..IN4 mapping per tray motor (28BYJ-48).
@@ -277,11 +275,9 @@ def gpio_init():
         GPIO.setup(pin, GPIO.OUT)
         GPIO.output(pin, GPIO.LOW)
 
-    # RFID reader reset lines
-    GPIO.setup(RFID_PINS["payment_reader_rst"], GPIO.OUT)
-    GPIO.setup(RFID_PINS["door_reader_rst"], GPIO.OUT)
-    GPIO.output(RFID_PINS["payment_reader_rst"], GPIO.HIGH)
-    GPIO.output(RFID_PINS["door_reader_rst"], GPIO.HIGH)
+    # Shared RFID reader reset line
+    GPIO.setup(RFID_PINS["shared_reader_rst"], GPIO.OUT)
+    GPIO.output(RFID_PINS["shared_reader_rst"], GPIO.HIGH)
 
     # Coin hopper outputs
     for pin in COIN_HOPPER_PINS.values():
@@ -734,11 +730,11 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
     def get_payment_pulse_counts_data(self):
         return get_payment_pulse_counts()
 
-    def _read_rfid_uid_from_hardware(self, reader_name: str) -> str | None:
+    def _read_rfid_uid_from_hardware(self, reader_name: str = "shared") -> str | None:
         if not ON_RPI:
             return None
 
-        uid = self._read_rfid_uid_dual_backend(reader_name)
+        uid = self._read_rfid_uid_single_backend(reader_name)
         if uid:
             return uid
 
@@ -746,7 +742,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             return None
 
         # Most SimpleMFRC522 setups map to CE0; this still enables live tap reads.
-        # Kept as fallback when low-level dual backend is unavailable.
+        # Kept as fallback when low-level backend is unavailable.
         _ = reader_name
         try:
             reader = SimpleMFRC522()
@@ -757,13 +753,14 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             return None
         return None
 
-    def _read_rfid_uid_dual_backend(self, reader_name: str) -> str | None:
-        """Read RFID UID from selected SPI CE device (payment=CE0, door=CE1)."""
+    def _read_rfid_uid_single_backend(self, reader_name: str = "shared") -> str | None:
+        """Read RFID UID from the shared SPI CE0 device used by all app flows."""
         if MFRC522 is None:
             return None
 
-        spi_device = 0 if reader_name == "payment" else 1
-        rst_pin = RFID_PINS["payment_reader_rst"] if reader_name == "payment" else RFID_PINS["door_reader_rst"]
+        _ = reader_name
+        spi_device = 0
+        rst_pin = RFID_PINS["shared_reader_rst"]
 
         try:
             # Reset only the selected reader before a poll.
@@ -824,7 +821,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
 
         return None
 
-    def read_rfid_uid(self, reader_name: str) -> str | None:
+    def read_rfid_uid(self, reader_name: str = "shared") -> str | None:
         return self._read_rfid_uid_from_hardware(reader_name)
 
     def start_cash_pulse_monitor(self, amount_var, remaining_var, total_amount: float):
@@ -2237,7 +2234,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         uid_entry.pack(pady=(0, 8))
 
         def read_from_reader():
-            uid = self.read_rfid_uid("payment")
+            uid = self.read_rfid_uid("shared")
             if not uid:
                 error_lbl.configure(text="No RFID tap detected. You can type card ID manually.")
                 return
@@ -2373,7 +2370,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         uid_entry.pack(pady=(0, 8))
 
         def read_from_reader():
-            uid = self.read_rfid_uid("payment")
+            uid = self.read_rfid_uid("shared")
             if not uid:
                 error_lbl.configure(text="No RFID tap detected. You can type card ID manually.")
                 return

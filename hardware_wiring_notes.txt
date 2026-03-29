@@ -15,8 +15,8 @@ Hardware Wiring Notes and Electrical Safety
 
 3) MFRC522 Reader Notes
 - MFRC522 is 3.3V logic. Do not feed 5V logic into Pi SPI lines.
-- Two readers share SPI SCK/MOSI/MISO.
-- Give each reader unique chip select (CS) and reset pins.
+- One reader is shared across payment/reload/staff access flows.
+- Reader uses SPI CE0 as chip select and a single reset pin.
 
 4) Bill/Coin Acceptor Pulse Inputs
 - Verify pulse output voltage from TB74 and WEIYU modules.

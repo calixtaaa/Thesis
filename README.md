@@ -55,6 +55,7 @@ A Raspberry Pi–based **personal hygiene vending machine** with:
 - **Hardware abstraction & UI**
   - Stepper motors per slot (GPIO pins configurable)
   - Coin hopper (for change)
+  - Single shared MFRC522 RFID reader for payment, reload, and staff access taps
   - GPIO mocked on Windows, real on Raspberry Pi
   - Light / Dark theme toggle; version (v.0.03) in window title and footer
 

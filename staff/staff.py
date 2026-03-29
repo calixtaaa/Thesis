@@ -102,8 +102,8 @@ class StaffMixin:
         entry.pack(pady=(0, 20))
         entry.focus_set()
 
-        def read_from_door_reader():
-            uid = self.read_rfid_uid("door")
+        def read_from_reader():
+            uid = self.read_rfid_uid("shared")
             if not uid:
                 error_lbl.configure(text="No RFID tap detected. You can type card ID manually.")
                 return
@@ -113,9 +113,9 @@ class StaffMixin:
 
         ctk.CTkButton(
             inner,
-            text="Read from Door RFID Reader",
+            text="Read from RFID Reader",
             font=(UI_FONT, 11, "bold"),
-            command=read_from_door_reader,
+            command=read_from_reader,
             fg_color=theme.get("button_bg", "#ffffff"),
             hover_color=theme.get("card_border", "#d1d1d6"),
             text_color=theme.get("button_fg", "#1c1c1e"),

@@ -8,9 +8,8 @@ Vending Motors
 - ULN2003 stepper motor driver board (one per tray)
 
 RFID Modules
-- 2x MFRC522 13.56 MHz RFID readers
-  - Reader 1: card payment/reload (cashless flow)
-  - Reader 2: access door authentication/unlock flow
+- 1x MFRC522 13.56 MHz RFID reader (shared)
+  - Shared for card payment/reload and access door authentication/unlock flows
 
 Door Access Hardware
 - 2x 12V solenoid locks (Model 102)

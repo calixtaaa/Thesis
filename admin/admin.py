@@ -1019,37 +1019,18 @@ class AdminMixin:
         btn_row = ctk.CTkFrame(card, fg_color=self.current_theme.get("card_bg", self.current_theme["button_bg"]))
         btn_row.pack(fill=tk.X, padx=14, pady=(0, 12))
 
-        def tap_payment():
-            uid = self.read_rfid_uid("payment")
+        def tap_reader():
+            uid = self.read_rfid_uid("shared")
             if uid:
                 uid_lbl.configure(text=f"Last RFID UID: {uid}")
-                result_lbl.configure(text="Payment reader tap detected.")
+                result_lbl.configure(text="RFID tap detected.")
             else:
-                result_lbl.configure(text="No payment RFID tap detected.")
-
-        def tap_door():
-            uid = self.read_rfid_uid("door")
-            if uid:
-                uid_lbl.configure(text=f"Last RFID UID: {uid}")
-                result_lbl.configure(text="Door reader tap detected.")
-            else:
-                result_lbl.configure(text="No door RFID tap detected.")
+                result_lbl.configure(text="No RFID tap detected.")
 
         ctk.CTkButton(
             btn_row,
-            text="Read Payment RFID",
-            command=tap_payment,
-            fg_color=self.current_theme.get("accent", "#10b981"),
-            hover_color=self.current_theme.get("accent_hover", "#059669"),
-            text_color="#ffffff",
-            corner_radius=8,
-            width=150,
-        ).pack(side=tk.LEFT, padx=(0, 8))
-
-        ctk.CTkButton(
-            btn_row,
-            text="Read Door RFID",
-            command=tap_door,
+            text="Read RFID",
+            command=tap_reader,
             fg_color=self.current_theme.get("accent", "#10b981"),
             hover_color=self.current_theme.get("accent_hover", "#059669"),
             text_color="#ffffff",
