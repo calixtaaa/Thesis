@@ -21,10 +21,10 @@ def extract_transactions_dataset(db_path: Path = DB_PATH) -> pd.DataFrame:
             """
             SELECT
                 t.timestamp,
-                DATE(t.timestamp) AS sale_date,
-                strftime('%Y-%m', t.timestamp) AS sale_month,
-                CAST(strftime('%H', t.timestamp) AS INTEGER) AS sale_hour,
-                CAST(strftime('%w', t.timestamp) AS INTEGER) AS sale_weekday,
+                DATE(t.timestamp, '+8 hours') AS sale_date,
+                strftime('%Y-%m', t.timestamp, '+8 hours') AS sale_month,
+                CAST(strftime('%H', t.timestamp, '+8 hours') AS INTEGER) AS sale_hour,
+                CAST(strftime('%w', t.timestamp, '+8 hours') AS INTEGER) AS sale_weekday,
                 t.product_id,
                 p.name AS product_name,
                 p.slot_number,

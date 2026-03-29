@@ -1,0 +1,439 @@
+/* ================================================================
+   Hygiene Vending — Admin Dashboard
+   Custom styles (Tailwind handles utilities via CDN)
+   ================================================================ */
+
+/* ── CSS Custom Properties ──────────────────────────────────────── */
+:root {
+    --bg-primary:     #ffffff;
+    --bg-secondary:   #f2f2f7;
+    --bg-page:        #f2f2f7;
+    --text-primary:   #1c1c1e;
+    --text-secondary: #8e8e93;
+    --border-color:   #d1d1d6;
+    --border-light:   #f5f5f5;
+    --card-bg:        #ffffff;
+    --card-shadow1:   rgba(0, 0, 0, 0.06);
+    --card-shadow2:   rgba(0, 0, 0, 0.04);
+    --input-bg:       #f2f2f7;
+    --input-border:   #d1d1d6;
+    --table-hover:    #f2f2f7;
+    --table-head-bg:  #f2f2f7;
+    --scrollbar:      #c7c7cc;
+    --scrollbar-hover:#8e8e93;
+    --frosted:        rgba(255, 255, 255, 0.85);
+    --modal-overlay:  rgba(0, 0, 0, 0.35);
+    --pill-green-bg:  #e8f5e9;
+    --pill-green-fg:  #2e7d32;
+    --pill-orange-bg: #fff3e0;
+    --pill-orange-fg: #e65100;
+    --pill-red-bg:    #ffebee;
+    --pill-red-fg:    #c62828;
+}
+
+html.dark {
+    --bg-primary:     #1c1c1e;
+    --bg-secondary:   #2c2c2e;
+    --bg-page:        #000000;
+    --text-primary:   #f5f5f7;
+    --text-secondary: #aeaeb2;
+    --border-color:   #3a3a3c;
+    --border-light:   #2c2c2e;
+    --card-bg:        #1c1c1e;
+    --card-shadow1:   rgba(0, 0, 0, 0.3);
+    --card-shadow2:   rgba(0, 0, 0, 0.2);
+    --input-bg:       #2c2c2e;
+    --input-border:   #3a3a3c;
+    --table-hover:    #2c2c2e;
+    --table-head-bg:  #2c2c2e;
+    --scrollbar:      #3a3a3c;
+    --scrollbar-hover:#636366;
+    --frosted:        rgba(28, 28, 30, 0.85);
+    --modal-overlay:  rgba(0, 0, 0, 0.6);
+    --pill-green-bg:  rgba(46, 125, 50, 0.2);
+    --pill-green-fg:  #66bb6a;
+    --pill-orange-bg: rgba(230, 81, 0, 0.2);
+    --pill-orange-fg: #ffb74d;
+    --pill-red-bg:    rgba(198, 40, 40, 0.2);
+    --pill-red-fg:    #ef5350;
+}
+
+/* ── Base Reset ──────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    color-scheme: light;
+}
+
+html.dark {
+    color-scheme: dark;
+}
+
+body {
+    overflow-x: hidden;
+    background: var(--bg-page);
+    color: var(--text-primary);
+    transition: background 0.3s, color 0.3s;
+}
+
+/* ── Page fade-in animation ──────────────────────────────────────── */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-fadein {
+    animation: fadeIn 0.25s ease;
+}
+
+/* ── iOS-style card shadow (reusable) ────────────────────────────── */
+.ios-card {
+    background: var(--card-bg);
+    border-radius: 14px;
+    box-shadow:
+        0 1px 3px var(--card-shadow1),
+        0 2px 8px var(--card-shadow2);
+    transition: background 0.3s, box-shadow 0.3s;
+}
+
+.ios-card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow:
+        0 4px 24px var(--card-shadow1);
+}
+
+/* ── iOS-style elevated shadow ───────────────────────────────────── */
+.ios-shadow {
+    box-shadow:
+        0 1px 3px var(--card-shadow1),
+        0 2px 8px var(--card-shadow2);
+}
+
+.ios-shadow-lg {
+    box-shadow:
+        0 4px 24px var(--card-shadow1);
+}
+
+/* ── Toast enter animation ───────────────────────────────────────── */
+@keyframes toastIn {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+.toast-enter {
+    animation: toastIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Frosted glass header (mobile) ───────────────────────────────── */
+.frosted-header {
+    background: var(--frosted);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+}
+
+/* ── Modal backdrop blur ─────────────────────────────────────────── */
+.modal-backdrop {
+    background: var(--modal-overlay);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+}
+
+/* ── Input focus ring (iOS style) ────────────────────────────────── */
+.ios-input {
+    width: 100%;
+    padding: 12px 16px;
+    font-size: 15px;
+    background: var(--input-bg);
+    border: 1px solid var(--input-border);
+    border-radius: 12px;
+    color: var(--text-primary);
+    outline: none;
+    transition: border-color 0.25s, box-shadow 0.25s, background 0.3s, color 0.3s;
+    font-family: inherit;
+}
+
+.ios-input:focus {
+    border-color: var(--text-primary);
+    box-shadow: 0 0 0 3px var(--card-shadow1);
+}
+
+.ios-input::placeholder {
+    color: var(--text-secondary);
+}
+
+/* ── Black pill button ───────────────────────────────────────────── */
+.btn-black {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 20px;
+    background: #1c1c1e;
+    color: #ffffff;
+    border-radius: 980px;
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    border: none;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+html.dark .btn-black {
+    background: #f5f5f7;
+    color: #1c1c1e;
+}
+
+.btn-black:hover {
+    background: #333333;
+    transform: scale(1.02);
+}
+
+html.dark .btn-black:hover {
+    background: #e5e5ea;
+}
+
+.btn-black:active {
+    transform: scale(0.98);
+}
+
+.btn-black:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* ── White pill button ───────────────────────────────────────────── */
+.btn-white {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 20px;
+    background: #ffffff;
+    color: #1c1c1e;
+    border-radius: 980px;
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    border: 1px solid #d1d1d6;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+html.dark .btn-white {
+    background: #2c2c2e;
+    color: #f5f5f7;
+    border-color: #3a3a3c;
+}
+
+.btn-white:hover {
+    background: #f5f5f5;
+    transform: scale(1.02);
+}
+
+html.dark .btn-white:hover {
+    background: #3a3a3c;
+}
+
+.btn-white:active {
+    transform: scale(0.98);
+}
+
+.btn-white:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* ── Small button variant ────────────────────────────────────────── */
+.btn-sm {
+    padding: 6px 14px;
+    font-size: 13px;
+}
+
+/* ── iOS-style table ─────────────────────────────────────────────── */
+.ios-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.ios-table thead {
+    background: var(--table-head-bg);
+}
+
+.ios-table th {
+    padding: 12px 20px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.ios-table td {
+    padding: 14px 20px;
+    font-size: 14px;
+    border-bottom: 1px solid var(--border-light);
+    vertical-align: middle;
+    color: var(--text-primary);
+}
+
+.ios-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.ios-table tbody tr {
+    transition: background 0.2s;
+}
+
+.ios-table tbody tr:hover {
+    background: var(--table-hover);
+}
+
+/* ── Stock status pills ──────────────────────────────────────────── */
+.pill {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 980px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.pill-green {
+    background: var(--pill-green-bg);
+    color: var(--pill-green-fg);
+}
+
+.pill-orange {
+    background: var(--pill-orange-bg);
+    color: var(--pill-orange-fg);
+}
+
+.pill-red {
+    background: var(--pill-red-bg);
+    color: var(--pill-red-fg);
+}
+
+/* ── Label style ─────────────────────────────────────────────────── */
+.ios-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 6px;
+}
+
+/* ── Tabular numbers for clock ────────────────────────────────────── */
+.tabular-nums {
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── Sidebar / Main surface helpers ─────────────────────────────── */
+.sidebar-surface {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    transition: background 0.3s, color 0.3s;
+}
+
+.main-surface {
+    background: var(--bg-page);
+    color: var(--text-primary);
+    transition: background 0.3s, color 0.3s;
+}
+
+/* ── Theme toggle button ────────────────────────────────────────── */
+.theme-toggle-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.25s;
+    flex-shrink: 0;
+}
+
+.theme-toggle-btn:hover {
+    background: var(--border-color);
+    transform: rotate(15deg);
+}
+
+/* ── Nav item inactive ───────────────────────────────────────────── */
+.nav-item-inactive {
+    color: var(--text-primary);
+}
+
+.nav-item-inactive:hover {
+    background: var(--bg-secondary);
+}
+
+/* ── Scrollbar (Webkit) ──────────────────────────────────────────── */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--scrollbar);
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-hover);
+}
+
+/* ── Dark-mode overrides for Tailwind utility classes ────────────── */
+html.dark .bg-white       { background-color: var(--card-bg) !important; }
+html.dark .bg-gray-50     { background-color: var(--bg-secondary) !important; }
+html.dark .bg-green-50    { background-color: rgba(46,125,50,.15) !important; }
+html.dark .bg-blue-50     { background-color: rgba(37,99,235,.15) !important; }
+html.dark .bg-purple-50   { background-color: rgba(147,51,234,.15) !important; }
+html.dark .bg-orange-50   { background-color: rgba(234,88,12,.15) !important; }
+html.dark .text-gray-900  { color: var(--text-primary) !important; }
+html.dark .text-gray-800  { color: var(--text-primary) !important; }
+html.dark .text-gray-700  { color: #d1d1d6 !important; }
+html.dark .text-gray-600  { color: var(--text-secondary) !important; }
+html.dark .text-gray-500  { color: var(--text-secondary) !important; }
+html.dark .border-gray-200 { border-color: var(--border-color) !important; }
+html.dark .border-gray-100 { border-color: var(--border-light) !important; }
+html.dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]) { border-color: var(--border-light) !important; }
+
+html.dark .border-ios-separator { border-color: var(--border-color) !important; }
+html.dark .text-ios-secondary   { color: var(--text-secondary) !important; }
+html.dark .text-ios-text        { color: var(--text-primary) !important; }
+html.dark .bg-ios-bg            { background-color: var(--bg-secondary) !important; }
+html.dark .bg-ios-surface       { background-color: var(--bg-primary) !important; }
+html.dark .divide-gray-50 > :not([hidden]) ~ :not([hidden]) { border-color: var(--border-light) !important; }
