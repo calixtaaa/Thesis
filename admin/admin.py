@@ -948,6 +948,14 @@ class AdminMixin:
 
         coin_var = tk.StringVar(value=str(getattr(self, "coin_pulse_value", 1.0)))
         bill_var = tk.StringVar(value=str(getattr(self, "bill_pulse_value", 20.0)))
+        current_edge = "falling"
+        try:
+            current_edge = str(self.get_hardware_setting_data("payment_pulse_edge", "falling") or "falling").strip().lower()
+        except Exception:
+            current_edge = "falling"
+        if current_edge not in {"falling", "rising"}:
+            current_edge = "falling"
+        pulse_edge_var = tk.StringVar(value=current_edge)
 
         ctk.CTkLabel(inner, text="Coin acceptor pulse value (PHP):", font=UI_FONT_BODY, text_color=self.current_theme["fg"]).pack(anchor="w")
         coin_entry = ctk.CTkEntry(inner, textvariable=coin_var, width=220)
@@ -957,6 +965,19 @@ class AdminMixin:
         bill_entry = ctk.CTkEntry(inner, textvariable=bill_var, width=220)
         bill_entry.pack(anchor="w", pady=(4, 10))
 
+        ctk.CTkLabel(inner, text="Payment pulse edge:", font=UI_FONT_BODY, text_color=self.current_theme["fg"]).pack(anchor="w")
+        edge_menu = ctk.CTkOptionMenu(
+            inner,
+            variable=pulse_edge_var,
+            values=["falling", "rising"],
+            width=220,
+            fg_color=self.current_theme.get("accent", "#10b981"),
+            button_color=self.current_theme.get("accent_hover", "#059669"),
+            button_hover_color=self.current_theme.get("accent_hover", "#059669"),
+            text_color="#ffffff",
+        )
+        edge_menu.pack(anchor="w", pady=(4, 10))
+
         status_lbl = ctk.CTkLabel(inner, text="", font=UI_FONT_SMALL, text_color=self.current_theme.get("status_error", "#b91c1c"))
         status_lbl.pack(anchor="w", pady=(0, 8))
 
@@ -964,14 +985,21 @@ class AdminMixin:
             try:
                 coin_val = float((coin_var.get() or "").strip())
                 bill_val = float((bill_var.get() or "").strip())
+                edge_val = str(pulse_edge_var.get() or "falling").strip().lower()
                 if coin_val <= 0 or bill_val <= 0:
                     raise ValueError("Values must be positive numbers.")
+                if edge_val not in {"falling", "rising"}:
+                    raise ValueError("Pulse edge must be either 'falling' or 'rising'.")
 
                 self.coin_pulse_value = coin_val
                 self.bill_pulse_value = bill_val
                 self.set_hardware_setting_data("coin_pulse_value", str(coin_val))
                 self.set_hardware_setting_data("bill_pulse_value", str(bill_val))
-                status_lbl.configure(text="Saved.", text_color=self.current_theme.get("status_success", "#065f46"))
+                self.set_hardware_setting_data("payment_pulse_edge", edge_val)
+                status_lbl.configure(
+                    text="Saved. Restart app to apply pulse-edge change.",
+                    text_color=self.current_theme.get("status_success", "#065f46"),
+                )
             except Exception as exc:
                 status_lbl.configure(text=f"Invalid values: {exc}", text_color=self.current_theme.get("status_error", "#b91c1c"))
 

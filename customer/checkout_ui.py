@@ -216,7 +216,20 @@ def build_cash_payment_content(app, parent, total_amount: float):
     action_bar.pack(side=tk.BOTTOM, fill=tk.X, pady=(0, 4))
 
     ctk.CTkLabel(content, text="Pay with Cash", font=app._ui_font_bold, text_color=app.current_theme["fg"]).pack(pady=(8, 4))
-    ctk.CTkLabel(content, text="Cash pulses from bill/coin acceptors are read from GPIO. Buttons below remain for simulation.", font=app._ui_font_small, text_color=app.current_theme["fg"]).pack(pady=(0, 2))
+    helper_var = tk.StringVar(
+        value=(
+            "Cash pulses from bill/coin acceptors are read from GPIO. "
+            f"{app.format_payment_pulse_debug_text()}"
+        )
+    )
+    ctk.CTkLabel(
+        content,
+        textvariable=helper_var,
+        font=app._ui_font_small,
+        text_color=app.current_theme.get("muted", app.current_theme["fg"]),
+        wraplength=720,
+        justify="left",
+    ).pack(pady=(0, 4), padx=12)
 
     card = ctk.CTkFrame(content, fg_color=app.current_theme["button_bg"], border_width=1, border_color=app.current_theme.get("card_border", "#e2e8f0"), corner_radius=12)
     card.pack(padx=24, pady=8)
@@ -233,6 +246,12 @@ def build_cash_payment_content(app, parent, total_amount: float):
         amount_display_var.set(f"₱{amount_var.get():.2f}")
         remaining_display_var.set(f"₱{remaining_var.get():.2f}")
         change_display_var.set(f"₱{change_var.get():.2f}")
+
+    def _refresh_pulse_debug():
+        helper_var.set(
+            "Cash pulses from bill/coin acceptors are read from GPIO. "
+            f"{app.format_payment_pulse_debug_text()}"
+        )
 
     _sync_cash_display()
     ctk.CTkLabel(card, text="Amount Inserted:", font=app._ui_font_body, text_color=app.current_theme["button_fg"]).pack(pady=4, padx=20)
@@ -269,4 +288,8 @@ def build_cash_payment_content(app, parent, total_amount: float):
     ctk.CTkButton(action_bar, text="Dispense product", font=app._ui_font_button, command=finish_if_enough, fg_color=app.current_theme.get("success_bg", app.current_theme.get("accent", "#10b981")), hover_color=app.current_theme.get("success_hover", app.current_theme.get("accent_hover", "#059669")), text_color=app.current_theme.get("on_accent", "#ffffff"), corner_radius=10, height=44).pack(pady=(0, 6), padx=24, fill=tk.X)
     build_checkout_back_bar(app, parent, "Cancel and go back", app.show_payment_method_screen)
 
-    app.start_cash_pulse_monitor(amount_var, remaining_var, total_amount, change_var=change_var, on_update=_sync_cash_display)
+    def _on_cash_update():
+        _sync_cash_display()
+        _refresh_pulse_debug()
+
+    app.start_cash_pulse_monitor(amount_var, remaining_var, total_amount, change_var=change_var, on_update=_on_cash_update)

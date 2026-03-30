@@ -67,6 +67,8 @@ except ImportError:
         LOW = 0
         PUD_UP = "PUD_UP"
         FALLING = "FALLING"
+        RISING = "RISING"
+        BOTH = "BOTH"
 
         def setmode(self, *_a, **_k): pass
         def setwarnings(self, *_a, **_k): pass
@@ -224,6 +226,7 @@ COINS_PER_SECOND = {
 
 COIN_ACCEPTOR_PULSE_VALUE = 1.0
 BILL_ACCEPTOR_PULSE_VALUE = 20.0
+PAYMENT_PULSE_EDGE_DEFAULT = "falling"  # supported: falling, rising
 PAYMENT_PULSE_BOUNCETIME_MS = 50
 HOPPER_PULSE_BOUNCETIME_MS = 20
 HOPPER_DISPENSE_TIMEOUT_PER_COIN_S = 0.5
@@ -268,6 +271,19 @@ def consume_payment_pulse_amount() -> float:
     return (coin_pulses * COIN_ACCEPTOR_PULSE_VALUE) + (bill_pulses * BILL_ACCEPTOR_PULSE_VALUE)
 
 
+def _normalize_payment_edge_name(value) -> str:
+    edge = str(value or PAYMENT_PULSE_EDGE_DEFAULT).strip().lower()
+    if edge in {"falling", "rising"}:
+        return edge
+    return PAYMENT_PULSE_EDGE_DEFAULT
+
+
+def _payment_pulse_edge_gpio_constant(edge_name: str):
+    if edge_name == "rising":
+        return getattr(GPIO, "RISING", GPIO.FALLING)
+    return GPIO.FALLING
+
+
 # ======================
 #  HARDWARE ABSTRACTION
 # ======================
@@ -275,6 +291,10 @@ def consume_payment_pulse_amount() -> float:
 def gpio_init():
     GPIO.setwarnings(False)
     GPIO.setmode(GPIO.BCM)
+    payment_edge_name = _normalize_payment_edge_name(
+        get_hardware_setting("payment_pulse_edge", PAYMENT_PULSE_EDGE_DEFAULT)
+    )
+    payment_edge = _payment_pulse_edge_gpio_constant(payment_edge_name)
 
     # Stepper pins (ULN2003 inputs)
     for cfg in PRODUCT_STEPPER_PINS.values():
@@ -304,7 +324,7 @@ def gpio_init():
         try:
             GPIO.add_event_detect(
                 pin,
-                GPIO.FALLING,
+                payment_edge,
                 callback=_payment_pulse_callback,
                 bouncetime=PAYMENT_PULSE_BOUNCETIME_MS,
             )
@@ -743,6 +763,19 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
 
     def get_payment_pulse_counts_data(self):
         return get_payment_pulse_counts()
+
+    def get_payment_pulse_edge_data(self):
+        return _normalize_payment_edge_name(
+            self.get_hardware_setting_data("payment_pulse_edge", PAYMENT_PULSE_EDGE_DEFAULT)
+        )
+
+    def format_payment_pulse_debug_text(self) -> str:
+        counts = self.get_payment_pulse_counts_data()
+        edge = self.get_payment_pulse_edge_data()
+        return (
+            f"Pulse debug  coin(GPIO13): {counts['coin_acceptor']}  "
+            f"bill(GPIO6): {counts['bill_acceptor']}  edge: {edge}"
+        )
 
     def _read_rfid_uid_from_hardware(self, reader_name: str) -> str | None:
         if not ON_RPI:
@@ -2223,12 +2256,25 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         tk.Label(inner, textvariable=amount_var, font=(UI_FONT, 20, "bold"), bg=theme["card_bg"], fg=theme["fg"]).pack()
         ctk.CTkLabel(inner, text="Remaining:", font=UI_FONT_BODY, text_color=theme["muted"]).pack(pady=4)
         tk.Label(inner, textvariable=remaining_var, font=(UI_FONT, 20, "bold"), bg=theme["card_bg"], fg=theme["fg"]).pack()
+        pulse_debug_var = tk.StringVar(value=self.format_payment_pulse_debug_text())
+        tk.Label(
+            inner,
+            textvariable=pulse_debug_var,
+            font=UI_FONT_SMALL,
+            bg=theme["card_bg"],
+            fg=theme.get("muted", theme["fg"]),
+            wraplength=360,
+            justify="left",
+        ).pack(pady=(6, 0), anchor="w")
 
         def add_money(value):
             cash_session.add(value)
             current = cash_session.get_amount()
             amount_var.set(current)
             remaining_var.set(max(0.0, card_price - current))
+
+        def _refresh_pulse_debug():
+            pulse_debug_var.set(self.format_payment_pulse_debug_text())
 
         btn_frame = ctk.CTkFrame(inner, fg_color=theme["card_bg"])
         btn_frame.pack(pady=12)
@@ -2245,7 +2291,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                 corner_radius=8,
             ).pack(side=tk.LEFT, padx=10)
 
-            self.start_cash_pulse_monitor(amount_var, remaining_var, card_price)
+            self.start_cash_pulse_monitor(amount_var, remaining_var, card_price, on_update=_refresh_pulse_debug)
 
         def confirm_purchase():
             inserted = cash_session.get_amount()
@@ -2374,6 +2420,16 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         amount_var = tk.DoubleVar(value=0.0)
         ctk.CTkLabel(card_inner, text="Amount to Load:", font=UI_FONT_BODY, text_color=theme["button_fg"]).pack(pady=5)
         tk.Label(card_inner, textvariable=amount_var, font=(UI_FONT, 22, "bold"), bg=theme["button_bg"], fg=theme["button_fg"]).pack()
+        pulse_debug_var = tk.StringVar(value=self.format_payment_pulse_debug_text())
+        tk.Label(
+            card_inner,
+            textvariable=pulse_debug_var,
+            font=UI_FONT_SMALL,
+            bg=theme["button_bg"],
+            fg=theme.get("muted", theme["button_fg"]),
+            wraplength=380,
+            justify="left",
+        ).pack(pady=(8, 0), anchor="w")
 
         btn_frame = ctk.CTkFrame(card_inner, fg_color=theme["button_bg"])
         btn_frame.pack(pady=15)
@@ -2382,11 +2438,14 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             cash_session.add(value)
             amount_var.set(cash_session.get_amount())
 
+        def _refresh_pulse_debug():
+            pulse_debug_var.set(self.format_payment_pulse_debug_text())
+
         for text, value in [("+₱1", 1), ("+₱5", 5), ("+₱10", 10), ("+₱20", 20)]:
             ctk.CTkButton(btn_frame, text=text, width=70, font=UI_FONT_BODY, command=lambda v=value: add_money(v), fg_color=theme["accent"], hover_color=theme["accent_hover"], text_color=theme.get("on_accent", "#ffffff"), corner_radius=8).pack(side=tk.LEFT, padx=5)
 
         # Monitor cash pulses from bill/coin acceptors while this screen is open.
-        self.start_cash_pulse_monitor(amount_var, tk.DoubleVar(value=0.0), 0.0)
+        self.start_cash_pulse_monitor(amount_var, tk.DoubleVar(value=0.0), 0.0, on_update=_refresh_pulse_debug)
 
         def confirm_reload():
             amount = cash_session.get_amount()
