@@ -1,11 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#6366f1">
     <title>Admin Dashboard — Hygiene Vending</title>
-    <link rel="icon" type="image/jpeg" href="/static/images/vendingMachineIcon.jpg">
+    <link rel="icon" type="image/jpeg" href="/static/images/ThesisLogo.png">
 
     <!-- Performance: preconnect to all CDNs (eliminates DNS+TCP+TLS latency) -->
     <link rel="preconnect" href="https://cdn.tailwindcss.com" crossorigin>
@@ -29,9 +30,9 @@
                         ],
                     },
                     colors: {
-                        'ios-bg':        '#f2f2f7',
-                        'ios-surface':   '#ffffff',
-                        'ios-text':      '#1c1c1e',
+                        'ios-bg': '#f2f2f7',
+                        'ios-surface': '#ffffff',
+                        'ios-text': '#1c1c1e',
                         'ios-secondary': '#8e8e93',
                         'ios-separator': '#d1d1d6',
                     },
@@ -53,13 +54,14 @@
     <!-- Babel (JSX compilation) -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
+
 <body class="font-sans">
 
     <div id="root"></div>
 
     <!-- Pass Jinja2 variables to JS (plain script — no JSX here) -->
     <script>
-        window.__USERNAME__   = "{{ username }}";
+        window.__USERNAME__ = "{{ username }}";
         window.__LOGOUT_URL__ = "{{ url_for('logout') }}";
         window.__CSRF_TOKEN__ = "{{ csrf_token() }}";
     </script>
@@ -68,4 +70,5 @@
     <script type="text/babel" src="/static/js/app.jsx?v=7"></script>
 
 </body>
+
 </html>
