@@ -13,34 +13,69 @@ import time
 import threading
 from pathlib import Path
 
-# GPIO mock for development
+# GPIO handling - try real hardware first, then mock
 try:
-    import RPi.GPIO as GPIO
+    from gpiozero import OutputDevice, InputDevice, LED
     ON_RPI = True
+    GPIO_LIBRARY = "gpiozero"
 except ImportError:
-    ON_RPI = False
-    class MockGPIO:
-        BCM = "BCM"
-        OUT = "OUT"
-        IN = "IN"
-        HIGH = 1
-        LOW = 0
-        PUD_UP = "PUD_UP"
-        FALLING = "FALLING"
-        RISING = "RISING"
-        BOTH = "BOTH"
+    try:
+        import RPi.GPIO as GPIO
+        ON_RPI = True
+        GPIO_LIBRARY = "RPi.GPIO"
+    except ImportError:
+        ON_RPI = False
+        GPIO_LIBRARY = "mock"
 
-        def setmode(self, *_a, **_k): pass
-        def setwarnings(self, *_a, **_k): pass
-        def setup(self, *_a, **_k): pass
-        def output(self, pin, state): 
-            print(f"[GPIO Mock] Pin {pin} set to {state}")
-        def input(self, pin): 
-            return self.HIGH
-        def cleanup(self): pass
-        def add_event_detect(self, *_a, **_k): pass
+# Global device storage for gpiozero
+_output_devices = {}
+_input_devices = {}
 
-    GPIO = MockGPIO()
+def setup_gpiozero_output(pin):
+    """Create and store gpiozero OutputDevice for a pin."""
+    if GPIO_LIBRARY != "gpiozero":
+        return
+    try:
+        _output_devices[pin] = OutputDevice(pin)
+    except Exception as e:
+        print(f"[GPIO] Failed to create output device for pin {pin}: {e}")
+
+def setup_gpiozero_input(pin):
+    """Create and store gpiozero InputDevice for a pin."""
+    if GPIO_LIBRARY != "gpiozero":
+        return
+    try:
+        _input_devices[pin] = InputDevice(pin, pull_up=True)
+    except Exception as e:
+        print(f"[GPIO] Failed to create input device for pin {pin}: {e}")
+
+def gpiozero_output(pin, state):
+    """Set pin HIGH (state=1) or LOW (state=0)."""
+    if pin not in _output_devices:
+        return
+    _output_devices[pin].value = bool(state)
+
+def gpiozero_input(pin):
+    """Read pin value (0=LOW/active, 1=HIGH/inactive with pull_up)."""
+    if pin not in _input_devices:
+        return 1
+    return 0 if _input_devices[pin].is_active else 1
+
+def gpiozero_cleanup():
+    """Close all GPIO devices."""
+    for dev in list(_output_devices.values()):
+        try:
+            dev.close()
+        except:
+            pass
+    _output_devices.clear()
+    
+    for dev in list(_input_devices.values()):
+        try:
+            dev.close()
+        except:
+            pass
+    _input_devices.clear()
 
 # Pin configuration from main.py
 RFID_PINS = {
@@ -192,7 +227,7 @@ class GPIOTestTool(ctk.CTk):
         self._setup_event_log()
         
         # Setup GPIO
-        self.setup_gpio()
+        self.gpio_ready = self.setup_gpio()
         
         # Build UI
         self.build_ui()
@@ -206,9 +241,10 @@ class GPIOTestTool(ctk.CTk):
             )
         
         # Start input monitoring thread
-        self.monitoring = True
-        self.monitor_thread = threading.Thread(target=self.monitor_input_pins, daemon=True)
-        self.monitor_thread.start()
+        self.monitoring = self.gpio_ready
+        if self.gpio_ready:
+            self.monitor_thread = threading.Thread(target=self.monitor_input_pins, daemon=True)
+            self.monitor_thread.start()
         
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
     
@@ -216,32 +252,40 @@ class GPIOTestTool(ctk.CTk):
         """Initialize GPIO pins"""
         if not ON_RPI:
             print("[GPIO Test Tool] Running in mock mode (not on Raspberry Pi)")
-            return
+            return False
+        
+        print(f"[GPIO Test Tool] Initializing GPIO using {GPIO_LIBRARY}...")
         
         try:
-            GPIO.setwarnings(False)
-            GPIO.setmode(GPIO.BCM)
-            
             # Setup output pins
             for pin in ALL_OUTPUT_PINS.values():
                 try:
-                    GPIO.setup(pin, GPIO.OUT)
-                    GPIO.output(pin, GPIO.LOW)
+                    if GPIO_LIBRARY == "gpiozero":
+                        setup_gpiozero_output(pin)
+                    else:
+                        GPIO.setup(pin, GPIO.OUT)
+                        GPIO.output(pin, GPIO.LOW)
                 except Exception as e:
                     print(f"[GPIO] Failed to setup output pin {pin}: {e}")
             
             # Setup input pins
             for pin in ALL_INPUT_PINS.values():
                 try:
-                    GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-                    GPIO.add_event_detect(pin, GPIO.BOTH, callback=self._on_input_edge, bouncetime=20)
-                    self.edge_detection_enabled[pin] = True
+                    if GPIO_LIBRARY == "gpiozero":
+                        setup_gpiozero_input(pin)
+                        self.edge_detection_enabled[pin] = True
+                    else:
+                        GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+                        GPIO.add_event_detect(pin, GPIO.BOTH, callback=self._on_input_edge, bouncetime=20)
+                        self.edge_detection_enabled[pin] = True
                 except Exception as e:
                     print(f"[GPIO] Failed to setup input pin {pin}: {e}")
             
             print("[GPIO Test Tool] GPIO setup complete")
+            return True
         except Exception as e:
             messagebox.showerror("GPIO Setup Error", f"Failed to initialize GPIO: {e}")
+            return False
 
     def _setup_event_log(self):
         """Create CSV log file for pin events if it does not exist."""
@@ -281,12 +325,16 @@ class GPIOTestTool(ctk.CTk):
 
     def _on_input_edge(self, pin_num):
         """Edge callback for input pins on Raspberry Pi."""
+        if not self.gpio_ready:
+            return
+
         if pin_num not in self.input_pulse_counts:
             return
 
         self.input_pulse_counts[pin_num] += 1
         self.input_last_change[pin_num] = time.strftime("%H:%M:%S")
-        self.log_event("input_edge", pin_num=pin_num, state=GPIO.input(pin_num))
+        state = gpiozero_input(pin_num) if GPIO_LIBRARY == "gpiozero" else GPIO.input(pin_num)
+        self.log_event("input_edge", pin_num=pin_num, state=state)
 
         # GPIO callbacks run outside Tk mainloop; schedule UI updates safely.
         self.after(0, self._refresh_input_aux_labels, pin_num)
@@ -312,7 +360,7 @@ class GPIOTestTool(ctk.CTk):
             text_color=self.current_theme["nav_fg"],
         ).pack(side=tk.LEFT, padx=16, pady=12)
         
-        status_text = "🟢 Live Mode (RPi)" if ON_RPI else "🟡 Mock Mode (Development)"
+        status_text = "🟢 Live Mode (RPi - " + GPIO_LIBRARY + ")" if ON_RPI else "🟡 Mock Mode (Development)"
         ctk.CTkLabel(
             header,
             text=status_text,
@@ -549,12 +597,18 @@ class GPIOTestTool(ctk.CTk):
 
     def _pulse_output_blocking(self, pin_num, duration_sec):
         """Pulse an output pin synchronously; safe to call from worker threads."""
-        GPIO.output(pin_num, 1)
+        if GPIO_LIBRARY == "gpiozero":
+            gpiozero_output(pin_num, 1)
+        else:
+            GPIO.output(pin_num, 1)
         self.output_pin_states[pin_num] = True
         self.log_event("output_pulse_start", pin_num=pin_num, state="HIGH")
         self.after(0, lambda: self._set_output_button_state(pin_num, True))
         time.sleep(duration_sec)
-        GPIO.output(pin_num, 0)
+        if GPIO_LIBRARY == "gpiozero":
+            gpiozero_output(pin_num, 0)
+        else:
+            GPIO.output(pin_num, 0)
         self.output_pin_states[pin_num] = False
         self.log_event("output_pulse_end", pin_num=pin_num, state="LOW")
         self.after(0, lambda: self._set_output_button_state(pin_num, False))
@@ -660,7 +714,10 @@ class GPIOTestTool(ctk.CTk):
         # Set GPIO
         try:
             gpio_state = 1 if new_state else 0
-            GPIO.output(pin_num, gpio_state)
+            if GPIO_LIBRARY == "gpiozero":
+                gpiozero_output(pin_num, gpio_state)
+            else:
+                GPIO.output(pin_num, gpio_state)
             print(f"[GPIO] Pin {pin_num} set to {'HIGH' if new_state else 'LOW'}")
             self.log_event("output_toggle", pin_num=pin_num, state=gpio_state)
         except Exception as e:
@@ -677,8 +734,14 @@ class GPIOTestTool(ctk.CTk):
             try:
                 ui_updates = []
                 for pin_num in self.input_state_labels:
+                    if not self.edge_detection_enabled.get(pin_num, False):
+                        continue
+
                     try:
-                        state = GPIO.input(pin_num)
+                        if GPIO_LIBRARY == "gpiozero":
+                            state = gpiozero_input(pin_num)
+                        else:
+                            state = GPIO.input(pin_num)
                         self.input_pin_states[pin_num] = bool(state)
 
                         previous_state = self.last_raw_input_states[pin_num]
@@ -735,14 +798,20 @@ class GPIOTestTool(ctk.CTk):
         # Reset all output pins to LOW
         try:
             for pin in ALL_OUTPUT_PINS.values():
-                GPIO.output(pin, 0)
+                if GPIO_LIBRARY == "gpiozero":
+                    gpiozero_output(pin, 0)
+                else:
+                    GPIO.output(pin, 0)
         except Exception:
             pass
         
         # Cleanup GPIO
         try:
             if ON_RPI:
-                GPIO.cleanup()
+                if GPIO_LIBRARY == "gpiozero":
+                    gpiozero_cleanup()
+                else:
+                    GPIO.cleanup()
         except Exception:
             pass
         
@@ -751,4 +820,8 @@ class GPIOTestTool(ctk.CTk):
 
 if __name__ == "__main__":
     app = GPIOTestTool()
-    app.mainloop()
+    try:
+        app.mainloop()
+    except KeyboardInterrupt:
+        print("\n[GPIO Test Tool] Interrupted by user")
+        app.on_closing()

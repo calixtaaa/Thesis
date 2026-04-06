@@ -1,0 +1,2 @@
+source venv/bin/activate
+sudo -E venv/bin/python gpio_test_tool.py
