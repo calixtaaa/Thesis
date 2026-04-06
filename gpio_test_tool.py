@@ -15,7 +15,7 @@ from pathlib import Path
 
 # GPIO handling - try real hardware first, then mock
 try:
-    from gpiozero import OutputDevice, InputDevice, LED
+    from gpiozero import OutputDevice, DigitalInputDevice, LED
     ON_RPI = True
     GPIO_LIBRARY = "gpiozero"
 except ImportError:
@@ -45,7 +45,9 @@ def setup_gpiozero_input(pin):
     if GPIO_LIBRARY != "gpiozero":
         return
     try:
-        _input_devices[pin] = InputDevice(pin, pull_up=True)
+        device = DigitalInputDevice(pin, pull_up=True, bounce_time=0.02)
+        device.when_activated = lambda pin_num=pin: _on_gpiozero_input_edge(pin_num)
+        _input_devices[pin] = device
     except Exception as e:
         print(f"[GPIO] Failed to create input device for pin {pin}: {e}")
 
@@ -60,6 +62,19 @@ def gpiozero_input(pin):
     if pin not in _input_devices:
         return 1
     return 0 if _input_devices[pin].is_active else 1
+
+def _on_gpiozero_input_edge(pin_num):
+    """Internal gpiozero activation callback for pulse counting."""
+    try:
+        app = _gpio_app_ref[0]
+    except Exception:
+        return
+
+    if app is not None:
+        app._on_input_edge(pin_num)
+
+
+_gpio_app_ref = [None]
 
 def gpiozero_cleanup():
     """Close all GPIO devices."""
@@ -214,6 +229,8 @@ class GPIOTestTool(ctk.CTk):
         self.input_last_labels = {}
         self.output_toggle_buttons = {}
         self.test_status_label = None
+
+        _gpio_app_ref[0] = self
 
         self.loopback_test_pairs = []
         for output_label, input_label in DEFAULT_LOOPBACK_TESTS:
@@ -794,6 +811,7 @@ class GPIOTestTool(ctk.CTk):
         """Cleanup on window close"""
         print("[GPIO Test Tool] Shutting down...")
         self.monitoring = False
+        _gpio_app_ref[0] = None
         
         # Reset all output pins to LOW
         try:
