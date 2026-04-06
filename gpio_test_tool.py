@@ -7,9 +7,11 @@ Not part of the main app - for development/testing only.
 import tkinter as tk
 from tkinter import messagebox
 import customtkinter as ctk
-from pathlib import Path
+import csv
+from datetime import datetime
 import time
 import threading
+from pathlib import Path
 
 # GPIO mock for development
 try:
@@ -109,6 +111,14 @@ ALL_INPUT_PINS = {
     "RFID SPI MISO (9)": 9,
 }
 
+OUTPUT_PIN_TO_LABEL = {pin: label for label, pin in ALL_OUTPUT_PINS.items()}
+INPUT_PIN_TO_LABEL = {pin: label for label, pin in ALL_INPUT_PINS.items()}
+
+DEFAULT_LOOPBACK_TESTS = [
+    ("Coin Hopper 1-peso (12)", "Hopper 1-peso Feedback (24)"),
+    ("Coin Hopper 5-peso (21)", "Hopper 5-peso Feedback (25)"),
+]
+
 UI_FONT = "Segoe UI"
 UI_FONT_BOLD = (UI_FONT, 12, "bold")
 UI_FONT_BODY = (UI_FONT, 11)
@@ -160,14 +170,40 @@ class GPIOTestTool(ctk.CTk):
         # Pin states tracking
         self.output_pin_states = {pin: False for pin in ALL_OUTPUT_PINS.values()}
         self.input_pin_states = {pin: False for pin in ALL_INPUT_PINS.values()}
+        self.last_raw_input_states = {pin: None for pin in ALL_INPUT_PINS.values()}
+        self.input_pulse_counts = {pin: 0 for pin in ALL_INPUT_PINS.values()}
+        self.input_last_change = {pin: "never" for pin in ALL_INPUT_PINS.values()}
+        self.edge_detection_enabled = {pin: False for pin in ALL_INPUT_PINS.values()}
         self.input_state_labels = {}
+        self.input_count_labels = {}
+        self.input_last_labels = {}
         self.output_toggle_buttons = {}
+        self.test_status_label = None
+
+        self.loopback_test_pairs = []
+        for output_label, input_label in DEFAULT_LOOPBACK_TESTS:
+            output_pin = ALL_OUTPUT_PINS.get(output_label)
+            input_pin = ALL_INPUT_PINS.get(input_label)
+            if output_pin is not None and input_pin is not None:
+                self.loopback_test_pairs.append((output_pin, input_pin))
+
+        self.event_log_path = Path(__file__).resolve().parent / "debug_logs" / "pin_test_events.csv"
+        self.event_log_lock = threading.Lock()
+        self._setup_event_log()
         
         # Setup GPIO
         self.setup_gpio()
         
         # Build UI
         self.build_ui()
+
+        if not ON_RPI:
+            messagebox.showwarning(
+                "Mock Mode",
+                "Running without RPi.GPIO.\n\n"
+                "Input/output changes are simulated only and do not verify electrical signals.\n"
+                "Run this tool on a Raspberry Pi to test actual pin signals.",
+            )
         
         # Start input monitoring thread
         self.monitoring = True
@@ -198,12 +234,69 @@ class GPIOTestTool(ctk.CTk):
             for pin in ALL_INPUT_PINS.values():
                 try:
                     GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+                    GPIO.add_event_detect(pin, GPIO.BOTH, callback=self._on_input_edge, bouncetime=20)
+                    self.edge_detection_enabled[pin] = True
                 except Exception as e:
                     print(f"[GPIO] Failed to setup input pin {pin}: {e}")
             
             print("[GPIO Test Tool] GPIO setup complete")
         except Exception as e:
             messagebox.showerror("GPIO Setup Error", f"Failed to initialize GPIO: {e}")
+
+    def _setup_event_log(self):
+        """Create CSV log file for pin events if it does not exist."""
+        try:
+            self.event_log_path.parent.mkdir(parents=True, exist_ok=True)
+            if not self.event_log_path.exists():
+                with self.event_log_path.open("w", newline="", encoding="utf-8") as f:
+                    writer = csv.writer(f)
+                    writer.writerow(["timestamp", "event", "pin", "label", "state", "details"])
+        except Exception as e:
+            print(f"[GPIO Log] Failed to initialize event log: {e}")
+
+    def log_event(self, event_name, pin_num=None, state=None, details=""):
+        """Append a pin event entry to CSV log."""
+        label = ""
+        if pin_num in OUTPUT_PIN_TO_LABEL:
+            label = OUTPUT_PIN_TO_LABEL[pin_num]
+        elif pin_num in INPUT_PIN_TO_LABEL:
+            label = INPUT_PIN_TO_LABEL[pin_num]
+
+        row = [
+            datetime.now().isoformat(timespec="seconds"),
+            event_name,
+            "" if pin_num is None else pin_num,
+            label,
+            "" if state is None else state,
+            details,
+        ]
+
+        try:
+            with self.event_log_lock:
+                with self.event_log_path.open("a", newline="", encoding="utf-8") as f:
+                    writer = csv.writer(f)
+                    writer.writerow(row)
+        except Exception as e:
+            print(f"[GPIO Log] Failed to write event: {e}")
+
+    def _on_input_edge(self, pin_num):
+        """Edge callback for input pins on Raspberry Pi."""
+        if pin_num not in self.input_pulse_counts:
+            return
+
+        self.input_pulse_counts[pin_num] += 1
+        self.input_last_change[pin_num] = time.strftime("%H:%M:%S")
+        self.log_event("input_edge", pin_num=pin_num, state=GPIO.input(pin_num))
+
+        # GPIO callbacks run outside Tk mainloop; schedule UI updates safely.
+        self.after(0, self._refresh_input_aux_labels, pin_num)
+
+    def _refresh_input_aux_labels(self, pin_num):
+        """Refresh pulse count and last-change labels for an input pin."""
+        if pin_num in self.input_count_labels:
+            self.input_count_labels[pin_num].configure(text=str(self.input_pulse_counts[pin_num]))
+        if pin_num in self.input_last_labels:
+            self.input_last_labels[pin_num].configure(text=self.input_last_change[pin_num])
     
     def build_ui(self):
         """Build the main UI"""
@@ -266,10 +359,44 @@ class GPIOTestTool(ctk.CTk):
         
         ctk.CTkLabel(
             card,
-            text="Click buttons to toggle OUTPUT pins HIGH/LOW. Connect an LED to verify signals.",
+            text="Toggle steady states or send 200ms pulse outputs to verify hardware response.",
             font=UI_FONT_SMALL,
             text_color=self.current_theme["fg"],
         ).pack(anchor="w", padx=16, pady=(0, 12))
+
+        action_row = ctk.CTkFrame(card, fg_color="transparent")
+        action_row.pack(fill=tk.X, padx=12, pady=(0, 8))
+
+        ctk.CTkButton(
+            action_row,
+            text="Run All Pin Tests",
+            font=UI_FONT_SMALL,
+            width=130,
+            height=30,
+            fg_color=self.current_theme["accent"],
+            hover_color=self.current_theme["accent_hover"],
+            command=self.run_all_pin_tests,
+        ).pack(side=tk.LEFT, padx=(0, 8))
+
+        ctk.CTkButton(
+            action_row,
+            text="Reset Input Counters",
+            font=UI_FONT_SMALL,
+            width=140,
+            height=30,
+            fg_color=self.current_theme["button_bg"],
+            text_color=self.current_theme["fg"],
+            hover_color=self.current_theme["card_border"],
+            command=self.reset_input_counters,
+        ).pack(side=tk.LEFT)
+
+        self.test_status_label = ctk.CTkLabel(
+            action_row,
+            text="Ready",
+            font=UI_FONT_SMALL,
+            text_color=self.current_theme["fg"],
+        )
+        self.test_status_label.pack(side=tk.RIGHT, padx=4)
         
         # Scrollable frame for pins
         scroll_frame = ctk.CTkScrollableFrame(
@@ -306,6 +433,19 @@ class GPIOTestTool(ctk.CTk):
             )
             btn.pack(side=tk.RIGHT, padx=4)
             self.output_toggle_buttons[pin_num] = btn
+
+            pulse_btn = ctk.CTkButton(
+                pin_row,
+                text="Pulse 200ms",
+                font=UI_FONT_SMALL,
+                width=110,
+                height=28,
+                fg_color=self.current_theme["button_bg"],
+                text_color=self.current_theme["fg"],
+                hover_color=self.current_theme["card_border"],
+                command=lambda p=pin_num: self.pulse_output_pin(p, 0.2),
+            )
+            pulse_btn.pack(side=tk.RIGHT, padx=4)
     
     def build_input_section(self, parent):
         """Build input pins monitoring section"""
@@ -329,7 +469,7 @@ class GPIOTestTool(ctk.CTk):
         
         ctk.CTkLabel(
             card,
-            text="Real-time monitoring - Apply 3V or 5V signals to test. Updates automatically.",
+            text="Live state plus edge counts and last-change timestamps.",
             font=UI_FONT_SMALL,
             text_color=self.current_theme["fg"],
         ).pack(anchor="w", padx=16, pady=(0, 12))
@@ -341,6 +481,13 @@ class GPIOTestTool(ctk.CTk):
             corner_radius=0,
         )
         scroll_frame.pack(fill=tk.BOTH, expand=True, padx=12, pady=12)
+
+        header_row = ctk.CTkFrame(scroll_frame, fg_color="transparent")
+        header_row.pack(fill=tk.X, pady=(0, 6))
+        ctk.CTkLabel(header_row, text="Pin", font=UI_FONT_SMALL, text_color=self.current_theme["fg"], width=200).pack(side=tk.LEFT, padx=4)
+        ctk.CTkLabel(header_row, text="State", font=UI_FONT_SMALL, text_color=self.current_theme["fg"], width=70).pack(side=tk.LEFT, padx=4)
+        ctk.CTkLabel(header_row, text="Edges", font=UI_FONT_SMALL, text_color=self.current_theme["fg"], width=70).pack(side=tk.LEFT, padx=4)
+        ctk.CTkLabel(header_row, text="Last Change", font=UI_FONT_SMALL, text_color=self.current_theme["fg"], width=120).pack(side=tk.LEFT, padx=4)
         
         # Pin status indicators
         for pin_label, pin_num in ALL_INPUT_PINS.items():
@@ -362,10 +509,144 @@ class GPIOTestTool(ctk.CTk):
                 text="LOW",
                 font=(UI_FONT, 11, "bold"),
                 text_color="#cbd5e1",
-                width=80,
+                width=70,
             )
-            status_label.pack(side=tk.RIGHT, padx=4)
+            status_label.pack(side=tk.LEFT, padx=4)
             self.input_state_labels[pin_num] = status_label
+
+            count_label = ctk.CTkLabel(
+                pin_row,
+                text="0",
+                font=UI_FONT_BODY,
+                text_color=self.current_theme["fg"],
+                width=70,
+            )
+            count_label.pack(side=tk.LEFT, padx=4)
+            self.input_count_labels[pin_num] = count_label
+
+            last_label = ctk.CTkLabel(
+                pin_row,
+                text="never",
+                font=UI_FONT_BODY,
+                text_color=self.current_theme["fg"],
+                width=120,
+            )
+            last_label.pack(side=tk.LEFT, padx=4)
+            self.input_last_labels[pin_num] = last_label
+
+    def pulse_output_pin(self, pin_num, duration_sec=0.2):
+        """Pulse an output pin HIGH for duration_sec, then return LOW."""
+        if pin_num not in self.output_pin_states:
+            return
+
+        def _pulse():
+            try:
+                self._pulse_output_blocking(pin_num, duration_sec)
+            except Exception as e:
+                self.after(0, lambda: messagebox.showerror("GPIO Error", f"Failed to pulse pin {pin_num}: {e}"))
+
+        threading.Thread(target=_pulse, daemon=True).start()
+
+    def _pulse_output_blocking(self, pin_num, duration_sec):
+        """Pulse an output pin synchronously; safe to call from worker threads."""
+        GPIO.output(pin_num, 1)
+        self.output_pin_states[pin_num] = True
+        self.log_event("output_pulse_start", pin_num=pin_num, state="HIGH")
+        self.after(0, lambda: self._set_output_button_state(pin_num, True))
+        time.sleep(duration_sec)
+        GPIO.output(pin_num, 0)
+        self.output_pin_states[pin_num] = False
+        self.log_event("output_pulse_end", pin_num=pin_num, state="LOW")
+        self.after(0, lambda: self._set_output_button_state(pin_num, False))
+
+    def _set_test_status(self, text):
+        """Update run-all test status text."""
+        if self.test_status_label:
+            self.test_status_label.configure(text=text)
+
+    def reset_input_counters(self):
+        """Reset edge counters and last-change markers for all inputs."""
+        for pin in self.input_pulse_counts:
+            self.input_pulse_counts[pin] = 0
+            self.input_last_change[pin] = "never"
+
+        self._apply_input_updates([
+            (
+                pin,
+                "LOW" if not self.input_pin_states.get(pin, False) else "HIGH",
+                self.current_theme["status_active"] if not self.input_pin_states.get(pin, False) else self.current_theme["status_inactive"],
+                "0",
+                "never",
+            )
+            for pin in self.input_state_labels
+        ])
+        self.log_event("input_counters_reset", details="All input counters reset")
+
+    def run_all_pin_tests(self):
+        """Run automated output sweep plus configured loopback pass/fail checks."""
+        if not ON_RPI:
+            messagebox.showwarning("Mock Mode", "Run All Pin Tests requires Raspberry Pi GPIO hardware.")
+            return
+
+        threading.Thread(target=self._run_all_pin_tests_worker, daemon=True).start()
+
+    def _run_all_pin_tests_worker(self):
+        """Worker that performs output pulse sweep and loopback validation."""
+        self.after(0, self._set_test_status, "Running tests...")
+        self.log_event("test_run_start", details="Run All Pin Tests started")
+
+        pulse_failures = 0
+        loopback_pass = 0
+        loopback_fail = 0
+
+        for output_pin in ALL_OUTPUT_PINS.values():
+            try:
+                self._pulse_output_blocking(output_pin, 0.12)
+                time.sleep(0.08)
+            except Exception as e:
+                pulse_failures += 1
+                self.log_event("output_pulse_error", pin_num=output_pin, details=str(e))
+
+        for output_pin, input_pin in self.loopback_test_pairs:
+            before = self.input_pulse_counts.get(input_pin, 0)
+            result_details = f"OUT {output_pin} -> IN {input_pin}"
+            try:
+                self._pulse_output_blocking(output_pin, 0.2)
+                deadline = time.time() + 0.7
+                detected = False
+                while time.time() < deadline:
+                    if self.input_pulse_counts.get(input_pin, 0) > before:
+                        detected = True
+                        break
+                    time.sleep(0.02)
+
+                if detected:
+                    loopback_pass += 1
+                    self.log_event("loopback_pass", pin_num=input_pin, details=result_details)
+                else:
+                    loopback_fail += 1
+                    self.log_event("loopback_fail", pin_num=input_pin, details=result_details)
+            except Exception as e:
+                loopback_fail += 1
+                self.log_event("loopback_error", pin_num=input_pin, details=f"{result_details} | {e}")
+
+        summary = (
+            f"Done: pulse failures={pulse_failures}, "
+            f"loopback pass={loopback_pass}, fail={loopback_fail}"
+        )
+        self.log_event("test_run_end", details=summary)
+        self.after(0, self._set_test_status, summary)
+
+    def _set_output_button_state(self, pin_num, is_high):
+        """Update output button visuals based on logical pin state."""
+        btn = self.output_toggle_buttons.get(pin_num)
+        if not btn:
+            return
+
+        if is_high:
+            btn.configure(text="HIGH", fg_color=self.current_theme["status_active"])
+        else:
+            btn.configure(text="LOW", fg_color=self.current_theme["status_inactive"])
     
     def toggle_output_pin(self, pin_num):
         """Toggle an output pin HIGH/LOW and update button"""
@@ -381,32 +662,35 @@ class GPIOTestTool(ctk.CTk):
             gpio_state = 1 if new_state else 0
             GPIO.output(pin_num, gpio_state)
             print(f"[GPIO] Pin {pin_num} set to {'HIGH' if new_state else 'LOW'}")
+            self.log_event("output_toggle", pin_num=pin_num, state=gpio_state)
         except Exception as e:
             messagebox.showerror("GPIO Error", f"Failed to set pin {pin_num}: {e}")
             self.output_pin_states[pin_num] = not new_state
             return
         
         # Update button appearance
-        btn = self.output_toggle_buttons[pin_num]
-        if new_state:
-            btn.configure(
-                text="HIGH",
-                fg_color=self.current_theme["status_active"],
-            )
-        else:
-            btn.configure(
-                text="LOW",
-                fg_color=self.current_theme["status_inactive"],
-            )
+        self._set_output_button_state(pin_num, new_state)
     
     def monitor_input_pins(self):
         """Background thread to monitor input pins"""
         while self.monitoring:
             try:
-                for pin_num, label_widget in self.input_state_labels.items():
+                ui_updates = []
+                for pin_num in self.input_state_labels:
                     try:
                         state = GPIO.input(pin_num)
                         self.input_pin_states[pin_num] = bool(state)
+
+                        previous_state = self.last_raw_input_states[pin_num]
+                        if previous_state is None:
+                            self.last_raw_input_states[pin_num] = state
+                        elif previous_state != state:
+                            self.last_raw_input_states[pin_num] = state
+                            # Fallback edge counting when callbacks are unavailable.
+                            if not self.edge_detection_enabled.get(pin_num, False):
+                                self.input_pulse_counts[pin_num] += 1
+                                self.input_last_change[pin_num] = time.strftime("%H:%M:%S")
+                                self.log_event("input_edge_polling", pin_num=pin_num, state=state)
                         
                         # Update label color based on state
                         if state == 0:  # LOW (active on most sensors)
@@ -415,14 +699,33 @@ class GPIOTestTool(ctk.CTk):
                         else:  # HIGH
                             text = "HIGH"
                             color = self.current_theme["status_inactive"]
-                        
-                        label_widget.configure(text=text, text_color=color)
+
+                        ui_updates.append(
+                            (pin_num, text, color, str(self.input_pulse_counts[pin_num]), self.input_last_change[pin_num])
+                        )
                     except Exception as e:
                         print(f"[GPIO Monitor] Error reading pin {pin_num}: {e}")
+
+                self.after(0, self._apply_input_updates, ui_updates)
                 
                 time.sleep(0.1)
             except Exception as e:
                 print(f"[GPIO Monitor] Error: {e}")
+
+    def _apply_input_updates(self, updates):
+        """Apply input label updates on Tk main thread."""
+        for pin_num, state_text, state_color, count_text, last_change_text in updates:
+            state_label = self.input_state_labels.get(pin_num)
+            if state_label:
+                state_label.configure(text=state_text, text_color=state_color)
+
+            count_label = self.input_count_labels.get(pin_num)
+            if count_label:
+                count_label.configure(text=count_text)
+
+            last_label = self.input_last_labels.get(pin_num)
+            if last_label:
+                last_label.configure(text=last_change_text)
     
     def on_closing(self):
         """Cleanup on window close"""
