@@ -31,6 +31,10 @@ except ImportError:
 _output_devices = {}
 _input_devices = {}
 
+# Debounce for input pulse lines (seconds).
+# Keep this low for fast pulse bursts from coin/bill acceptors.
+GPIOZERO_INPUT_BOUNCE_S = 0.002
+
 def setup_gpiozero_output(pin):
     """Create and store gpiozero OutputDevice for a pin."""
     if GPIO_LIBRARY != "gpiozero":
@@ -45,7 +49,7 @@ def setup_gpiozero_input(pin):
     if GPIO_LIBRARY != "gpiozero":
         return
     try:
-        device = DigitalInputDevice(pin, pull_up=True, bounce_time=0.02)
+        device = DigitalInputDevice(pin, pull_up=True, bounce_time=GPIOZERO_INPUT_BOUNCE_S)
         device.when_activated = lambda pin_num=pin: _on_gpiozero_input_edge(pin_num)
         _input_devices[pin] = device
     except Exception as e:
@@ -91,6 +95,14 @@ def gpiozero_cleanup():
         except:
             pass
     _input_devices.clear()
+
+
+def gpiozero_is_output_ready(pin):
+    return pin in _output_devices
+
+
+def gpiozero_is_input_ready(pin):
+    return pin in _input_devices
 
 # Pin configuration from main.py
 RFID_PINS = {
@@ -229,6 +241,8 @@ class GPIOTestTool(ctk.CTk):
         self.input_last_labels = {}
         self.output_toggle_buttons = {}
         self.test_status_label = None
+        self.initialized_output_pins = set()
+        self.initialized_input_pins = set()
 
         _gpio_app_ref[0] = self
 
@@ -279,9 +293,12 @@ class GPIOTestTool(ctk.CTk):
                 try:
                     if GPIO_LIBRARY == "gpiozero":
                         setup_gpiozero_output(pin)
+                        if gpiozero_is_output_ready(pin):
+                            self.initialized_output_pins.add(pin)
                     else:
                         GPIO.setup(pin, GPIO.OUT)
                         GPIO.output(pin, GPIO.LOW)
+                        self.initialized_output_pins.add(pin)
                 except Exception as e:
                     print(f"[GPIO] Failed to setup output pin {pin}: {e}")
             
@@ -290,16 +307,23 @@ class GPIOTestTool(ctk.CTk):
                 try:
                     if GPIO_LIBRARY == "gpiozero":
                         setup_gpiozero_input(pin)
-                        self.edge_detection_enabled[pin] = True
+                        if gpiozero_is_input_ready(pin):
+                            self.edge_detection_enabled[pin] = True
+                            self.initialized_input_pins.add(pin)
                     else:
                         GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
                         GPIO.add_event_detect(pin, GPIO.BOTH, callback=self._on_input_edge, bouncetime=20)
                         self.edge_detection_enabled[pin] = True
+                        self.initialized_input_pins.add(pin)
                 except Exception as e:
                     print(f"[GPIO] Failed to setup input pin {pin}: {e}")
             
-            print("[GPIO Test Tool] GPIO setup complete")
-            return True
+            print(
+                f"[GPIO Test Tool] GPIO setup complete: "
+                f"outputs={len(self.initialized_output_pins)}/{len(ALL_OUTPUT_PINS)}, "
+                f"inputs={len(self.initialized_input_pins)}/{len(ALL_INPUT_PINS)}"
+            )
+            return bool(self.initialized_output_pins or self.initialized_input_pins)
         except Exception as e:
             messagebox.showerror("GPIO Setup Error", f"Failed to initialize GPIO: {e}")
             return False
@@ -511,6 +535,10 @@ class GPIOTestTool(ctk.CTk):
                 command=lambda p=pin_num: self.pulse_output_pin(p, 0.2),
             )
             pulse_btn.pack(side=tk.RIGHT, padx=4)
+
+            if GPIO_LIBRARY == "gpiozero" and pin_num not in self.initialized_output_pins:
+                btn.configure(state="disabled")
+                pulse_btn.configure(state="disabled")
     
     def build_input_section(self, parent):
         """Build input pins monitoring section"""
