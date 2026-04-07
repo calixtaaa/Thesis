@@ -112,7 +112,7 @@ RFID_PINS = {
     "payment_reader_cs": 8,
     "door_reader_cs": 7,
     "payment_reader_rst": 5,
-    "door_reader_rst": 19,
+    "door_reader_rst": 1,
 }
 
 PRODUCT_STEPPER_PINS = {
@@ -127,7 +127,7 @@ SOLENOID_PINS = {
 
 PAYMENT_INPUT_PINS = {
     "bill_acceptor": 6,
-    "coin_acceptor": 13,
+    "coin_acceptor": 19,
 }
 
 COIN_HOPPER_PINS = {
@@ -149,7 +149,7 @@ ALL_OUTPUT_PINS = {
     "RFID Payment CS (8)": 8,
     "RFID Door CS (7)": 7,
     "RFID Payment RST (5)": 5,
-    "RFID Door RST (19)": 19,
+    "RFID Door RST (1)": 1,
     "Stepper 1 - IN1 (17)": 17,
     "Stepper 1 - IN2 (27)": 27,
     "Stepper 1 - IN3 (22)": 22,
@@ -166,7 +166,7 @@ ALL_OUTPUT_PINS = {
 
 ALL_INPUT_PINS = {
     "Bill Acceptor Pulse (6)": 6,
-    "Coin Acceptor Pulse (13)": 13,
+    "Coin Acceptor Pulse (19)": 19,
     "Hopper 1-peso Feedback (24)": 24,
     "Hopper 5-peso Feedback (25)": 25,
     "IR Break Beam (26)": 26,

@@ -185,7 +185,7 @@ RFID_PINS = {
     "payment_reader_cs": 8,      # Physical pin 24 (CE0)
     "door_reader_cs": 7,         # Physical pin 26 (CE1)
     "payment_reader_rst": 5,     # Physical pin 29
-    "door_reader_rst": 19,       # Physical pin 35
+    "door_reader_rst": 1,        # Physical pin 28
 }
 
 # ULN2003 IN1..IN4 mapping per tray motor (28BYJ-48).
@@ -202,7 +202,7 @@ SOLENOID_PINS = {
 
 PAYMENT_INPUT_PINS = {
     "bill_acceptor": 6,     # Physical pin 31
-    "coin_acceptor": 13,    # Physical pin 33
+    "coin_acceptor": 19,    # Physical pin 35
 }
 
 COIN_HOPPER_PINS = {
@@ -773,7 +773,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         counts = self.get_payment_pulse_counts_data()
         edge = self.get_payment_pulse_edge_data()
         return (
-            f"Pulse debug  coin(GPIO13): {counts['coin_acceptor']}  "
+            f"Pulse debug  coin(GPIO19): {counts['coin_acceptor']}  "
             f"bill(GPIO6): {counts['bill_acceptor']}  edge: {edge}"
         )
 
