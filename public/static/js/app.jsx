@@ -8,6 +8,38 @@ const { useState, useEffect, useRef, useCallback, useMemo } = React;
 
 const POLL_MS = 5000;
 
+// ── Vercel Speed Insights Component ────────────────────────────────
+function SpeedInsights() {
+    useEffect(() => {
+        // Initialize Speed Insights queue
+        if (!window.si) {
+            window.si = function(...params) {
+                window.siq = window.siq || [];
+                window.siq.push(params);
+            };
+        }
+
+        // Load Speed Insights script
+        const script = document.createElement('script');
+        script.src = '/_vercel/speed-insights/script.js';
+        script.defer = true;
+        script.dataset.sdkn = '@vercel/speed-insights/react';
+        script.dataset.sdkv = '1.0.0';
+        
+        document.head.appendChild(script);
+
+        return () => {
+            // Cleanup if component unmounts
+            const existingScript = document.querySelector('script[src*="speed-insights"]');
+            if (existingScript) {
+                existingScript.remove();
+            }
+        };
+    }, []);
+
+    return null;
+}
+
 // ── API helper (includes CSRF token for state-changing requests) ──
 async function api(path, opts = {}) {
     const headers = { "Content-Type": "application/json" };
@@ -1114,6 +1146,7 @@ function App() {
 
     return (
         <React.Fragment>
+            <SpeedInsights />
             {/* Sidebar */}
             <aside className={
                 "fixed top-0 left-0 w-[260px] h-screen sidebar-surface border-r border-ios-separator flex flex-col z-[100] transition-transform duration-300 " +
