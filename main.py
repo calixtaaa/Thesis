@@ -485,10 +485,18 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         ctk.set_appearance_mode("light")
         ctk.set_default_color_theme("green")
 
-        # On the Raspberry Pi 7" touchscreen, use fullscreen.
-        # On desktop (development), use a resizable window.
-        if ON_RPI:
-            self.attributes("-fullscreen", True)
+        # Fill the display by default; set APP_WINDOWED=1 for a fixed dev window.
+        self._fill_screen = os.getenv("APP_WINDOWED", "").strip().lower() not in {"1", "true", "yes"}
+        if self._fill_screen:
+            if ON_RPI:
+                self.attributes("-fullscreen", True)
+            else:
+                try:
+                    self.state("zoomed")
+                except Exception:
+                    self.geometry(f"{self.winfo_screenwidth()}x{self.winfo_screenheight()}+0+0")
+            self.minsize(640, 400)
+            self.resizable(True, True)
         else:
             self.geometry(f"{BASE_APP_W}x{BASE_APP_H}")
             self.minsize(640, 400)
@@ -659,6 +667,19 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         On Raspberry Pi the window is already fullscreen.
         On Windows / LCD, centre and size to fill most of the screen.
         """
+        if getattr(self, "_fill_screen", False):
+            try:
+                if ON_RPI:
+                    self.attributes("-fullscreen", True)
+                else:
+                    try:
+                        self.state("zoomed")
+                    except Exception:
+                        self.geometry(f"{self.winfo_screenwidth()}x{self.winfo_screenheight()}+0+0")
+            except Exception:
+                pass
+            return
+
         if ON_RPI:
             return
         try:
@@ -2573,6 +2594,8 @@ def main():
     app = MainApp()
     try:
         app.mainloop()
+    except KeyboardInterrupt:
+        print("\nStopped by user (Ctrl+C).")
     finally:
         GPIO.cleanup()
 
