@@ -1,207 +1,65 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <meta name="description" content="Hygiene Vending Machine — Smart IoT-powered vending with real-time analytics, ML forecasting, and secure admin dashboard.">
+    <meta name="description"
+        content="Hygiene Vending Machine — Smart IoT-powered vending with real-time analytics, ML forecasting, and secure admin dashboard. Built by SyntaxError™.">
     <meta name="theme-color" content="#6366f1">
-    <title>Hygiene Vending Machine — Home</title>
-    <link rel="icon" type="image/jpeg" href="/static/images/vendingMachineIcon.jpg">
+    <title>Hygiene Vending Machine — SyntaxError™</title>
+    <link rel="icon" type="image/jpeg" href="/static/images/ThesisLogo.png">
 
-    <!-- Performance: preconnect to CDN -->
+    <!-- Performance: preconnect to CDNs -->
     <link rel="preconnect" href="https://cdn.tailwindcss.com" crossorigin>
+    <link rel="preconnect" href="https://unpkg.com" crossorigin>
     <link rel="dns-prefetch" href="https://cdn.tailwindcss.com">
+    <link rel="dns-prefetch" href="https://unpkg.com">
 
+    <!-- Google Font: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+        rel="stylesheet">
+
+    <!-- Tailwind CSS (CDN) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     fontFamily: {
-                        sans: ['-apple-system','BlinkMacSystemFont','"SF Pro Display"','"SF Pro Text"','"Helvetica Neue"','Helvetica','Arial','sans-serif'],
+                        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', '"SF Pro Text"', '"Helvetica Neue"', 'Helvetica', 'Arial', 'sans-serif'],
                     },
                 },
             },
         }
     </script>
-    <style>
-        @keyframes fadeUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
-        @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
-        .fade-up{animation:fadeUp .7s ease both}
-        .fade-up-d1{animation-delay:.15s}
-        .fade-up-d2{animation-delay:.3s}
-        .fade-up-d3{animation-delay:.45s}
-        .fade-up-d4{animation-delay:.6s}
-        .float-anim{animation:float 4s ease-in-out infinite}
-        .glass{background:rgba(255,255,255,.7);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
-        .gradient-bg{background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 40%,#a78bfa 70%,#c4b5fd 100%)}
-        .feature-card{transition:transform .25s,box-shadow .25s}
-        .feature-card:hover{transform:translateY(-4px);box-shadow:0 12px 40px rgba(99,102,241,.18)}
-        @media(max-width:640px){
-            .feature-card:hover{transform:none;box-shadow:none}
-        }
-        html{scroll-behavior:smooth}
-    </style>
+
+    <!-- Home Page Styles -->
+    <link rel="stylesheet" href="/static/css/home.css?v=1">
+
+    <!-- React 18 -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
+    <!-- Babel (JSX compilation) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
-<body class="font-sans min-h-screen gradient-bg text-white overflow-x-hidden">
 
-    <!-- Navigation -->
-    <nav class="fixed top-0 left-0 right-0 z-50 glass border-b border-white/20">
-        <div class="max-w-6xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
-            <div class="flex items-center gap-2 sm:gap-3">
-                <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-indigo-600 flex items-center justify-center shadow-lg flex-shrink-0">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5"><rect x="2" y="3" width="20" height="18" rx="3"/><path d="M8 7h8M8 11h5"/></svg>
-                </div>
-                <span class="text-base sm:text-lg font-bold text-gray-900 tracking-tight">SyntaxError&trade;</span>
-            </div>
-            <a href="{{ url_for('login') }}"
-               class="px-4 sm:px-5 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95 transition-all shadow-lg shadow-indigo-500/25 min-h-[44px] flex items-center">
-                Admin Login
-            </a>
-        </div>
-    </nav>
+<body class="font-sans">
 
-    <!-- Hero Section -->
-    <section class="relative min-h-screen flex items-center justify-center px-4 sm:px-6 pt-20 pb-16">
-        <div class="max-w-4xl mx-auto text-center w-full">
-            <div class="fade-up mb-6 sm:mb-8 float-anim">
-                <div class="inline-flex items-center justify-center w-20 h-20 sm:w-24 sm:h-24 rounded-2xl sm:rounded-3xl bg-white/20 backdrop-blur-sm border border-white/30 shadow-2xl">
-                    <svg class="w-10 h-10 sm:w-12 sm:h-12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="2" y="3" width="20" height="18" rx="3"/>
-                        <path d="M8 7h8M8 11h5"/>
-                        <circle cx="16" cy="16" r="2" fill="white" stroke="none"/>
-                    </svg>
-                </div>
-            </div>
+    <div id="root"></div>
 
-            <h1 class="fade-up fade-up-d1 text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight leading-tight mb-4 sm:mb-6">
-                Hygiene Vending<br>
-                <span class="bg-clip-text text-transparent bg-gradient-to-r from-white to-indigo-200">Machine System</span>
-            </h1>
+    <!-- Pass Jinja2 variables to JS -->
+    <script>
+        window.__LOGIN_URL__ = "{{ url_for('login') }}";
+        window.__HOME_URL__ = "{{ url_for('index') }}";
+    </script>
 
-            <p class="fade-up fade-up-d2 text-base sm:text-lg md:text-xl text-indigo-100 max-w-2xl mx-auto mb-8 sm:mb-10 leading-relaxed px-2">
-                A smart, IoT-powered vending solution with real-time inventory tracking,
-                ML-driven sales forecasting, and a secure admin dashboard.
-            </p>
-
-            <div class="fade-up fade-up-d3 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 w-full px-4 sm:px-0">
-                <a href="{{ url_for('login') }}"
-                   class="w-full sm:w-auto px-8 py-3.5 sm:py-4 rounded-full text-base font-bold bg-white text-indigo-700 hover:bg-indigo-50 active:scale-95 transition-all shadow-xl shadow-black/10 text-center min-h-[48px] flex items-center justify-center">
-                    Open Dashboard &rarr;
-                </a>
-                <a href="#features"
-                   class="w-full sm:w-auto px-8 py-3.5 sm:py-4 rounded-full text-base font-semibold bg-white/15 text-white border border-white/30 hover:bg-white/25 active:scale-95 transition-all backdrop-blur-sm text-center min-h-[48px] flex items-center justify-center">
-                    Learn More
-                </a>
-            </div>
-
-            <div class="fade-up fade-up-d4 mt-10 sm:mt-16 flex flex-wrap items-center justify-center gap-3 sm:gap-6 md:gap-8 text-xs sm:text-sm text-indigo-200 px-2">
-                <div class="flex items-center gap-1.5 sm:gap-2">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                    SHA-256 Encrypted
-                </div>
-                <div class="flex items-center gap-1.5 sm:gap-2">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-                    Real-Time Data
-                </div>
-                <div class="flex items-center gap-1.5 sm:gap-2">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a7 7 0 017 7c0 2.38-1.19 4.47-3 5.74V17a2 2 0 01-2 2h-4a2 2 0 01-2-2v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 017-7z"/></svg>
-                    ML Forecasting
-                </div>
-            </div>
-        </div>
-
-        <!-- Scroll indicator (hidden on mobile for cleanliness) -->
-        <div class="absolute bottom-8 sm:bottom-10 left-1/2 -translate-x-1/2 animate-bounce hidden sm:block">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
-        </div>
-    </section>
-
-    <!-- Features Section -->
-    <section id="features" class="py-16 sm:py-24 px-4 sm:px-6 bg-white text-gray-900">
-        <div class="max-w-6xl mx-auto">
-            <div class="text-center mb-10 sm:mb-16">
-                <p class="text-xs sm:text-sm font-bold text-indigo-600 uppercase tracking-widest mb-2 sm:mb-3">Features</p>
-                <h2 class="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight">Everything you need to manage</h2>
-            </div>
-
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                <div class="feature-card bg-gradient-to-br from-emerald-50 to-white border border-emerald-100 rounded-2xl p-5 sm:p-7">
-                    <div class="w-11 h-11 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-emerald-500 flex items-center justify-center mb-4 sm:mb-5">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-                    </div>
-                    <h3 class="text-base sm:text-lg font-bold mb-1.5 sm:mb-2">Real-Time Analytics</h3>
-                    <p class="text-sm text-gray-500 leading-relaxed">Live sales trends, revenue tracking, and stock level monitoring updated every few seconds.</p>
-                </div>
-
-                <div class="feature-card bg-gradient-to-br from-violet-50 to-white border border-violet-100 rounded-2xl p-5 sm:p-7">
-                    <div class="w-11 h-11 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-violet-500 flex items-center justify-center mb-4 sm:mb-5">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 2a7 7 0 017 7c0 2.38-1.19 4.47-3 5.74V17a2 2 0 01-2 2h-4a2 2 0 01-2-2v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 017-7z"/><line x1="9" y1="22" x2="15" y2="22"/></svg>
-                    </div>
-                    <h3 class="text-base sm:text-lg font-bold mb-1.5 sm:mb-2">ML Forecasting</h3>
-                    <p class="text-sm text-gray-500 leading-relaxed">Predictive analysis powered by machine learning — sales forecasts, peak hours, and restocking recommendations.</p>
-                </div>
-
-                <div class="feature-card bg-gradient-to-br from-cyan-50 to-white border border-cyan-100 rounded-2xl p-5 sm:p-7">
-                    <div class="w-11 h-11 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-cyan-500 flex items-center justify-center mb-4 sm:mb-5">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                    </div>
-                    <h3 class="text-base sm:text-lg font-bold mb-1.5 sm:mb-2">SHA-256 Security</h3>
-                    <p class="text-sm text-gray-500 leading-relaxed">Salted SHA-256 password hashing, CSRF protection, rate limiting, and secure session management.</p>
-                </div>
-
-                <div class="feature-card bg-gradient-to-br from-amber-50 to-white border border-amber-100 rounded-2xl p-5 sm:p-7">
-                    <div class="w-11 h-11 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-amber-500 flex items-center justify-center mb-4 sm:mb-5">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg>
-                    </div>
-                    <h3 class="text-base sm:text-lg font-bold mb-1.5 sm:mb-2">Cash &amp; RFID Payments</h3>
-                    <p class="text-sm text-gray-500 leading-relaxed">TB74 bill acceptor, WEIYU coin slot, and MFRC522 RFID card reader integration.</p>
-                </div>
-
-                <div class="feature-card bg-gradient-to-br from-rose-50 to-white border border-rose-100 rounded-2xl p-5 sm:p-7">
-                    <div class="w-11 h-11 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-rose-500 flex items-center justify-center mb-4 sm:mb-5">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/></svg>
-                    </div>
-                    <h3 class="text-base sm:text-lg font-bold mb-1.5 sm:mb-2">Raspberry Pi 5</h3>
-                    <p class="text-sm text-gray-500 leading-relaxed">Built for Raspberry Pi with GPIO hardware control for motors, solenoids, and sensors.</p>
-                </div>
-
-                <div class="feature-card bg-gradient-to-br from-indigo-50 to-white border border-indigo-100 rounded-2xl p-5 sm:p-7">
-                    <div class="w-11 h-11 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-indigo-500 flex items-center justify-center mb-4 sm:mb-5">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
-                    </div>
-                    <h3 class="text-base sm:text-lg font-bold mb-1.5 sm:mb-2">Inventory Management</h3>
-                    <p class="text-sm text-gray-500 leading-relaxed">Full product catalog, stock management, restocking alerts, and multi-slot tray dispensing.</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Tech Stack Section -->
-    <section class="py-14 sm:py-20 px-4 sm:px-6 bg-gray-50 text-gray-900">
-        <div class="max-w-4xl mx-auto text-center">
-            <p class="text-xs sm:text-sm font-bold text-indigo-600 uppercase tracking-widest mb-2 sm:mb-3">Built With</p>
-            <h2 class="text-2xl sm:text-3xl font-extrabold tracking-tight mb-8 sm:mb-12">Modern Technology Stack</h2>
-            <div class="flex flex-wrap items-center justify-center gap-2.5 sm:gap-4">
-                <span class="px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-full bg-white border border-gray-200 text-xs sm:text-sm font-semibold shadow-sm">Python</span>
-                <span class="px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-full bg-white border border-gray-200 text-xs sm:text-sm font-semibold shadow-sm">Flask</span>
-                <span class="px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-full bg-white border border-gray-200 text-xs sm:text-sm font-semibold shadow-sm">React 18</span>
-                <span class="px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-full bg-white border border-gray-200 text-xs sm:text-sm font-semibold shadow-sm">Tailwind CSS</span>
-                <span class="px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-full bg-white border border-gray-200 text-xs sm:text-sm font-semibold shadow-sm">Chart.js</span>
-                <span class="px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-full bg-white border border-gray-200 text-xs sm:text-sm font-semibold shadow-sm">SQLite</span>
-                <span class="px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-full bg-white border border-gray-200 text-xs sm:text-sm font-semibold shadow-sm">CustomTkinter</span>
-                <span class="px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-full bg-white border border-gray-200 text-xs sm:text-sm font-semibold shadow-sm">scikit-learn</span>
-                <span class="px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-full bg-white border border-gray-200 text-xs sm:text-sm font-semibold shadow-sm">Raspberry Pi 5</span>
-                <span class="px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-full bg-white border border-gray-200 text-xs sm:text-sm font-semibold shadow-sm">RPi.GPIO</span>
-            </div>
-        </div>
-    </section>
-
-    <!-- Footer -->
-    <footer class="py-8 sm:py-10 px-4 sm:px-6 bg-gray-900 text-gray-400 text-center text-xs sm:text-sm">
-        <p class="font-semibold text-white mb-1">SyntaxError&trade; — Hygiene Vending Machine</p>
-        <p>Capstone Project &middot; Secured with SHA-256 &middot; Built with Python &amp; React</p>
-    </footer>
+    <!-- React Home App -->
+    <script type="text/babel" src="/static/js/home.jsx?v=1"></script>
 
 </body>
+
 </html>
