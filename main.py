@@ -244,7 +244,7 @@ _hopper_pulse_counts = {
 
 def get_payment_pulse_counts() -> dict:
     return {
-        "coin_acceptor": int(_payment_pulse_counts["coin_acceptor"]),
+            f"Pulse debug  coin(GPIO13): {counts['coin_acceptor']}  "
         "bill_acceptor": int(_payment_pulse_counts["bill_acceptor"]),
     }
 
