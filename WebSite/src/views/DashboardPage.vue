@@ -1,42 +1,62 @@
 <template>
   <div class="relative min-h-[calc(100vh-4rem)] flex flex-col lg:flex-row">
 
+    <!-- Overlay for mobile sidebar -->
+    <div
+      v-if="sidebarOpen"
+      @click="sidebarOpen = false"
+      class="lg:hidden fixed inset-0 bg-surface-950/60 z-40 backdrop-blur-sm transition-opacity"
+    ></div>
+
     <!-- Sidebar -->
     <aside
-      class="lg:w-56 shrink-0 border-r border-surface-800/30 glass lg:fixed lg:top-16 lg:left-0 lg:bottom-0 lg:z-30
-             transition-all duration-300"
-      :class="{ 'hidden lg:block': !sidebarOpen }"
+      class="fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-300 ease-in-out glass lg:translate-x-0 lg:sticky lg:top-16 lg:h-[calc(100vh-4rem)] lg:z-30 lg:border-r border-surface-800/30 flex flex-col shadow-2xl lg:shadow-none"
+      :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
     >
-      <div class="p-4 lg:p-5">
-        <h2 class="text-lg font-bold font-display text-surface-100 mb-1">Admin</h2>
-        <p class="text-xs text-surface-500 mb-5">{{ currentUser?.username || 'admin' }}</p>
+      <div class="p-5 lg:p-6 pb-2">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h2 class="text-2xl lg:text-3xl font-bold font-display text-surface-100 mb-0.5 tracking-tight">Admin</h2>
+            <p class="text-xs lg:text-sm text-surface-500 font-medium capitalize">{{ currentUser?.username || 'admin' }}</p>
+          </div>
+          <!-- Profile Image Upload Node -->
+          <div class="relative group cursor-pointer w-12 h-12 shrink-0">
+            <input type="file" accept="image/*" @change="handleProfileUpload" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" title="Change Profile Picture" />
+            <div class="w-full h-full rounded-full overflow-hidden bg-surface-800/40 border-2 border-transparent group-hover:border-brand-500/50 transition-all duration-300 transform group-hover:scale-110 group-hover:rotate-[15deg] shadow-md flex items-center justify-center">
+              <img v-if="adminProfileImage" :src="adminProfileImage" class="w-full h-full object-cover" />
+              <svg v-else class="w-6 h-6 text-surface-400 group-hover:text-brand-500 transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+            </div>
+          </div>
+        </div>
 
-        <nav class="space-y-1">
+        <nav class="space-y-1.5 flex-1">
           <button
             v-for="item in sidebarItems"
             :key="item.id"
             @click="activeSection = item.id; sidebarOpen = false"
-            class="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200"
+            class="relative w-full flex items-center p-3.5 rounded-2xl transition-all duration-300 group"
             :class="activeSection === item.id
-              ? 'bg-brand-700 text-white shadow-md shadow-brand-800/30'
-              : 'text-surface-400 hover:text-surface-200 hover:bg-surface-800/50'"
+              ? 'bg-brand-700 text-white shadow-lg shadow-brand-800/30 border border-brand-900/10'
+              : 'text-surface-500 hover:text-surface-100 font-medium hover:bg-surface-800/30'"
           >
-            <span v-html="item.icon" class="w-4 h-4 shrink-0"></span>
-            {{ item.label }}
+            <span v-html="item.icon" class="absolute left-4 w-5 h-5 shrink-0 transition-opacity" :class="activeSection === item.id ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'"></span>
+            <span class="w-full text-center leading-[1.25] text-[14.5px] font-display pr-1 pl-6" :class="activeSection === item.id ? 'font-bold' : 'font-medium'">{{ item.label }}</span>
           </button>
         </nav>
       </div>
 
+      <div class="flex-1"></div>
+
       <!-- Logout -->
-      <div class="p-4 mt-auto border-t border-surface-800/30">
+      <div class="p-5 lg:p-6 pt-4 border-t border-surface-800/30 mt-auto">
         <button
           @click="handleLogout"
-          class="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-sm font-medium text-red-400 hover:bg-red-400/10 transition-all duration-200"
+          class="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-[14.5px] font-bold text-red-500 hover:bg-red-500/10 hover:text-red-400 transition-all duration-300"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
           </svg>
-          Logout
+          <span class="leading-none mt-0.5">Logout</span>
         </button>
       </div>
     </aside>
@@ -44,15 +64,15 @@
     <!-- Mobile sidebar toggle -->
     <button
       @click="sidebarOpen = !sidebarOpen"
-      class="lg:hidden fixed bottom-6 right-6 z-50 w-12 h-12 rounded-2xl bg-brand-700 text-white shadow-xl shadow-brand-800/40 flex items-center justify-center active:scale-95 transition-transform"
+      class="lg:hidden fixed bottom-6 right-6 z-30 w-14 h-14 rounded-full bg-brand-700 text-white shadow-xl shadow-brand-800/40 flex items-center justify-center active:scale-95 transition-transform border border-brand-600/30"
     >
-      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
       </svg>
     </button>
 
     <!-- Main Content -->
-    <main class="flex-1 lg:ml-56 p-4 sm:p-6 lg:p-8">
+    <main class="flex-1 w-full lg:w-auto p-4 sm:p-6 lg:p-8">
 
       <!-- Header -->
       <div class="flex items-center justify-between mb-6">
@@ -154,8 +174,10 @@
             </table>
           </div>
         </div>
+      </div>
 
-        <!-- Prediction Analysis Section -->
+      <!-- PREDICTION ANALYSIS SECTION -->
+      <div v-else-if="activeSection === 'prediction'">
         <div class="ios-card rounded-2xl p-5 sm:p-6">
           <h3 class="text-sm font-bold text-surface-200 mb-0.5">Prediction Analysis (Demand + Restock)</h3>
           <p class="text-xs text-surface-500 mb-4">
@@ -378,6 +400,7 @@ const sidebarItems = [
   { id: 'cash', label: 'Cash Pulse Settings', icon: '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>' },
   { id: 'hardware', label: 'Hardware Diagnostics', icon: '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" /></svg>' },
   { id: 'sales-reports', label: 'Sales Reports', icon: '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>' },
+  { id: 'prediction', label: 'Prediction Analysis', icon: '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>' },
   { id: 'users', label: 'Manage Users', icon: '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>' },
   { id: 'credentials', label: 'Change Credentials', icon: '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>' },
 ]
@@ -387,6 +410,20 @@ const currentSidebarItem = computed(() => sidebarItems.find(i => i.id === active
 function handleLogout() {
   logout()
   router.push('/')
+}
+
+const adminProfileImage = ref(localStorage.getItem('adminProfileImg') || null)
+
+function handleProfileUpload(e) {
+  const file = e.target.files[0]
+  if (file) {
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      adminProfileImage.value = ev.target.result
+      localStorage.setItem('adminProfileImg', ev.target.result)
+    }
+    reader.readAsDataURL(file)
+  }
 }
 
 // === DATA (demo data matching machine format - replace with API) ===

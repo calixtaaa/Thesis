@@ -1,7 +1,7 @@
 <template>
   <div class="relative min-h-[calc(100vh-4rem)] overflow-hidden">
     <!-- Background -->
-    <div class="absolute inset-0 bg-gradient-to-br from-surface-950 via-surface-900 to-surface-950 light-bg-gradient pointer-events-none"></div>
+    <div class="absolute inset-0 bg-gradient-to-br from-surface-950 via-surface-900 to-surface-950 pointer-events-none" :class="{ 'light-bg-gradient': theme === 'light' }"></div>
 
     <!-- Page Header -->
     <div class="relative text-center pt-10 pb-4 px-4 z-10">
@@ -142,6 +142,9 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useTheme } from '../composables/useTheme'
+
+const { theme } = useTheme()
 import dacerPhoto from '../assets/members/Dacer.jpg'
 import tiuPhoto from '../assets/members/Tiu.jpg'
 import romuloPhoto from '../assets/members/Romulo.png'
