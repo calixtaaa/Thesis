@@ -1,0 +1,168 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Dark mode (default) */
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
+    background-color: #020617;
+    color: #f1f5f9;
+    overflow-x: hidden;
+    transition: background-color 0.35s ease, color 0.35s ease;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Light mode */
+  html.light body {
+    background-color: #f2f2f7;
+    color: #0f172a;
+  }
+
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: #475569; }
+  html.light ::-webkit-scrollbar-thumb { background: #cbd5e1; }
+  html.light ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+}
+
+@layer components {
+  .glass {
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(24px) saturate(1.2);
+    -webkit-backdrop-filter: blur(24px) saturate(1.2);
+    border: 1px solid rgba(148, 163, 184, 0.08);
+  }
+
+  html.light .glass {
+    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    box-shadow: 0 2px 24px rgba(0, 0, 0, 0.04);
+  }
+
+  .glass-light {
+    background: rgba(30, 41, 59, 0.35);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(148, 163, 184, 0.06);
+  }
+
+  html.light .glass-light {
+    background: rgba(255, 255, 255, 0.5);
+    border: 1px solid rgba(148, 163, 184, 0.12);
+  }
+
+  .gradient-text {
+    background: linear-gradient(135deg, #fde047, #f9d019, #e9b308);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .gradient-text-brand {
+    background: linear-gradient(135deg, #ec7a95, #df4d72, #800020);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .btn-primary {
+    @apply px-6 py-3 rounded-2xl font-semibold text-white inline-flex items-center
+           bg-gradient-to-r from-brand-800 to-brand-600
+           hover:from-brand-700 hover:to-brand-500
+           transition-all duration-300 ease-out
+           shadow-lg shadow-brand-800/25
+           hover:shadow-xl hover:shadow-brand-800/40
+           hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98];
+  }
+
+  .btn-secondary {
+    @apply px-6 py-3 rounded-2xl font-semibold inline-flex items-center
+           border border-surface-600 text-surface-200
+           hover:bg-surface-800 hover:border-surface-500
+           transition-all duration-300 ease-out
+           hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98];
+  }
+
+  html.light .btn-secondary {
+    @apply border-surface-300 text-surface-700
+           hover:bg-surface-100 hover:border-surface-400;
+  }
+
+  .card-hover {
+    @apply transition-all duration-500 ease-out
+           hover:-translate-y-1.5 hover:shadow-2xl;
+  }
+}
+
+/* ====== LIGHT MODE OVERRIDES ====== */
+
+/* Text colors */
+html.light .text-surface-100 { color: #0f172a; }
+html.light .text-surface-200 { color: #1e293b; }
+html.light .text-surface-300 { color: #334155; }
+html.light .text-surface-400 { color: #475569; }
+html.light .text-surface-500 { color: #64748b; }
+html.light .text-surface-600 { color: #94a3b8; }
+
+/* Backgrounds */
+html.light .bg-surface-950 { background-color: #f2f2f7; }
+html.light .bg-surface-900 { background-color: #e5e5ea; }
+html.light .bg-surface-800\/50 { background-color: rgba(229, 229, 234, 0.5); }
+html.light .bg-surface-800\/40 { background-color: rgba(229, 229, 234, 0.4); }
+html.light .bg-surface-800\/30 { background-color: rgba(229, 229, 234, 0.3); }
+html.light .bg-surface-800\/20 { background-color: rgba(229, 229, 234, 0.2); }
+html.light .bg-surface-800 { background-color: #d1d1d6; }
+
+/* Borders */
+html.light .border-surface-800\/50 { border-color: rgba(199, 199, 204, 0.5); }
+html.light .border-surface-800\/40 { border-color: rgba(199, 199, 204, 0.4); }
+html.light .border-surface-800\/30 { border-color: rgba(199, 199, 204, 0.3); }
+html.light .border-surface-800\/20 { border-color: rgba(199, 199, 204, 0.2); }
+html.light .border-surface-700\/50 { border-color: rgba(199, 199, 204, 0.5); }
+html.light .border-surface-700\/40 { border-color: rgba(199, 199, 204, 0.4); }
+html.light .border-surface-700\/30 { border-color: rgba(199, 199, 204, 0.3); }
+html.light .border-surface-700\/20 { border-color: rgba(199, 199, 204, 0.2); }
+
+/* Inputs */
+html.light input,
+html.light select {
+  background-color: rgba(255, 255, 255, 0.8) !important;
+  border-color: rgba(199, 199, 204, 0.5) !important;
+  color: #0f172a !important;
+}
+html.light input::placeholder { color: #8e8e93 !important; }
+
+/* Blur backgrounds */
+html.light .bg-brand-800\/10,
+html.light .bg-brand-800\/8,
+html.light .bg-brand-800\/5 { background-color: rgba(128, 0, 32, 0.04); }
+html.light .bg-gold-400\/5 { background-color: rgba(249, 208, 25, 0.04); }
+html.light .bg-emerald-400\/5 { background-color: rgba(52, 211, 153, 0.04); }
+
+/* Shadows for light mode */
+html.light .shadow-2xl { box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.08); }
+html.light .shadow-xl { box-shadow: 0 20px 30px -6px rgba(0, 0, 0, 0.06); }
+html.light .shadow-lg { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05); }
+html.light .shadow-md { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.04); }
+
+/* Light mode gradient text */
+html.light .gradient-text {
+  background: linear-gradient(135deg, #b45309, #a16207, #854d0e);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+@layer utilities {
+  .text-balance { text-wrap: balance; }
+}
