@@ -7,7 +7,7 @@ from datetime import datetime
 
 
 # App version (bump when releasing; shown in title, footers, and patch notes)
-VERSION = "v.0.03"
+VERSION = "v1.0.0"
 
 
 # ---------------------------------------------------------------------------
@@ -101,14 +101,55 @@ PATCH_v0_03 = {
     ],
 }
 
+# v1.0.0 – Major UI Redesign + Chatbot Upgrade + Responsiveness
+PATCH_v1_0_0 = {
+    "version": "v1.0.0",
+    "added": [
+        "🤖 Hygiene Hero AI Chatbot — bilingual support (English + Tagalog/Filipino).",
+        "🤖 Chatbot profanity filter — detects bad language and responds with a witty comeback.",
+        "🤖 Chatbot now understands 'How to use this machine' / 'Paano gamitin ito' and gives step-by-step instructions.",
+        "🤖 Chatbot dynamic follow-up suggestions — after each reply, related suggestions appear for the user to tap.",
+        "🛒 New Product Detail Modal — tap any product card to see a full-screen page with image, description, benefits, and Add to Cart button.",
+        "📢 Auto-cycling Promotional Carousel — rotating banner at the top of the product grid highlighting products and deals.",
+        "📝 Product descriptions embedded in every detail modal explaining how each item helps the user's hygiene.",
+        "🧭 Navigation breadcrumb system — Step 1/2/3 indicator in the header so users always know where they are.",
+        "🤖 'Ask Hygiene Hero' button moved to top-right header — prominently visible for easy access.",
+    ],
+    "improved": [
+        "🎨 Complete brand palette redesign: Emerald Green (#50C878), Plum (#8E4585), Creamy White (#F9F9FB).",
+        "🎨 Dark mode updated to Deep Navy (#1A1A2E) with Mint-Emerald accents (#6AEAA0).",
+        "✏️ Typography upgraded from Segoe UI → Poppins for a modern, premium feel.",
+        "🖼️ All product images now load from images/Products/ with explicit mapping for all 10 items.",
+        "🖼️ Uniform image sizing — all product images rendered at identical dimensions via PIL centering on transparent canvas.",
+        "🎲 2.5D elevated product cards — thicker borders, larger corner radius, dimensional styling.",
+        "👆 All product cards are now fully touchable — optimized for touchscreen LCD interaction.",
+        "📱 App responsiveness optimized — layouts adapt to any screen size, fullscreen on Raspberry Pi.",
+        "🤖 Chatbot welcome message improved with richer formatting and clearer feature list.",
+        "🤖 Chatbot now shows contextual quick-reply chips after each bot response.",
+    ],
+    "bugs_fixed": [
+        "Chatbot could not answer 'how to use this machine' — fixed with new keyword matching and Tagalog support.",
+        "Product images had inconsistent sizes — fixed with uniform PIL canvas sizing.",
+        "Chatbot button was hard to find in the footer — moved to top-right header for visibility.",
+    ],
+    "future": [
+        "Voice-activated chatbot for hands-free interaction.",
+        "Product recommendation engine based on purchase history.",
+        "Multi-language support beyond English and Tagalog.",
+        "Real-time inventory sync with cloud dashboard.",
+    ],
+}
+
 # All versions in order (oldest first)
-PATCH_HISTORY = [PATCH_v0_01, PATCH_v0_02, PATCH_v0_03]
+PATCH_HISTORY = [PATCH_v0_01, PATCH_v0_02, PATCH_v0_03, PATCH_v1_0_0]
 
 
 def get_patch_notes_text() -> str:
-    """Return a single string with full version history for the Patch Notes dialog."""
+    """Return a single string with full version history for the Patch Notes dialog.
+    Latest version is shown first (at the top), oldest at the bottom.
+    """
     lines = [f"Patch Notes / Updates  —  Current: {VERSION}", ""]
-    for patch in PATCH_HISTORY:
+    for patch in reversed(PATCH_HISTORY):
         v = patch["version"]
         lines.extend([f"═══════════════════════════════════  {v}  ═══════════════════════════════════", ""])
         if patch["added"]:

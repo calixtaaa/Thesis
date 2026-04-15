@@ -11,6 +11,7 @@ import customtkinter as ctk
 
 import prediction_runtime
 from customer import checkout_ui, main_menu_ui, status_ui
+from chatbot.chatbot_ui import build_chatbot_screen
 
 from admin.admin import AdminMixin
 from admin.reports import get_reports_dir
@@ -91,73 +92,76 @@ DEBUG_LOGS_DIR = BASE_DIR / "debug_logs"
 BASE_APP_W = 800
 BASE_APP_H = 480
 
-# Vibrant theming – colorful accents with clean surfaces
+# ──────────────────────────────────────────────
+#  Brand palette: Emerald Green · Plum · Creamy White
+# ──────────────────────────────────────────────
 THEMES = {
     "light": {
-        "bg": "#f8fafc",
-        "fg": "#0f172a",
-        "button_bg": "#f1f5f9",
-        "button_fg": "#0f172a",
-        "accent": "#10b981",
-        "accent_hover": "#059669",
-        "card_bg": "#ffffff",
-        "card_border": "#e2e8f0",
-        "search_bg": "#f1f5f9",
-        "search_border": "#cbd5e1",
-        "muted": "#64748b",
-        "nav_bg": "#6366f1",
-        "nav_fg": "#ffffff",
-        "nav_hover": "#4f46e5",
-        "on_accent": "#ffffff",
-        "status_error": "#b91c1c",
-        "status_success": "#065f46",
-        "success_bg": "#10b981",
-        "success_hover": "#059669",
-        "chart_line": "#10b981",
-        "chart_fill": "#d1fae5",
-        "chart_grid": "#e2e8f0",
-        "btn_add": "#10b981",
-        "btn_add_hover": "#059669",
-        "btn_remove": "#ef4444",
-        "btn_remove_hover": "#dc2626",
-        "price_color": "#0f172a",
-        "selected_bg": "#d1fae5",
-        "selected_border": "#10b981",
+        "bg": "#F9F9FB",              # Creamy white
+        "fg": "#1E1E2F",              # Deep charcoal text
+        "button_bg": "#F0EFF4",       # Soft lavender-gray
+        "button_fg": "#1E1E2F",
+        "accent": "#50C878",          # Emerald green (primary CTA)
+        "accent_hover": "#3DA863",    # Darker emerald on hover
+        "card_bg": "#FFFFFF",
+        "card_border": "#E8E5F0",     # Subtle plum-tinted border
+        "search_bg": "#F0EFF4",
+        "search_border": "#D1CDE0",
+        "muted": "#7A7491",           # Muted plum-gray
+        "nav_bg": "#8E4585",          # Plum (navigation / header)
+        "nav_fg": "#FFFFFF",
+        "nav_hover": "#723670",       # Darker plum on hover
+        "on_accent": "#FFFFFF",
+        "status_error": "#C0392B",
+        "status_success": "#27AE60",
+        "success_bg": "#50C878",
+        "success_hover": "#3DA863",
+        "chart_line": "#50C878",
+        "chart_fill": "#D5F5E3",
+        "chart_grid": "#E8E5F0",
+        "btn_add": "#50C878",
+        "btn_add_hover": "#3DA863",
+        "btn_remove": "#E74C3C",
+        "btn_remove_hover": "#C0392B",
+        "price_color": "#8E4585",     # Plum price tag
+        "selected_bg": "#D5F5E3",     # Light emerald tint
+        "selected_border": "#50C878",
     },
     "dark": {
-        "bg": "#0f172a",
-        "fg": "#f1f5f9",
-        "button_bg": "#1e293b",
-        "button_fg": "#f1f5f9",
-        "accent": "#22d3ee",
-        "accent_hover": "#06b6d4",
-        "card_bg": "#1e293b",
-        "card_border": "#334155",
-        "search_bg": "#1e293b",
-        "search_border": "#475569",
-        "muted": "#94a3b8",
-        "nav_bg": "#8b5cf6",
-        "nav_fg": "#ffffff",
-        "nav_hover": "#7c3aed",
-        "on_accent": "#082f49",
-        "status_error": "#fca5a5",
-        "status_success": "#86efac",
-        "success_bg": "#22c55e",
-        "success_hover": "#16a34a",
-        "chart_line": "#22d3ee",
-        "chart_fill": "#164e63",
-        "chart_grid": "#334155",
-        "btn_add": "#22d3ee",
-        "btn_add_hover": "#06b6d4",
-        "btn_remove": "#f43f5e",
-        "btn_remove_hover": "#e11d48",
-        "price_color": "#22d3ee",
-        "selected_bg": "#164e63",
-        "selected_border": "#22d3ee",
+        "bg": "#1A1A2E",              # Deep navy/charcoal
+        "fg": "#F0EFF4",
+        "button_bg": "#242440",
+        "button_fg": "#F0EFF4",
+        "accent": "#6AEAA0",          # Bright mint-emerald
+        "accent_hover": "#50C878",
+        "card_bg": "#242440",
+        "card_border": "#3D3A5C",
+        "search_bg": "#242440",
+        "search_border": "#4A4670",
+        "muted": "#A09BB8",
+        "nav_bg": "#B06AAB",          # Lighter plum
+        "nav_fg": "#FFFFFF",
+        "nav_hover": "#8E4585",
+        "on_accent": "#1A1A2E",
+        "status_error": "#F1948A",
+        "status_success": "#82E0AA",
+        "success_bg": "#6AEAA0",
+        "success_hover": "#50C878",
+        "chart_line": "#6AEAA0",
+        "chart_fill": "#1E3A2F",
+        "chart_grid": "#3D3A5C",
+        "btn_add": "#6AEAA0",
+        "btn_add_hover": "#50C878",
+        "btn_remove": "#F1948A",
+        "btn_remove_hover": "#E74C3C",
+        "price_color": "#D7A0D3",     # Soft plum price
+        "selected_bg": "#1E3A2F",
+        "selected_border": "#6AEAA0",
     },
 }
 
-UI_FONT = "Segoe UI"
+# Poppins first, fall back to Segoe UI if not installed
+UI_FONT = "Poppins"
 UI_FONT_BOLD = (UI_FONT, 22, "bold")
 UI_FONT_TITLE = (UI_FONT, 20, "bold")
 UI_FONT_BODY = (UI_FONT, 13)
@@ -1594,6 +1598,12 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             lambda: (self.show_role_menu(), self.enter_admin_dashboard()),
         )
 
+        # Hygiene Hero chatbot
+        make_nav_button(
+            "🤖 Hygiene Hero",
+            lambda: (self.show_role_menu(), self.show_chatbot_screen()),
+        )
+
         # Back to main screen: show thank-you in-app then return to welcome screen
         def go_back_to_welcome():
             self.show_role_menu()
@@ -1613,6 +1623,12 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             },
         )
         # endregion
+
+    # ---------- Chatbot Screen ----------
+
+    def show_chatbot_screen(self):
+        """Open the Hygiene Hero chatbot interface."""
+        build_chatbot_screen(self)
 
     # ---------- Welcome Screen ----------
 
