@@ -194,11 +194,16 @@ RFID_PINS = {
     "door_reader_rst": 1,        # Physical pin 28
 }
 
-# ULN2003 IN1..IN4 mapping per tray motor (28BYJ-48).
-# Extend this dictionary with more trays as hardware is added.
+# ULN2003 IN1..IN4 mapping per tray motor (28BYJ-48), keyed by DB `slot_number` (1..10).
+# Ten trays need 40 GPIO lines if every motor is independent; with RFID, payment, hoppers, and
+# solenoids on the same header, native BCM is not enough for ten separate drivers. Odd slots
+# (1,3,5,7,9) share motor bank A; even slots (2,4,6,8,10) share motor bank B — typical when
+# each bank is one ULN2003 driving one physical lane until you add MCP23017 / second expanders.
+# Replace with unique BCM per slot when your wiring does.
+_STEPPER_BANK_A = {"in1": 17, "in2": 27, "in3": 22, "in4": 23}
+_STEPPER_BANK_B = {"in1": 4, "in2": 18, "in3": 15, "in4": 14}
 PRODUCT_STEPPER_PINS = {
-    1: {"in1": 17, "in2": 27, "in3": 22, "in4": 23},
-    2: {"in1": 4, "in2": 18, "in3": 15, "in4": 14},
+    slot: (_STEPPER_BANK_A if slot % 2 == 1 else _STEPPER_BANK_B).copy() for slot in range(1, 11)
 }
 
 SOLENOID_PINS = {
@@ -724,10 +729,6 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             pass
         self.sidebar_holder = None
 
-        try:
-            self.unbind_all("<MouseWheel>")
-        except Exception:
-            pass
         # Cancel any pending focus callbacks before destroying widgets
         for after_id in getattr(self, "_pending_focus_ids", []):
             try:

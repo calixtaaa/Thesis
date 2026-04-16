@@ -115,9 +115,10 @@ RFID_PINS = {
     "door_reader_rst": 1,
 }
 
+_STEPPER_BANK_A = {"in1": 17, "in2": 27, "in3": 22, "in4": 23}
+_STEPPER_BANK_B = {"in1": 4, "in2": 18, "in3": 15, "in4": 14}
 PRODUCT_STEPPER_PINS = {
-    1: {"in1": 17, "in2": 27, "in3": 22, "in4": 23},
-    2: {"in1": 4, "in2": 18, "in3": 15, "in4": 14},
+    slot: (_STEPPER_BANK_A if slot % 2 == 1 else _STEPPER_BANK_B).copy() for slot in range(1, 11)
 }
 
 SOLENOID_PINS = {
@@ -150,14 +151,14 @@ ALL_OUTPUT_PINS = {
     "RFID Door CS (7)": 7,
     "RFID Payment RST (5)": 5,
     "RFID Door RST (1)": 1,
-    "Stepper 1 - IN1 (17)": 17,
-    "Stepper 1 - IN2 (27)": 27,
-    "Stepper 1 - IN3 (22)": 22,
-    "Stepper 1 - IN4 (23)": 23,
-    "Stepper 2 - IN1 (4)": 4,
-    "Stepper 2 - IN2 (18)": 18,
-    "Stepper 2 - IN3 (15)": 15,
-    "Stepper 2 - IN4 (14)": 14,
+    "Motor bank A (slots 1,3,5,7,9) IN1 (17)": 17,
+    "Motor bank A (slots 1,3,5,7,9) IN2 (27)": 27,
+    "Motor bank A (slots 1,3,5,7,9) IN3 (22)": 22,
+    "Motor bank A (slots 1,3,5,7,9) IN4 (23)": 23,
+    "Motor bank B (slots 2,4,6,8,10) IN1 (4)": 4,
+    "Motor bank B (slots 2,4,6,8,10) IN2 (18)": 18,
+    "Motor bank B (slots 2,4,6,8,10) IN3 (15)": 15,
+    "Motor bank B (slots 2,4,6,8,10) IN4 (14)": 14,
     "Solenoid Restock (16)": 16,
     "Solenoid Troubleshoot (20)": 20,
     "Coin Hopper 1-peso (12)": 12,

@@ -1,3 +1,4 @@
+import sys
 import tkinter as tk
 from pathlib import Path
 
@@ -22,7 +23,8 @@ PRODUCT_IMAGE_MAP = {
     "alcohol":              "GreenCross.png",
     "all night pads":       "All_Night_Pads.png",
     "panty liners":         "Panty_Liners.png",
-    "regular w/ wings pads":"Regular_W_Wings_Pads.png",
+    "regular w/ wings pads": "Regular_W_Wings_Pads.png",
+    "regular w wings pads": "Regular_W_Wings_Pads.png",
     "non-wing pads":        "Non_Wing_Pads.png",
     "mouthwash":            "Mouthwash.png",
     "tissues":              "Tissue.png",
@@ -107,6 +109,43 @@ def _resolve_product_image_path(product_name):
     return None
 
 
+_RESAMPLE = None
+if _HAS_PIL:
+    _RESAMPLE = getattr(Image, "Resampling", Image).LANCZOS
+
+
+def _pil_square_rgba_to_ctk(pil_src, box: int) -> ctk.CTkImage:
+    """RGB CTkImage on a square canvas — avoids RGBA display issues on some Linux/Tk builds."""
+    if not _HAS_PIL or _RESAMPLE is None:
+        raise RuntimeError("Pillow is required for _pil_square_rgba_to_ctk")
+    pil_img = pil_src.convert("RGBA")
+    pil_img.thumbnail((box, box), _RESAMPLE)
+    square = Image.new("RGBA", (box, box), (0, 0, 0, 0))
+    ox = (box - pil_img.width) // 2
+    oy = (box - pil_img.height) // 2
+    square.paste(pil_img, (ox, oy), pil_img)
+    rgb = Image.new("RGB", (box, box), (255, 255, 255))
+    rgb.paste(square, mask=square.split()[3])
+    return ctk.CTkImage(light_image=rgb, dark_image=rgb, size=(box, box))
+
+
+def _load_product_image_tk(product_name: str, max_px: int) -> tk.PhotoImage | None:
+    """Fallback when Pillow is missing (install `pillow` on the Pi for best results)."""
+    img_path = _resolve_product_image_path(product_name)
+    if not img_path:
+        return None
+    suf = img_path.suffix.lower()
+    if suf not in (".png", ".gif", ".pgm", ".ppm"):
+        return None
+    try:
+        ph = tk.PhotoImage(file=str(img_path))
+        while max(ph.width(), ph.height()) > max_px:
+            ph = ph.subsample(2, 2)
+        return ph
+    except Exception:
+        return None
+
+
 def _load_uniform_image(product_name, size=140):
     """Load a product image and force it into a uniform square with padding."""
     if not _HAS_PIL:
@@ -124,7 +163,7 @@ def _load_uniform_image(product_name, size=140):
         pil_img = Image.open(str(img_path)).convert("RGBA")
 
         # Resize to fit within size×size, maintaining aspect ratio
-        pil_img.thumbnail((size, size), Image.LANCZOS)
+        pil_img.thumbnail((size, size), _RESAMPLE)
 
         # Create a transparent square canvas and paste centered
         canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
@@ -155,7 +194,7 @@ def build_main_menu_header(app, parent, *, ui_font, ui_font_title, ui_font_small
     title_block.pack(side=tk.LEFT)
     ctk.CTkLabel(
         title_block,
-        text="Syntax Error",
+        text="SyntaxError™",
         font=(ui_font, 20, "bold"),
         text_color=app.current_theme.get("nav_bg", "#8E4585"),
     ).pack(anchor="w")
@@ -205,7 +244,7 @@ def build_main_menu_header(app, parent, *, ui_font, ui_font_title, ui_font_small
 #  PROMOTIONAL CAROUSEL  (auto-cycling banner)
 # ══════════════════════════════════════════════
 
-def build_promo_carousel(app, parent):
+def build_promo_carousel(app, parent, *, grid_kw=None):
     """Auto-scrolling promotional banner above the product grid."""
     carousel_frame = ctk.CTkFrame(
         parent,
@@ -213,7 +252,10 @@ def build_promo_carousel(app, parent):
         corner_radius=12,
         height=48,
     )
-    carousel_frame.pack(fill=tk.X, padx=12, pady=(6, 8))
+    if grid_kw is not None:
+        carousel_frame.grid(**grid_kw)
+    else:
+        carousel_frame.pack(fill=tk.X, padx=12, pady=(6, 8))
     carousel_frame.pack_propagate(False)
 
     promo_var = tk.StringVar(value=PROMO_MESSAGES[0])
@@ -295,23 +337,37 @@ def _show_product_detail_modal(app, product):
     )
     img_holder.pack(pady=(16, 12), padx=40)
 
+    preview_bg = app.current_theme.get("card_bg", "#FFFFFF")
+    detail_img_ok = False
     if _HAS_PIL:
         try:
             img_path = _resolve_product_image_path(product["name"])
             if img_path:
                 pil_img = Image.open(str(img_path)).convert("RGBA")
-                pil_img.thumbnail((200, 200), Image.LANCZOS)
-                canvas = Image.new("RGBA", (200, 200), (0, 0, 0, 0))
-                ox = (200 - pil_img.width) // 2
-                oy = (200 - pil_img.height) // 2
-                canvas.paste(pil_img, (ox, oy), pil_img)
-                ctk_img = ctk.CTkImage(light_image=canvas, dark_image=canvas, size=(200, 200))
+                ctk_img = _pil_square_rgba_to_ctk(pil_img, 200)
                 lbl = ctk.CTkLabel(img_holder, image=ctk_img, text="", fg_color="transparent")
                 lbl._ctk_img_ref = ctk_img
                 lbl.pack(padx=20, pady=20)
-        except Exception:
-            ctk.CTkLabel(img_holder, text="\U0001f5bc\ufe0f", font=(app._ui_font_name, 48)).pack(padx=20, pady=20)
-    else:
+                detail_img_ok = True
+        except Exception as ex:
+            print(
+                f"[UI] Detail modal image failed for {product.get('name')!r}: {ex}",
+                file=sys.stderr,
+            )
+    if not detail_img_ok:
+        tkph = _load_product_image_tk(product["name"], 200)
+        if tkph is not None:
+            lbl = tk.Label(
+                img_holder,
+                image=tkph,
+                bd=0,
+                bg=preview_bg,
+                highlightthickness=0,
+            )
+            lbl.tk_img_ref = tkph
+            lbl.pack(padx=20, pady=20)
+            detail_img_ok = True
+    if not detail_img_ok:
         ctk.CTkLabel(img_holder, text="\U0001f5bc\ufe0f", font=(app._ui_font_name, 48)).pack(padx=20, pady=20)
 
     # ── Product info ──
@@ -423,9 +479,6 @@ def build_main_menu_products(app, parent, products):
     content_frame = ctk.CTkFrame(parent, fg_color=app.current_theme["bg"], corner_radius=0)
     content_frame.pack(expand=True, fill=tk.BOTH)
 
-    # Promotional carousel at the top
-    build_promo_carousel(app, content_frame)
-
     scroll_frame = ctk.CTkScrollableFrame(
         content_frame,
         fg_color=app.current_theme["bg"],
@@ -436,6 +489,20 @@ def build_main_menu_products(app, parent, products):
     grid = scroll_frame
     for col in range(2):
         grid.grid_columnconfigure(col, weight=1)
+
+    # Carousel scrolls with the grid so touch / wheel gestures apply to one surface.
+    build_promo_carousel(
+        app,
+        scroll_frame,
+        grid_kw={
+            "row": 0,
+            "column": 0,
+            "columnspan": 2,
+            "sticky": "ew",
+            "padx": 12,
+            "pady": (6, 8),
+        },
+    )
 
     app._cart_card_bg = app.current_theme.get("card_bg", app.current_theme["button_bg"])
     app._cart_card_border = app.current_theme.get("card_border", "#E8E5F0")
@@ -451,7 +518,7 @@ def build_main_menu_products(app, parent, products):
 
 def build_product_card(app, grid, product, idx):
     in_cart = app._cart_has_product(product)
-    row_index, column_index = idx // 2, idx % 2
+    row_index, column_index = idx // 2 + 1, idx % 2
 
     # 2.5D card: thicker border, larger corner radius, soft shadow effect
     card = ctk.CTkFrame(
@@ -481,27 +548,39 @@ def build_product_card(app, grid, product, idx):
     placeholder.pack_propagate(False)
     placeholder.bind("<Button-1>", _on_card_tap)
 
+    sz = app._product_placeholder_size - 20
+    image_placed = False
     if _HAS_PIL:
         try:
             img_path = _resolve_product_image_path(product["name"])
             if img_path:
-                sz = app._product_placeholder_size - 20
                 pil_img = Image.open(str(img_path)).convert("RGBA")
-                pil_img.thumbnail((sz, sz), Image.LANCZOS)
-                # Center on transparent canvas for uniform sizing
-                canvas = Image.new("RGBA", (sz, sz), (0, 0, 0, 0))
-                ox = (sz - pil_img.width) // 2
-                oy = (sz - pil_img.height) // 2
-                canvas.paste(pil_img, (ox, oy), pil_img)
-                ctk_img = ctk.CTkImage(light_image=canvas, dark_image=canvas, size=(sz, sz))
+                ctk_img = _pil_square_rgba_to_ctk(pil_img, sz)
                 img_label = ctk.CTkLabel(
                     placeholder, image=ctk_img, text="", fg_color="transparent",
                 )
                 img_label._ctk_img_ref = ctk_img
                 img_label.place(relx=0.5, rely=0.5, anchor="center")
                 img_label.bind("<Button-1>", _on_card_tap)
-        except Exception:
-            pass
+                image_placed = True
+        except Exception as ex:
+            print(
+                f"[UI] Product card image failed for {product.get('name')!r}: {ex}",
+                file=sys.stderr,
+            )
+    if not image_placed:
+        tkph = _load_product_image_tk(product["name"], sz)
+        if tkph is not None:
+            lbl = tk.Label(
+                placeholder,
+                image=tkph,
+                bd=0,
+                bg=app._product_placeholder_bg,
+                highlightthickness=0,
+            )
+            lbl.tk_img_ref = tkph
+            lbl.place(relx=0.5, rely=0.5, anchor="center")
+            lbl.bind("<Button-1>", _on_card_tap)
 
     # ── Product name ──
     name_text = product["name"]
