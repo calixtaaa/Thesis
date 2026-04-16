@@ -3,6 +3,7 @@ import sys
 import time
 import uuid
 import json
+import math
 import datetime
 from pathlib import Path
 import tkinter as tk
@@ -54,31 +55,32 @@ except Exception:
 #  ENV & GPIO HANDLING
 # ======================
 
+# MockGPIO defined at module level so it can be used as a fallback
+# both at import time (Windows) and at runtime (Pi 5 compatibility).
+class MockGPIO:
+    BCM = "BCM"
+    OUT = "OUT"
+    IN = "IN"
+    HIGH = 1
+    LOW = 0
+    PUD_UP = "PUD_UP"
+    FALLING = "FALLING"
+    RISING = "RISING"
+    BOTH = "BOTH"
+
+    def setmode(self, *_a, **_k): pass
+    def setwarnings(self, *_a, **_k): pass
+    def setup(self, *_a, **_k): pass
+    def output(self, *_a, **_k): pass
+    def input(self, *_a, **_k): return self.HIGH
+    def cleanup(self): pass
+    def add_event_detect(self, *_a, **_k): pass
+
 ON_RPI = False
 try:
     import RPi.GPIO as GPIO  # type: ignore
     ON_RPI = True
 except ImportError:
-    # Simple mock for development on Windows
-    class MockGPIO:
-        BCM = "BCM"
-        OUT = "OUT"
-        IN = "IN"
-        HIGH = 1
-        LOW = 0
-        PUD_UP = "PUD_UP"
-        FALLING = "FALLING"
-        RISING = "RISING"
-        BOTH = "BOTH"
-
-        def setmode(self, *_a, **_k): pass
-        def setwarnings(self, *_a, **_k): pass
-        def setup(self, *_a, **_k): pass
-        def output(self, *_a, **_k): pass
-        def input(self, *_a, **_k): return self.HIGH
-        def cleanup(self): pass
-        def add_event_detect(self, *_a, **_k): pass
-
     GPIO = MockGPIO()  # type: ignore
 
 # ======================
@@ -248,7 +250,7 @@ _hopper_pulse_counts = {
 
 def get_payment_pulse_counts() -> dict:
     return {
-            f"Pulse debug  coin(GPIO13): {counts['coin_acceptor']}  "
+        "coin_acceptor": int(_payment_pulse_counts["coin_acceptor"]),
         "bill_acceptor": int(_payment_pulse_counts["bill_acceptor"]),
     }
 
@@ -1081,7 +1083,9 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             return
         try:
             builder()
-        except Exception:
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
             # Fallback: keep app usable even if a specific screen rebuild fails.
             try:
                 self.apply_theme_to_widget(self)
@@ -1152,38 +1156,119 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         except Exception:
             pass
 
+    def _apply_theme_change(self, next_theme_name):
+        """Core logic to switch the theme (no animation)."""
+        old_theme = dict(self.current_theme)
+        self.current_theme_name = next_theme_name
+        self.current_theme = THEMES[next_theme_name]
+        ctk.set_appearance_mode(self.current_theme_name)
+        try:
+            self.configure(fg_color=self.current_theme["bg"])
+        except Exception:
+            pass
+        try:
+            self.content_holder.configure(fg_color=self.current_theme["bg"])
+        except Exception:
+            pass
+        try:
+            self._apply_theme_to_ctk_widget_tree(self, old_theme, self.current_theme)
+        except Exception:
+            pass
+        try:
+            self.apply_theme_to_widget(self)
+        except Exception:
+            pass
+        self._rebuild_current_screen_after_theme_change()
+
+    def _circle_reveal_theme_change(self, next_theme_name, cx=None, cy=None):
+        """Animate an expanding circle to reveal the new theme."""
+        next_theme = THEMES[next_theme_name]
+        circle_color = next_theme["bg"]
+
+        win_w = max(self.winfo_width(), 100)
+        win_h = max(self.winfo_height(), 100)
+
+        if cx is None:
+            cx = win_w // 2
+        if cy is None:
+            cy = win_h // 2
+
+        # Calculate the radius needed to cover the entire window from (cx, cy)
+        max_radius = int(math.sqrt(
+            max(cx, win_w - cx) ** 2 + max(cy, win_h - cy) ** 2
+        )) + 50
+
+        # Create a fullscreen canvas overlay on top of everything
+        overlay = tk.Canvas(
+            self,
+            highlightthickness=0,
+            bd=0,
+        )
+        overlay.place(x=0, y=0, relwidth=1, relheight=1)
+        tk.Misc.tkraise(overlay)
+
+        # Draw the expanding circle in the new theme's background color
+        circle = overlay.create_oval(
+            cx, cy, cx, cy,
+            fill=circle_color,
+            outline="",
+        )
+
+        total_steps = 20
+        step_duration = 12  # milliseconds per frame
+
+        def _animate(step=0):
+            try:
+                if not overlay.winfo_exists():
+                    self._apply_theme_change(next_theme_name)
+                    self.theme_animating = False
+                    return
+            except Exception:
+                self._apply_theme_change(next_theme_name)
+                self.theme_animating = False
+                return
+
+            if step >= total_steps:
+                # Circle covers the screen — apply theme underneath and remove overlay
+                self._apply_theme_change(next_theme_name)
+                try:
+                    overlay.destroy()
+                except Exception:
+                    pass
+                self.theme_animating = False
+                return
+
+            # Cubic ease-out for smooth deceleration
+            progress = (step + 1) / total_steps
+            eased = 1 - (1 - progress) ** 3
+            radius = int(max_radius * eased)
+
+            try:
+                overlay.coords(
+                    circle,
+                    cx - radius, cy - radius,
+                    cx + radius, cy + radius,
+                )
+            except Exception:
+                self._apply_theme_change(next_theme_name)
+                try:
+                    overlay.destroy()
+                except Exception:
+                    pass
+                self.theme_animating = False
+                return
+
+            overlay.after(step_duration, lambda: _animate(step + 1))
+
+        _animate()
+
     def toggle_theme(self):
-        """Switch between light and dark modes and rebuild the active screen."""
+        """Switch between light and dark modes with expanding circle animation."""
         if getattr(self, "theme_animating", False):
             return
         self.theme_animating = True
-        try:
-            old_theme = dict(self.current_theme)
-            next_theme_name = "dark" if self.current_theme_name == "light" else "light"
-            next_theme = THEMES[next_theme_name]
-
-            self.current_theme_name = next_theme_name
-            self.current_theme = next_theme
-            ctk.set_appearance_mode(self.current_theme_name)
-            try:
-                self.configure(fg_color=self.current_theme["bg"])
-            except Exception:
-                pass
-            try:
-                self.content_holder.configure(fg_color=self.current_theme["bg"])
-            except Exception:
-                pass
-            try:
-                self._apply_theme_to_ctk_widget_tree(self, old_theme, self.current_theme)
-            except Exception:
-                pass
-            try:
-                self.apply_theme_to_widget(self)
-            except Exception:
-                pass
-            self._rebuild_current_screen_after_theme_change()
-        finally:
-            self.theme_animating = False
+        next_theme_name = "dark" if self.current_theme_name == "light" else "light"
+        self._circle_reveal_theme_change(next_theme_name)
 
     def animate_button_press(self, button, callback):
         """Play a quick press animation before running a button action."""
@@ -1254,40 +1339,14 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         # No icon inside knob – avoids black line artifacts (reference: clean white knob)
 
         def _finish_toggle(target_dark):
-            """Apply the theme swap after the knob animation finishes."""
+            """Start the expanding circle reveal after the knob animation finishes."""
+            next_name = "dark" if target_dark else "light"
             try:
-                canvas.itemconfigure(
-                    track,
-                    fill=track_dark if target_dark else track_light,
-                    outline=border_dark if target_dark else border_light,
-                )
+                cx = canvas.winfo_rootx() + canvas.winfo_width() // 2 - self.winfo_rootx()
+                cy = canvas.winfo_rooty() + canvas.winfo_height() // 2 - self.winfo_rooty()
             except Exception:
-                pass
-            old_theme = dict(self.current_theme)
-            self.current_theme_name = "dark" if target_dark else "light"
-            self.current_theme = THEMES[self.current_theme_name]
-            ctk.set_appearance_mode(self.current_theme_name)
-            try:
-                self.configure(fg_color=self.current_theme["bg"])
-            except Exception:
-                pass
-            try:
-                self.content_holder.configure(fg_color=self.current_theme["bg"])
-            except Exception:
-                pass
-            try:
-                canvas.configure(bg=self.current_theme["bg"])
-            except Exception:
-                pass
-            try:
-                self._apply_theme_to_ctk_widget_tree(self, old_theme, self.current_theme)
-            except Exception:
-                pass
-            try:
-                self.apply_theme_to_widget(self)
-            except Exception:
-                pass
-            self._rebuild_current_screen_after_theme_change()
+                cx, cy = None, None
+            self._circle_reveal_theme_change(next_name, cx, cy)
 
         def animate_toggle(_event=None):
             if self.theme_animating:
@@ -1311,12 +1370,10 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                         raise RuntimeError("canvas gone")
                 except Exception:
                     _finish_toggle(target_dark)
-                    self.theme_animating = False
                     return
 
                 if index >= step_count:
                     _finish_toggle(target_dark)
-                    self.theme_animating = False
                     return
 
                 try:
@@ -1331,7 +1388,6 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                     canvas.after(14, lambda: step(index + 1))
                 except Exception:
                     _finish_toggle(target_dark)
-                    self.theme_animating = False
 
             step()
 
@@ -2604,8 +2660,18 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
 # ======================
 
 def main():
+    global ON_RPI, GPIO
     init_db()
-    gpio_init()
+    try:
+        gpio_init()
+    except RuntimeError as e:
+        # RPi.GPIO does not support Raspberry Pi 5 (RP1 chip).
+        # Fall back to simulation mode so the app still runs.
+        print(f"[HW] GPIO init failed: {e}")
+        print("[HW] Tip: On Raspberry Pi 5, install rpi-lgpio:  pip install rpi-lgpio")
+        print("[HW] Falling back to simulation mode.")
+        ON_RPI = False
+        GPIO = MockGPIO()
 
     app = MainApp()
     try:
@@ -2613,7 +2679,10 @@ def main():
     except KeyboardInterrupt:
         print("\nStopped by user (Ctrl+C).")
     finally:
-        GPIO.cleanup()
+        try:
+            GPIO.cleanup()
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":
