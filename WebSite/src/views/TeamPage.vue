@@ -155,7 +155,7 @@ import facebookIcon from '../assets/facebook.svg'
 
 const members = [
   {
-    name: 'Astriel Romulo',
+    name: 'Asriel Romulo',
     role: 'Leader',
     photo: romuloPhoto,
     facebook: 'https://www.facebook.com/calixta27',
