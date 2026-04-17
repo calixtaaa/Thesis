@@ -1,4 +1,4 @@
 source venv/bin/activate
 export DISPLAY=:0
 export PYTHONNOUSERSITE=1
-python gpio_test_tool.py
+exec venv/bin/python main.py

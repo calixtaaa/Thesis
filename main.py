@@ -1,5 +1,7 @@
 import os
 import sys
+import re
+import subprocess
 import time
 import uuid
 import json
@@ -359,6 +361,42 @@ def gpio_init():
     GPIO.setup(IR_BREAK_BEAM_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
 
+def _describe_gpio_owners() -> str:
+    device_paths = ["/dev/gpiochip0", "/dev/gpiochip4", "/dev/gpiomem0"]
+    try:
+        result = subprocess.run(
+            ["fuser", "-v", *device_paths],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        output = "\n".join(part for part in (result.stdout, result.stderr) if part).strip()
+        pid_set = set()
+        for pid_text in re.findall(r"\b\d+\b", output):
+            pid = int(pid_text)
+            if pid != os.getpid():
+                pid_set.add(pid)
+
+        lines = []
+        if output:
+            lines.append(output)
+
+        if pid_set:
+            ps = subprocess.run(
+                ["ps", "-p", ",".join(str(pid) for pid in sorted(pid_set)), "-o", "pid=,comm=,args="],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if ps.stdout.strip():
+                lines.append("Process details:")
+                lines.append(ps.stdout.strip())
+
+        return "\n".join(lines).strip()
+    except Exception as detail_error:
+        return f"Unable to inspect GPIO ownership: {detail_error}"
+
+
 ULN2003_SEQUENCE = [
     (1, 0, 0, 0),
     (1, 1, 0, 0),
@@ -516,6 +554,10 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         # Auto-fit scale for different LCD resolutions (keeps layout consistent)
         try:
             self.after(50, lambda: self._apply_lcd_fit(profile="customer"))
+        except Exception:
+            pass
+        try:
+            self.after(250, self._report_window_state)
         except Exception:
             pass
 
@@ -711,6 +753,34 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                 self.geometry(f"{target_w}x{target_h}+{x}+{y}")
         except Exception:
             pass
+
+    def _report_window_state(self):
+        try:
+            self.update_idletasks()
+        except Exception:
+            pass
+
+        try:
+            actual_state = self.state()
+        except Exception:
+            actual_state = "unknown"
+
+        try:
+            fullscreen_enabled = bool(self.attributes("-fullscreen"))
+        except Exception:
+            fullscreen_enabled = actual_state == "zoomed"
+
+        try:
+            geometry = self.winfo_geometry()
+        except Exception:
+            geometry = "unknown"
+
+        requested_mode = "fullscreen" if self._fill_screen else "windowed"
+        accepted_text = "accepted" if fullscreen_enabled else "not fullscreen"
+        print(
+            f"[HW] Main window state: requested={requested_mode}, actual={actual_state}, "
+            f"fullscreen={accepted_text}, geometry={geometry}"
+        )
 
     # ---------- Screen helpers ----------
 
@@ -2666,11 +2736,16 @@ def main():
     try:
         gpio_init()
         print("[HW] GPIO mode: live (RPi.GPIO)")
-    except RuntimeError as e:
-        # RPi.GPIO does not support Raspberry Pi 5 (RP1 chip).
+    except Exception as e:
+        # GPIO init can fail on unsupported backends or when the chip is not available.
         # Fall back to simulation mode so the app still runs.
         print(f"[HW] GPIO init failed: {e}")
-        print("[HW] Tip: On Raspberry Pi 5, install rpi-lgpio:  pip install rpi-lgpio")
+        if "busy" in str(e).lower() or "not allocated" in str(e).lower():
+            owner_details = _describe_gpio_owners()
+            print("[HW] GPIO pins appear to be in use by another process.")
+            if owner_details:
+                print("[HW] GPIO ownership details:\n" + owner_details)
+        print("[HW] Tip: On Raspberry Pi 5, install rpi-lgpio and ensure GPIO access is available.")
         print("[HW] Falling back to simulation mode.")
         ON_RPI = False
         GPIO = MockGPIO()

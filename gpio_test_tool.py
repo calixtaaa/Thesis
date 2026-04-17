@@ -4,6 +4,7 @@ Simple utility to test input and output pins for the vending machine hardware.
 Not part of the main app - for development/testing only.
 """
 
+import os
 import tkinter as tk
 from tkinter import messagebox
 import customtkinter as ctk
@@ -221,7 +222,19 @@ class GPIOTestTool(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("GPIO Pin Testing Tool")
-        self.geometry("1000x700")
+        self._fill_screen = os.getenv("APP_WINDOWED", "").strip().lower() not in {"1", "true", "yes"}
+        if self._fill_screen:
+            try:
+                self.attributes("-fullscreen", True)
+            except Exception:
+                try:
+                    self.state("zoomed")
+                except Exception:
+                    self.geometry(f"{self.winfo_screenwidth()}x{self.winfo_screenheight()}+0+0")
+        else:
+            self.geometry("1000x700")
+        self.minsize(640, 400)
+        self.resizable(True, True)
         
         self.current_theme_name = "light"
         self.current_theme = THEMES[self.current_theme_name]
@@ -264,6 +277,7 @@ class GPIOTestTool(ctk.CTk):
             print(f"[GPIO Test Tool] GPIO mode: live ({GPIO_LIBRARY})")
         else:
             print("[GPIO Test Tool] GPIO mode: simulation")
+        print(f"[GPIO Test Tool] Window mode: {'fullscreen' if self._fill_screen else 'windowed'}")
         
         # Build UI
         self.build_ui()
