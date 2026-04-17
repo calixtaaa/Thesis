@@ -2665,6 +2665,7 @@ def main():
     init_db()
     try:
         gpio_init()
+        print("[HW] GPIO mode: live (RPi.GPIO)")
     except RuntimeError as e:
         # RPi.GPIO does not support Raspberry Pi 5 (RP1 chip).
         # Fall back to simulation mode so the app still runs.
@@ -2673,6 +2674,7 @@ def main():
         print("[HW] Falling back to simulation mode.")
         ON_RPI = False
         GPIO = MockGPIO()
+        print("[HW] GPIO mode: simulation")
 
     app = MainApp()
     try:

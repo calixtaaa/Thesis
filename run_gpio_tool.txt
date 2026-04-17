@@ -1,4 +1,8 @@
-source venv/bin/activate
+cd /home/syntaxerror/Thesis || exit 1
+if [ ! -x venv/bin/python ]; then
+	echo "Missing venv/bin/python"
+	exit 1
+fi
 export DISPLAY=:0
 export PYTHONNOUSERSITE=1
-python gpio_test_tool.py
+exec venv/bin/python gpio_test_tool.py

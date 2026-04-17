@@ -260,6 +260,10 @@ class GPIOTestTool(ctk.CTk):
         
         # Setup GPIO
         self.gpio_ready = self.setup_gpio()
+        if self.gpio_ready:
+            print(f"[GPIO Test Tool] GPIO mode: live ({GPIO_LIBRARY})")
+        else:
+            print("[GPIO Test Tool] GPIO mode: simulation")
         
         # Build UI
         self.build_ui()
