@@ -3,6 +3,7 @@ import sys
 import time
 import uuid
 import json
+import math
 import datetime
 from pathlib import Path
 import tkinter as tk
@@ -11,6 +12,7 @@ import customtkinter as ctk
 
 import prediction_runtime
 from customer import checkout_ui, main_menu_ui, status_ui
+from chatbot.chatbot_ui import build_chatbot_screen
 
 from admin.admin import AdminMixin
 from admin.reports import get_reports_dir
@@ -53,31 +55,32 @@ except Exception:
 #  ENV & GPIO HANDLING
 # ======================
 
+# MockGPIO defined at module level so it can be used as a fallback
+# both at import time (Windows) and at runtime (Pi 5 compatibility).
+class MockGPIO:
+    BCM = "BCM"
+    OUT = "OUT"
+    IN = "IN"
+    HIGH = 1
+    LOW = 0
+    PUD_UP = "PUD_UP"
+    FALLING = "FALLING"
+    RISING = "RISING"
+    BOTH = "BOTH"
+
+    def setmode(self, *_a, **_k): pass
+    def setwarnings(self, *_a, **_k): pass
+    def setup(self, *_a, **_k): pass
+    def output(self, *_a, **_k): pass
+    def input(self, *_a, **_k): return self.HIGH
+    def cleanup(self): pass
+    def add_event_detect(self, *_a, **_k): pass
+
 ON_RPI = False
 try:
     import RPi.GPIO as GPIO  # type: ignore
     ON_RPI = True
 except ImportError:
-    # Simple mock for development on Windows
-    class MockGPIO:
-        BCM = "BCM"
-        OUT = "OUT"
-        IN = "IN"
-        HIGH = 1
-        LOW = 0
-        PUD_UP = "PUD_UP"
-        FALLING = "FALLING"
-        RISING = "RISING"
-        BOTH = "BOTH"
-
-        def setmode(self, *_a, **_k): pass
-        def setwarnings(self, *_a, **_k): pass
-        def setup(self, *_a, **_k): pass
-        def output(self, *_a, **_k): pass
-        def input(self, *_a, **_k): return self.HIGH
-        def cleanup(self): pass
-        def add_event_detect(self, *_a, **_k): pass
-
     GPIO = MockGPIO()  # type: ignore
 
 # ======================
@@ -91,73 +94,76 @@ DEBUG_LOGS_DIR = BASE_DIR / "debug_logs"
 BASE_APP_W = 800
 BASE_APP_H = 480
 
-# Vibrant theming – colorful accents with clean surfaces
+# ──────────────────────────────────────────────
+#  Brand palette: Emerald Green · Plum · Creamy White
+# ──────────────────────────────────────────────
 THEMES = {
     "light": {
-        "bg": "#f8fafc",
-        "fg": "#0f172a",
-        "button_bg": "#f1f5f9",
-        "button_fg": "#0f172a",
-        "accent": "#10b981",
-        "accent_hover": "#059669",
-        "card_bg": "#ffffff",
-        "card_border": "#e2e8f0",
-        "search_bg": "#f1f5f9",
-        "search_border": "#cbd5e1",
-        "muted": "#64748b",
-        "nav_bg": "#6366f1",
-        "nav_fg": "#ffffff",
-        "nav_hover": "#4f46e5",
-        "on_accent": "#ffffff",
-        "status_error": "#b91c1c",
-        "status_success": "#065f46",
-        "success_bg": "#10b981",
-        "success_hover": "#059669",
-        "chart_line": "#10b981",
-        "chart_fill": "#d1fae5",
-        "chart_grid": "#e2e8f0",
-        "btn_add": "#10b981",
-        "btn_add_hover": "#059669",
-        "btn_remove": "#ef4444",
-        "btn_remove_hover": "#dc2626",
-        "price_color": "#0f172a",
-        "selected_bg": "#d1fae5",
-        "selected_border": "#10b981",
+        "bg": "#F9F9FB",              # Creamy white
+        "fg": "#1E1E2F",              # Deep charcoal text
+        "button_bg": "#F0EFF4",       # Soft lavender-gray
+        "button_fg": "#1E1E2F",
+        "accent": "#50C878",          # Emerald green (primary CTA)
+        "accent_hover": "#3DA863",    # Darker emerald on hover
+        "card_bg": "#FFFFFF",
+        "card_border": "#E8E5F0",     # Subtle plum-tinted border
+        "search_bg": "#F0EFF4",
+        "search_border": "#D1CDE0",
+        "muted": "#7A7491",           # Muted plum-gray
+        "nav_bg": "#8E4585",          # Plum (navigation / header)
+        "nav_fg": "#FFFFFF",
+        "nav_hover": "#723670",       # Darker plum on hover
+        "on_accent": "#FFFFFF",
+        "status_error": "#C0392B",
+        "status_success": "#27AE60",
+        "success_bg": "#50C878",
+        "success_hover": "#3DA863",
+        "chart_line": "#50C878",
+        "chart_fill": "#D5F5E3",
+        "chart_grid": "#E8E5F0",
+        "btn_add": "#50C878",
+        "btn_add_hover": "#3DA863",
+        "btn_remove": "#E74C3C",
+        "btn_remove_hover": "#C0392B",
+        "price_color": "#8E4585",     # Plum price tag
+        "selected_bg": "#D5F5E3",     # Light emerald tint
+        "selected_border": "#50C878",
     },
     "dark": {
-        "bg": "#0f172a",
-        "fg": "#f1f5f9",
-        "button_bg": "#1e293b",
-        "button_fg": "#f1f5f9",
-        "accent": "#22d3ee",
-        "accent_hover": "#06b6d4",
-        "card_bg": "#1e293b",
-        "card_border": "#334155",
-        "search_bg": "#1e293b",
-        "search_border": "#475569",
-        "muted": "#94a3b8",
-        "nav_bg": "#8b5cf6",
-        "nav_fg": "#ffffff",
-        "nav_hover": "#7c3aed",
-        "on_accent": "#082f49",
-        "status_error": "#fca5a5",
-        "status_success": "#86efac",
-        "success_bg": "#22c55e",
-        "success_hover": "#16a34a",
-        "chart_line": "#22d3ee",
-        "chart_fill": "#164e63",
-        "chart_grid": "#334155",
-        "btn_add": "#22d3ee",
-        "btn_add_hover": "#06b6d4",
-        "btn_remove": "#f43f5e",
-        "btn_remove_hover": "#e11d48",
-        "price_color": "#22d3ee",
-        "selected_bg": "#164e63",
-        "selected_border": "#22d3ee",
+        "bg": "#1A1A2E",              # Deep navy/charcoal
+        "fg": "#F0EFF4",
+        "button_bg": "#242440",
+        "button_fg": "#F0EFF4",
+        "accent": "#6AEAA0",          # Bright mint-emerald
+        "accent_hover": "#50C878",
+        "card_bg": "#242440",
+        "card_border": "#3D3A5C",
+        "search_bg": "#242440",
+        "search_border": "#4A4670",
+        "muted": "#A09BB8",
+        "nav_bg": "#B06AAB",          # Lighter plum
+        "nav_fg": "#FFFFFF",
+        "nav_hover": "#8E4585",
+        "on_accent": "#1A1A2E",
+        "status_error": "#F1948A",
+        "status_success": "#82E0AA",
+        "success_bg": "#6AEAA0",
+        "success_hover": "#50C878",
+        "chart_line": "#6AEAA0",
+        "chart_fill": "#1E3A2F",
+        "chart_grid": "#3D3A5C",
+        "btn_add": "#6AEAA0",
+        "btn_add_hover": "#50C878",
+        "btn_remove": "#F1948A",
+        "btn_remove_hover": "#E74C3C",
+        "price_color": "#D7A0D3",     # Soft plum price
+        "selected_bg": "#1E3A2F",
+        "selected_border": "#6AEAA0",
     },
 }
 
-UI_FONT = "Segoe UI"
+# Poppins first, fall back to Segoe UI if not installed
+UI_FONT = "Poppins"
 UI_FONT_BOLD = (UI_FONT, 22, "bold")
 UI_FONT_TITLE = (UI_FONT, 20, "bold")
 UI_FONT_BODY = (UI_FONT, 13)
@@ -188,11 +194,16 @@ RFID_PINS = {
     "door_reader_rst": 1,        # Physical pin 28
 }
 
-# ULN2003 IN1..IN4 mapping per tray motor (28BYJ-48).
-# Extend this dictionary with more trays as hardware is added.
+# ULN2003 IN1..IN4 mapping per tray motor (28BYJ-48), keyed by DB `slot_number` (1..10).
+# Ten trays need 40 GPIO lines if every motor is independent; with RFID, payment, hoppers, and
+# solenoids on the same header, native BCM is not enough for ten separate drivers. Odd slots
+# (1,3,5,7,9) share motor bank A; even slots (2,4,6,8,10) share motor bank B — typical when
+# each bank is one ULN2003 driving one physical lane until you add MCP23017 / second expanders.
+# Replace with unique BCM per slot when your wiring does.
+_STEPPER_BANK_A = {"in1": 17, "in2": 27, "in3": 22, "in4": 23}
+_STEPPER_BANK_B = {"in1": 4, "in2": 18, "in3": 15, "in4": 14}
 PRODUCT_STEPPER_PINS = {
-    1: {"in1": 17, "in2": 27, "in3": 22, "in4": 23},
-    2: {"in1": 4, "in2": 18, "in3": 15, "in4": 14},
+    slot: (_STEPPER_BANK_A if slot % 2 == 1 else _STEPPER_BANK_B).copy() for slot in range(1, 11)
 }
 
 SOLENOID_PINS = {
@@ -244,7 +255,7 @@ _hopper_pulse_counts = {
 
 def get_payment_pulse_counts() -> dict:
     return {
-            f"Pulse debug  coin(GPIO13): {counts['coin_acceptor']}  "
+        "coin_acceptor": int(_payment_pulse_counts["coin_acceptor"]),
         "bill_acceptor": int(_payment_pulse_counts["bill_acceptor"]),
     }
 
@@ -718,10 +729,6 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             pass
         self.sidebar_holder = None
 
-        try:
-            self.unbind_all("<MouseWheel>")
-        except Exception:
-            pass
         # Cancel any pending focus callbacks before destroying widgets
         for after_id in getattr(self, "_pending_focus_ids", []):
             try:
@@ -1077,7 +1084,9 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             return
         try:
             builder()
-        except Exception:
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
             # Fallback: keep app usable even if a specific screen rebuild fails.
             try:
                 self.apply_theme_to_widget(self)
@@ -1148,38 +1157,119 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         except Exception:
             pass
 
+    def _apply_theme_change(self, next_theme_name):
+        """Core logic to switch the theme (no animation)."""
+        old_theme = dict(self.current_theme)
+        self.current_theme_name = next_theme_name
+        self.current_theme = THEMES[next_theme_name]
+        ctk.set_appearance_mode(self.current_theme_name)
+        try:
+            self.configure(fg_color=self.current_theme["bg"])
+        except Exception:
+            pass
+        try:
+            self.content_holder.configure(fg_color=self.current_theme["bg"])
+        except Exception:
+            pass
+        try:
+            self._apply_theme_to_ctk_widget_tree(self, old_theme, self.current_theme)
+        except Exception:
+            pass
+        try:
+            self.apply_theme_to_widget(self)
+        except Exception:
+            pass
+        self._rebuild_current_screen_after_theme_change()
+
+    def _circle_reveal_theme_change(self, next_theme_name, cx=None, cy=None):
+        """Animate an expanding circle to reveal the new theme."""
+        next_theme = THEMES[next_theme_name]
+        circle_color = next_theme["bg"]
+
+        win_w = max(self.winfo_width(), 100)
+        win_h = max(self.winfo_height(), 100)
+
+        if cx is None:
+            cx = win_w // 2
+        if cy is None:
+            cy = win_h // 2
+
+        # Calculate the radius needed to cover the entire window from (cx, cy)
+        max_radius = int(math.sqrt(
+            max(cx, win_w - cx) ** 2 + max(cy, win_h - cy) ** 2
+        )) + 50
+
+        # Create a fullscreen canvas overlay on top of everything
+        overlay = tk.Canvas(
+            self,
+            highlightthickness=0,
+            bd=0,
+        )
+        overlay.place(x=0, y=0, relwidth=1, relheight=1)
+        tk.Misc.tkraise(overlay)
+
+        # Draw the expanding circle in the new theme's background color
+        circle = overlay.create_oval(
+            cx, cy, cx, cy,
+            fill=circle_color,
+            outline="",
+        )
+
+        total_steps = 20
+        step_duration = 12  # milliseconds per frame
+
+        def _animate(step=0):
+            try:
+                if not overlay.winfo_exists():
+                    self._apply_theme_change(next_theme_name)
+                    self.theme_animating = False
+                    return
+            except Exception:
+                self._apply_theme_change(next_theme_name)
+                self.theme_animating = False
+                return
+
+            if step >= total_steps:
+                # Circle covers the screen — apply theme underneath and remove overlay
+                self._apply_theme_change(next_theme_name)
+                try:
+                    overlay.destroy()
+                except Exception:
+                    pass
+                self.theme_animating = False
+                return
+
+            # Cubic ease-out for smooth deceleration
+            progress = (step + 1) / total_steps
+            eased = 1 - (1 - progress) ** 3
+            radius = int(max_radius * eased)
+
+            try:
+                overlay.coords(
+                    circle,
+                    cx - radius, cy - radius,
+                    cx + radius, cy + radius,
+                )
+            except Exception:
+                self._apply_theme_change(next_theme_name)
+                try:
+                    overlay.destroy()
+                except Exception:
+                    pass
+                self.theme_animating = False
+                return
+
+            overlay.after(step_duration, lambda: _animate(step + 1))
+
+        _animate()
+
     def toggle_theme(self):
-        """Switch between light and dark modes and rebuild the active screen."""
+        """Switch between light and dark modes with expanding circle animation."""
         if getattr(self, "theme_animating", False):
             return
         self.theme_animating = True
-        try:
-            old_theme = dict(self.current_theme)
-            next_theme_name = "dark" if self.current_theme_name == "light" else "light"
-            next_theme = THEMES[next_theme_name]
-
-            self.current_theme_name = next_theme_name
-            self.current_theme = next_theme
-            ctk.set_appearance_mode(self.current_theme_name)
-            try:
-                self.configure(fg_color=self.current_theme["bg"])
-            except Exception:
-                pass
-            try:
-                self.content_holder.configure(fg_color=self.current_theme["bg"])
-            except Exception:
-                pass
-            try:
-                self._apply_theme_to_ctk_widget_tree(self, old_theme, self.current_theme)
-            except Exception:
-                pass
-            try:
-                self.apply_theme_to_widget(self)
-            except Exception:
-                pass
-            self._rebuild_current_screen_after_theme_change()
-        finally:
-            self.theme_animating = False
+        next_theme_name = "dark" if self.current_theme_name == "light" else "light"
+        self._circle_reveal_theme_change(next_theme_name)
 
     def animate_button_press(self, button, callback):
         """Play a quick press animation before running a button action."""
@@ -1250,40 +1340,14 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         # No icon inside knob – avoids black line artifacts (reference: clean white knob)
 
         def _finish_toggle(target_dark):
-            """Apply the theme swap after the knob animation finishes."""
+            """Start the expanding circle reveal after the knob animation finishes."""
+            next_name = "dark" if target_dark else "light"
             try:
-                canvas.itemconfigure(
-                    track,
-                    fill=track_dark if target_dark else track_light,
-                    outline=border_dark if target_dark else border_light,
-                )
+                cx = canvas.winfo_rootx() + canvas.winfo_width() // 2 - self.winfo_rootx()
+                cy = canvas.winfo_rooty() + canvas.winfo_height() // 2 - self.winfo_rooty()
             except Exception:
-                pass
-            old_theme = dict(self.current_theme)
-            self.current_theme_name = "dark" if target_dark else "light"
-            self.current_theme = THEMES[self.current_theme_name]
-            ctk.set_appearance_mode(self.current_theme_name)
-            try:
-                self.configure(fg_color=self.current_theme["bg"])
-            except Exception:
-                pass
-            try:
-                self.content_holder.configure(fg_color=self.current_theme["bg"])
-            except Exception:
-                pass
-            try:
-                canvas.configure(bg=self.current_theme["bg"])
-            except Exception:
-                pass
-            try:
-                self._apply_theme_to_ctk_widget_tree(self, old_theme, self.current_theme)
-            except Exception:
-                pass
-            try:
-                self.apply_theme_to_widget(self)
-            except Exception:
-                pass
-            self._rebuild_current_screen_after_theme_change()
+                cx, cy = None, None
+            self._circle_reveal_theme_change(next_name, cx, cy)
 
         def animate_toggle(_event=None):
             if self.theme_animating:
@@ -1307,12 +1371,10 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                         raise RuntimeError("canvas gone")
                 except Exception:
                     _finish_toggle(target_dark)
-                    self.theme_animating = False
                     return
 
                 if index >= step_count:
                     _finish_toggle(target_dark)
-                    self.theme_animating = False
                     return
 
                 try:
@@ -1327,7 +1389,6 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                     canvas.after(14, lambda: step(index + 1))
                 except Exception:
                     _finish_toggle(target_dark)
-                    self.theme_animating = False
 
             step()
 
@@ -1594,6 +1655,12 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             lambda: (self.show_role_menu(), self.enter_admin_dashboard()),
         )
 
+        # Hygiene Hero chatbot
+        make_nav_button(
+            "🤖 Hygiene Hero",
+            lambda: (self.show_role_menu(), self.show_chatbot_screen()),
+        )
+
         # Back to main screen: show thank-you in-app then return to welcome screen
         def go_back_to_welcome():
             self.show_role_menu()
@@ -1613,6 +1680,12 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             },
         )
         # endregion
+
+    # ---------- Chatbot Screen ----------
+
+    def show_chatbot_screen(self):
+        """Open the Hygiene Hero chatbot interface."""
+        build_chatbot_screen(self)
 
     # ---------- Welcome Screen ----------
 
@@ -2588,8 +2661,18 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
 # ======================
 
 def main():
+    global ON_RPI, GPIO
     init_db()
-    gpio_init()
+    try:
+        gpio_init()
+    except RuntimeError as e:
+        # RPi.GPIO does not support Raspberry Pi 5 (RP1 chip).
+        # Fall back to simulation mode so the app still runs.
+        print(f"[HW] GPIO init failed: {e}")
+        print("[HW] Tip: On Raspberry Pi 5, install rpi-lgpio:  pip install rpi-lgpio")
+        print("[HW] Falling back to simulation mode.")
+        ON_RPI = False
+        GPIO = MockGPIO()
 
     app = MainApp()
     try:
@@ -2597,7 +2680,10 @@ def main():
     except KeyboardInterrupt:
         print("\nStopped by user (Ctrl+C).")
     finally:
-        GPIO.cleanup()
+        try:
+            GPIO.cleanup()
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":
