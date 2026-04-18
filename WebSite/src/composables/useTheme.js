@@ -1,10 +1,12 @@
 import { ref, watch, nextTick } from 'vue'
 
-const THEME_KEY = 'syntax-error-theme'
+const THEME_KEY = 'shms-theme'
+const LEGACY_THEME_KEY = 'syntax-error-theme'
 
 function getInitialTheme() {
   if (typeof window !== 'undefined') {
-    const saved = localStorage.getItem(THEME_KEY)
+    const saved =
+      localStorage.getItem(THEME_KEY) ?? localStorage.getItem(LEGACY_THEME_KEY)
     if (saved) return saved
     return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
   }

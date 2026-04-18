@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen flex flex-col bg-surface-950">
+  <div class="min-h-screen flex flex-col bg-surface-950 light:bg-slate-50">
     <LoadingScreen />
     <NavBar />
     <main class="flex-1 pt-16 lg:pt-18">

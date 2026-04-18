@@ -9,6 +9,19 @@ export default {
   theme: {
     extend: {
       colors: {
+        burgundy: {
+          50: '#fdf2f4',
+          100: '#fce7eb',
+          200: '#f9d0d9',
+          300: '#f4a9ba',
+          400: '#ec7a95',
+          500: '#df4d72',
+          600: '#c9305b',
+          700: '#a9234a',
+          800: '#800020',
+          900: '#6b1d3a',
+          950: '#3d0a1e',
+        },
         brand: {
           50: '#fdf2f4',
           100: '#fce7eb',
@@ -60,6 +73,8 @@ export default {
         'slide-up': 'slideUp 0.6s ease-out',
         'slide-down': 'slideDown 0.6s ease-out',
         'float': 'float 6s ease-in-out infinite',
+        'fade-in-down': 'fadeInDown 0.35s ease-out',
+        'shake': 'shake 0.35s ease-in-out',
       },
       keyframes: {
         fadeIn: {
@@ -77,6 +92,17 @@ export default {
         float: {
           '0%, 100%': { transform: 'translateY(0)' },
           '50%': { transform: 'translateY(-20px)' },
+        },
+        fadeInDown: {
+          '0%': { opacity: '0', transform: 'translateY(-12px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        shake: {
+          '0%, 100%': { transform: 'translateX(0)' },
+          '20%': { transform: 'translateX(-6px)' },
+          '40%': { transform: 'translateX(6px)' },
+          '60%': { transform: 'translateX(-4px)' },
+          '80%': { transform: 'translateX(4px)' },
         },
       },
     },

@@ -1,5 +1,5 @@
 <template>
-  <div class="relative overflow-hidden min-h-[calc(100vh-4rem)] flex items-center justify-center px-4">
+  <div class="relative overflow-hidden min-h-screen flex items-center justify-center px-4">
     <!-- Background Effects -->
     <div class="absolute inset-0 pointer-events-none">
       <div class="absolute top-1/4 left-1/4 w-80 h-80 bg-brand-800/10 rounded-full blur-3xl"></div>
@@ -8,7 +8,7 @@
 
     <div class="relative w-full max-w-md">
       <!-- Login Card -->
-      <div class="glass rounded-3xl p-8 sm:p-10 animate-slide-up">
+      <div class="glass rounded-3xl p-8 sm:p-10 animate-slide-up" :class="shake ? 'animate-shake' : ''">
         <!-- Header -->
         <div class="text-center mb-8">
           <div class="w-16 h-16 mx-auto mb-4 rounded-2xl overflow-hidden shadow-lg shadow-brand-800/30">
@@ -23,17 +23,17 @@
         <!-- Login Form -->
         <form v-if="!showCreateUser" @submit.prevent="handleLogin" class="space-y-5">
           <div>
-            <label for="login-username" class="block text-xs font-semibold text-surface-400 uppercase tracking-wider mb-2">
-              Username
+            <label for="login-email" class="block text-xs font-semibold text-surface-400 uppercase tracking-wider mb-2">
+              Email
             </label>
             <input
-              id="login-username"
-              v-model="username"
-              type="text"
+              id="login-email"
+              v-model="email"
+              type="email"
               required
-              autocomplete="username"
-              class="w-full px-4 py-3 rounded-xl bg-surface-800/50 border border-surface-700/50 text-surface-100 placeholder-surface-500 focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 transition-all duration-300 text-sm"
-              placeholder="Enter username"
+              autocomplete="email"
+              class="w-full px-4 py-3 rounded-xl bg-surface-800/50 border border-surface-700/50 text-surface-100 placeholder-surface-500 focus:outline-none focus:ring-2 focus:ring-burgundy-500 transition-all duration-300 text-sm"
+              placeholder="you@school.edu"
             />
           </div>
           <div>
@@ -47,7 +47,7 @@
                 :type="showPassword ? 'text' : 'password'"
                 required
                 autocomplete="current-password"
-                class="w-full px-4 py-3 rounded-xl bg-surface-800/50 border border-surface-700/50 text-surface-100 placeholder-surface-500 focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 transition-all duration-300 text-sm pr-12"
+                class="w-full px-4 py-3 rounded-xl bg-surface-800/50 border border-surface-700/50 text-surface-100 placeholder-surface-500 focus:outline-none focus:ring-2 focus:ring-burgundy-500 transition-all duration-300 text-sm pr-12"
                 placeholder="Enter password"
               />
               <button
@@ -75,9 +75,10 @@
 
           <button
             type="submit"
-            class="w-full btn-primary text-center justify-center"
+            class="w-full btn-primary text-center justify-center disabled:opacity-60 disabled:cursor-not-allowed disabled:transform-none disabled:hover:shadow-lg"
+            :disabled="loading"
           >
-            Sign In
+            {{ loading ? 'Signing in…' : 'Sign In' }}
           </button>
 
           <button
@@ -102,15 +103,15 @@
 
           <div>
             <label for="new-username" class="block text-xs font-semibold text-surface-400 uppercase tracking-wider mb-2">
-              Username
+              Email
             </label>
             <input
               id="new-username"
               v-model="newUsername"
-              type="text"
+              type="email"
               required
-              class="w-full px-4 py-3 rounded-xl bg-surface-800/50 border border-surface-700/50 text-surface-100 placeholder-surface-500 focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 transition-all duration-300 text-sm"
-              placeholder="Choose username"
+              class="w-full px-4 py-3 rounded-xl bg-surface-800/50 border border-surface-700/50 text-surface-100 placeholder-surface-500 focus:outline-none focus:ring-2 focus:ring-burgundy-500 transition-all duration-300 text-sm"
+              placeholder="you@school.edu"
             />
           </div>
           <div>
@@ -122,7 +123,7 @@
               v-model="newPassword"
               type="password"
               required
-              class="w-full px-4 py-3 rounded-xl bg-surface-800/50 border border-surface-700/50 text-surface-100 placeholder-surface-500 focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 transition-all duration-300 text-sm"
+              class="w-full px-4 py-3 rounded-xl bg-surface-800/50 border border-surface-700/50 text-surface-100 placeholder-surface-500 focus:outline-none focus:ring-2 focus:ring-burgundy-500 transition-all duration-300 text-sm"
               placeholder="Choose password"
             />
           </div>
@@ -133,10 +134,11 @@
             <select
               id="new-role"
               v-model="newRole"
-              class="w-full px-4 py-3 rounded-xl bg-surface-800/50 border border-surface-700/50 text-surface-100 focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 transition-all duration-300 text-sm"
+              class="w-full px-4 py-3 rounded-xl bg-surface-800/50 border border-surface-700/50 text-surface-100 focus:outline-none focus:ring-2 focus:ring-burgundy-500 transition-all duration-300 text-sm"
             >
               <option value="admin">Admin</option>
               <option value="staff">Staff</option>
+              <option value="maintenance">Maintenance</option>
             </select>
           </div>
 
@@ -165,28 +167,41 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
 import logoImg from '../assets/LogoThesis.png'
 
 const router = useRouter()
+const route = useRoute()
 const { login, createUser } = useAuth()
 
+onMounted(() => {
+  if (route.query.reason === 'supabase-env') {
+    error.value = 'Supabase environment variables are missing. Add WebSite/.env.local (see .env.example) and restart Vite.'
+  }
+})
+
 // Login
-const username = ref('')
+const email = ref('')
 const password = ref('')
 const showPassword = ref(false)
 const error = ref('')
+const loading = ref(false)
+const shake = ref(false)
 
-function handleLogin() {
+async function handleLogin() {
   error.value = ''
-  const result = login(username.value, password.value)
+  loading.value = true
+  const result = await login(email.value, password.value)
   if (result.success) {
     router.push('/dashboard')
   } else {
     error.value = result.message
+    shake.value = true
+    setTimeout(() => { shake.value = false }, 450)
   }
+  loading.value = false
 }
 
 // Create User
@@ -197,12 +212,12 @@ const newRole = ref('staff')
 const createError = ref('')
 const createSuccess = ref('')
 
-function handleCreateUser() {
+async function handleCreateUser() {
   createError.value = ''
   createSuccess.value = ''
-  const result = createUser(newUsername.value, newPassword.value, newRole.value)
+  const result = await createUser(newUsername.value, newPassword.value, newRole.value)
   if (result.success) {
-    createSuccess.value = `Account "${newUsername.value}" created! You can now sign in.`
+    createSuccess.value = result.message || `Account "${newUsername.value}" created! You can now sign in.`
     newUsername.value = ''
     newPassword.value = ''
     newRole.value = 'staff'

@@ -6,12 +6,14 @@ import hashlib
 import hmac as _hmac
 import secrets
 import sqlite3
+import time
 from pathlib import Path
 from datetime import datetime as dt, timedelta
 
 from openpyxl import Workbook
 
 from admin.reports import get_reports_dir
+from supabase_feed import insert_live_feed_row
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -224,6 +226,84 @@ def get_product_by_id(product_id: int):
     return row
 
 
+
+def _payment_method_label(method: str | None) -> str:
+    if not method:
+        return "Sale"
+    mapping = {
+        "cash": "Cash",
+        "rfid_purchase": "RFID",
+        "card_purchase": "Card purchase",
+        "rfid_reload": "RFID reload",
+    }
+    return mapping.get(str(method).strip().lower(), str(method))
+
+
+def _sync_supabase_live_feed(
+    product_id,
+    quantity,
+    total_amount,
+    payment_method,
+    rfid_user_id,
+):
+    """Best-effort: notify Supabase live_feed for the web dashboard (never raises)."""
+    try:
+        name = ""
+        slot = ""
+        if product_id is not None:
+            p = get_product_by_id(product_id)
+            if p:
+                name = (p["name"] or "").strip()
+                slot = str(p["slot_number"])
+
+        user_label = None
+        if rfid_user_id is not None:
+            conn = get_connection()
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT rfid_uid, name FROM rfid_users WHERE id = ?",
+                (rfid_user_id,),
+            )
+            u = cur.fetchone()
+            conn.close()
+            if u:
+                uid = (u["rfid_uid"] or "").strip()
+                nm = (u["name"] or "").strip()
+                user_label = nm or uid or None
+
+        qty_part = ""
+        if quantity is not None:
+            qty_part = f" × {quantity}"
+
+        label = _payment_method_label(payment_method)
+        if name:
+            title = f"{name}{qty_part}"
+            item = f"{name} — Slot {slot}" if slot else name
+        else:
+            title = f"{label}{qty_part}" if qty_part else label
+            item = label
+
+        payload = {
+            "title": title,
+            "item": item,
+            "subtitle": label,
+            "ts": int(time.time() * 1000),
+        }
+        if slot:
+            payload["slot"] = slot
+        if total_amount is not None:
+            try:
+                payload["amount"] = float(total_amount)
+            except (TypeError, ValueError):
+                pass
+        if user_label:
+            payload["user"] = user_label
+
+        insert_live_feed_row(payload)
+    except Exception as e:
+        print(f"[supabase_feed] skipped: {e}")
+
+
 def decrement_stock(product_id: int, quantity: int):
     conn = get_connection()
     cur = conn.cursor()
@@ -249,6 +329,7 @@ def record_transaction(product_id, quantity, total_amount, payment_method, rfid_
     """, (product_id, quantity, total_amount, payment_method, rfid_user_id))
     conn.commit()
     conn.close()
+    _sync_supabase_live_feed(product_id, quantity, total_amount, payment_method, rfid_user_id)
 
 
 def get_user_by_uid(rfid_uid: str):

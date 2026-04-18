@@ -152,8 +152,8 @@ const { isLoggedIn, logout } = useAuth()
 
 const isActive = (path) => route.path === path
 
-function handleLogout() {
-  logout()
+async function handleLogout() {
+  await logout()
   router.push('/')
 }
 

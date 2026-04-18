@@ -4,7 +4,7 @@ import TeamPage from '../views/TeamPage.vue'
 import AdviserPage from '../views/AdviserPage.vue'
 import DashboardPage from '../views/DashboardPage.vue'
 import LoginPage from '../views/LoginPage.vue'
-import { useAuth } from '../composables/useAuth'
+import { supabase, isSupabaseConfigured } from '../utils/supabase'
 
 const routes = [
   {
@@ -47,15 +47,18 @@ const router = createRouter({
   }
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   document.title = to.meta.title || 'Syntax Error — Capstone Project'
 
-  if (to.meta.requiresAuth) {
-    const { isLoggedIn } = useAuth()
-    if (!isLoggedIn.value) {
-      return { name: 'Login' }
-    }
+  const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
+  if (!requiresAuth) return
+
+  if (!isSupabaseConfigured()) {
+    return { name: 'Login', query: { reason: 'supabase-env' } }
   }
+
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) return { name: 'Login' }
 })
 
 export default router
