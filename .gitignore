@@ -6,6 +6,8 @@ __pycache__/
 *.pyc
 *.pyo
 
+supabase.env
+
 vending.db
 
 # Debug logs
