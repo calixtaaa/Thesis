@@ -229,7 +229,7 @@ HOPPER_FEEDBACK_PINS = {
 }
 
 IR_BREAK_BEAM_PIN = 26        # Physical pin 37
-STEPS_PER_PRODUCT = 512       # 28BYJ-48 full revolution in full-step mode
+STEPS_PER_PRODUCT = 4096      # 28BYJ-48 output-shaft revolution (8-phase half-step)
 STEP_DELAY = 0.002
 SOLENOID_UNLOCK_SECONDS = 3.0
 COINS_PER_SECOND = {

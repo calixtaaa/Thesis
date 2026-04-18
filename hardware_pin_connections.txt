@@ -22,6 +22,14 @@ Shared RFID Reader:
 ========================================
 2) Tray Stepper Motors (28BYJ-48 + ULN2003)
 ========================================
+Per ULN2003AN board wiring (12V 28BYJ-48 setup):
+- Motor 5-wire connector -> ULN2003 motor socket
+- ULN2003 V+ / DC+ -> +12V from external PSU
+- ULN2003 GND / DC- -> PSU GND
+- Raspberry Pi GND -> same PSU GND (common ground)
+- Raspberry Pi GPIO pins -> ULN2003 IN1, IN2, IN3, IN4
+- Do NOT connect ULN2003 motor supply pin to Raspberry Pi 5V when using the 12V motor variant
+
 Tray/Slot 1 ULN2003 inputs:
 - IN1 -> GPIO17 (Physical pin 11)
 - IN2 -> GPIO27 (Physical pin 13)
@@ -35,8 +43,11 @@ Tray/Slot 2 ULN2003 inputs:
 - IN4 -> GPIO14 (Physical pin 8)
 
 Note:
-- Current code maps slots 1-2 directly.
-- For >2 trays, add GPIO expanders or additional controller hardware.
+- Current code uses two stepper banks and maps odd slots to bank A, even slots to bank B:
+	- Bank A: GPIO17, GPIO27, GPIO22, GPIO23
+	- Bank B: GPIO4, GPIO18, GPIO15, GPIO14
+- This lets slot_number 1..10 run with shared bank wiring in software.
+- For unique per-slot motor wiring across many trays, add GPIO expanders (for example MCP23017) or dedicated motor controllers and update PRODUCT_STEPPER_PINS in main.py.
 
 ========================================
 3) Solenoid Locks (12V Solenoid Model 102)

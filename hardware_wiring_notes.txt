@@ -3,7 +3,8 @@ Hardware Wiring Notes and Electrical Safety
 1) Power Distribution
 - Raspberry Pi 5 runs on its own regulated 5V supply.
 - 12V devices (solenoids, hoppers, some acceptors) need a separate 12V PSU.
-- Stepper motors with ULN2003 commonly use 5V motor supply.
+- Your 28BYJ-48 dispensing motor is the 12V variant, so each ULN2003AN board motor supply should be 12V.
+- ULN2003AN inputs are controlled by 3.3V Raspberry Pi GPIO, but motor power is external.
 - Tie all grounds together: Pi GND, 12V driver board GND, ULN2003 GND, sensor GND.
 
 2) Solenoid and Hopper Driving
@@ -34,10 +35,26 @@ Hardware Wiring Notes and Electrical Safety
 - Adjust logic in software if your sensor outputs active-high.
 
 6) Stepper Motion Parameters
-- Current software uses ULN2003 half-step sequence and 512 steps per vend revolution.
-- Tune STEP_DELAY and STEPS_PER_PRODUCT in main.py based on your mechanical dispenser.
+- Current software uses ULN2003 8-phase half-step sequence.
+- Current code constants in main.py:
+	- STEPS_PER_PRODUCT = 4096
+	- STEP_DELAY = 0.002
+- Treat STEPS_PER_PRODUCT as a calibration value for one dispense cycle (not always one full output-shaft revolution in every mechanism).
+- Tune STEP_DELAY and STEPS_PER_PRODUCT in main.py based on your spiral/dispenser geometry.
 
-7) Expansion for Many Trays
+7) Raspberry Pi Implementation Checklist (28BYJ-48 12V + ULN2003AN)
+- Wire ULN2003 IN1..IN4 to the exact BCM pins defined in hardware_pin_connections.txt.
+- Keep motor power (12V) separate from Pi power (5V), but keep common ground.
+- Verify PRODUCT_STEPPER_PINS in main.py matches your physical wiring before live testing.
+- Start with low-risk test runs using the GPIO test utility before full vending:
+	- source venv/bin/activate
+	- export DISPLAY=:0
+	- export PYTHONNOUSERSITE=1
+	- python gpio_test_tool.py
+- After GPIO test passes, run the main app and perform one-item dispense tests per slot.
+- If motor stalls/skips: reduce speed first (increase STEP_DELAY), then fine-tune STEPS_PER_PRODUCT.
+
+8) Expansion for Many Trays
 - Direct GPIO wiring is limited for many ULN2003 channels.
 - For full multi-tray deployments, consider GPIO expanders or dedicated motor controllers.
 - Keep one tray-per-slot software mapping aligned with database slot_number.

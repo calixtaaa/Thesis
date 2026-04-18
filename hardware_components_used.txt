@@ -4,8 +4,11 @@ Core Controller
 - Raspberry Pi 5
 
 Vending Motors
-- 28BYJ-48 stepper motor (12V stated in your setup)
-- ULN2003 stepper motor driver board (one per tray)
+- 28BYJ-48 stepper motor (12V variant for product dispensing)
+- ULN2003AN stepper motor driver board (one per tray/lane)
+  - ULN2003 IN1..IN4 are driven by Raspberry Pi GPIO
+  - ULN2003 board power input is supplied by external 12V PSU for the 12V motor
+  - Raspberry Pi and 12V PSU grounds are tied together (common ground)
 
 RFID Modules
 - 1x MFRC522 13.56 MHz RFID reader (shared)
