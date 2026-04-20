@@ -846,6 +846,16 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
     def get_all_rfid_users_data(self):
         return get_all_rfid_users()
 
+    def create_rfid_user_data(
+        self,
+        rfid_uid: str,
+        name: str | None = None,
+        is_staff: int = 0,
+        initial_balance: float = 0.0,
+        role: str = "customer",
+    ):
+        return create_user(rfid_uid, name=name, is_staff=is_staff, initial_balance=initial_balance, role=role)
+
     def update_rfid_user_role_data(self, user_id: int, role: str):
         return update_rfid_user_role(user_id, role)
 
@@ -870,6 +880,84 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             f"Pulse debug  coin(GPIO19): {counts['coin_acceptor']}  "
             f"bill(GPIO6): {counts['bill_acceptor']}  edge: {edge}"
         )
+
+    def _create_mfrc522_reader(self):
+        if MFRC522 is None:
+            return None
+
+        ctor_attempts = (
+            {"bus": 0, "device": 0},
+            {"dev": 0},
+            {"device": 0},
+            {"bus": 0, "dev": 0},
+            {},
+        )
+        for kwargs in ctor_attempts:
+            try:
+                return MFRC522(**kwargs)
+            except TypeError:
+                continue
+            except Exception:
+                continue
+        return None
+
+    def _close_mfrc522_spi(self, reader) -> None:
+        try:
+            spi_obj = getattr(reader, "spi", None)
+            if spi_obj is not None and hasattr(spi_obj, "close"):
+                spi_obj.close()
+        except Exception:
+            pass
+
+    def _read_mfrc522_register(self, reader, reg_addr: int) -> int | None:
+        method_names = ("Read_MFRC522", "MFRC522_Read", "ReadReg", "read")
+        for name in method_names:
+            fn = getattr(reader, name, None)
+            if fn is None:
+                continue
+            try:
+                value = fn(reg_addr)
+                if isinstance(value, (tuple, list)) and value:
+                    value = value[0]
+                return int(value) & 0xFF
+            except Exception:
+                continue
+        return None
+
+    def probe_rfid_spi_link(self) -> tuple[bool, str]:
+        """Probe MFRC522 SPI link by reading VersionReg over CE0."""
+        if not ON_RPI:
+            return False, "SPI probe unavailable in simulation mode."
+        if MFRC522 is None:
+            return False, "MFRC522 backend is not available."
+
+        try:
+            GPIO.output(RFID_PINS["reader_rst"], GPIO.LOW)
+            time.sleep(0.01)
+            GPIO.output(RFID_PINS["reader_rst"], GPIO.HIGH)
+            time.sleep(0.01)
+        except Exception:
+            pass
+
+        reader = self._create_mfrc522_reader()
+        if reader is None:
+            return False, "Could not initialize MFRC522 reader on SPI0 CE0."
+
+        try:
+            version_reg = int(getattr(reader, "VersionReg", 0x37))
+            value = self._read_mfrc522_register(reader, version_reg)
+            if value is None:
+                return False, "Reader API does not expose a known register-read method."
+            if value in {0x00, 0xFF}:
+                return False, (
+                    f"SPI probe FAIL: VersionReg=0x{value:02X}. "
+                    "Check CE0/SCK/MOSI/MISO wiring, power, and SPI enablement."
+                )
+            return True, f"SPI probe PASS: VersionReg=0x{value:02X}."
+        except Exception as exc:
+            return False, f"SPI probe error: {exc}"
+        finally:
+            self._close_mfrc522_spi(reader)
 
     def _read_rfid_uid_from_hardware(self, reader_name: str) -> str | None:
         if not ON_RPI:
@@ -912,22 +1000,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         except Exception:
             pass
 
-        reader = None
-        ctor_attempts = (
-            {"bus": 0, "device": spi_device},
-            {"dev": spi_device},
-            {"device": spi_device},
-            {"bus": 0, "dev": spi_device},
-            {},
-        )
-        for kwargs in ctor_attempts:
-            try:
-                reader = MFRC522(**kwargs)
-                break
-            except TypeError:
-                continue
-            except Exception:
-                continue
+        reader = self._create_mfrc522_reader()
 
         if reader is None:
             return None
@@ -953,12 +1026,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             return None
         finally:
             # Close SPI if the backend exposes it.
-            try:
-                spi_obj = getattr(reader, "spi", None)
-                if spi_obj is not None and hasattr(spi_obj, "close"):
-                    spi_obj.close()
-            except Exception:
-                pass
+            self._close_mfrc522_spi(reader)
 
         return None
 

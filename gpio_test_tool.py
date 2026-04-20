@@ -146,7 +146,6 @@ IR_BREAK_BEAM_PIN = 26
 ALL_OUTPUT_PINS = {
     "RFID SPI SCLK (11)": 11,
     "RFID SPI MOSI (10)": 10,
-    "RFID Reader CS (8)": 8,
     "RFID Reader RST (5)": 5,
     "Motor bank A (slots 1,3,5,7,9) IN1 (17)": 17,
     "Motor bank A (slots 1,3,5,7,9) IN2 (27)": 27,
@@ -160,6 +159,11 @@ ALL_OUTPUT_PINS = {
     "Solenoid Troubleshoot (20)": 20,
     "Coin Hopper 1-peso (12)": 12,
     "Coin Hopper 5-peso (21)": 21,
+}
+
+# Reserved by the SPI driver for MFRC522 CE0. Do not toggle as a generic GPIO output.
+RESERVED_PINS = {
+    "RFID Reader CS (8)": 8,
 }
 
 ALL_INPUT_PINS = {

@@ -74,6 +74,97 @@ def _init_gpio() -> tuple[bool, str | None]:
     return True, None
 
 
+def _pulse_reader_reset(pulses: int = 3, low_s: float = 0.08, high_s: float = 0.08) -> tuple[bool, str]:
+    if GPIO is None:
+        return False, "RPi.GPIO is not available."
+    if pulses < 1:
+        pulses = 1
+
+    try:
+        for _ in range(pulses):
+            GPIO.output(RFID_RST_PIN, GPIO.LOW)
+            time.sleep(max(0.01, low_s))
+            GPIO.output(RFID_RST_PIN, GPIO.HIGH)
+            time.sleep(max(0.01, high_s))
+        return True, f"Pulsed RFID RST (GPIO{RFID_RST_PIN}) x{pulses}."
+    except Exception as exc:
+        return False, f"Failed to pulse RFID RST: {exc}"
+
+
+def _create_mfrc522_reader():
+    if MFRC522 is None:
+        return None
+
+    ctor_attempts = (
+        {"bus": 0, "device": 0},
+        {"dev": 0},
+        {"device": 0},
+        {"bus": 0, "dev": 0},
+        {},
+    )
+    for kwargs in ctor_attempts:
+        try:
+            return MFRC522(**kwargs)
+        except TypeError:
+            continue
+        except Exception:
+            continue
+    return None
+
+
+def _close_reader_spi(reader) -> None:
+    try:
+        spi_obj = getattr(reader, "spi", None)
+        if spi_obj is not None and hasattr(spi_obj, "close"):
+            spi_obj.close()
+    except Exception:
+        pass
+
+
+def _read_reader_register(reader, reg_addr: int) -> int | None:
+    method_names = ("Read_MFRC522", "MFRC522_Read", "ReadReg", "read")
+    for name in method_names:
+        fn = getattr(reader, name, None)
+        if fn is None:
+            continue
+        try:
+            value = fn(reg_addr)
+            if isinstance(value, (tuple, list)) and value:
+                value = value[0]
+            return int(value) & 0xFF
+        except Exception:
+            continue
+    return None
+
+
+def _probe_mfrc522_spi_link() -> tuple[bool, str]:
+    if MFRC522 is None:
+        return False, "MFRC522 backend is not available."
+
+    # Brief reset pulse before probing the version register over SPI.
+    _pulse_reader_reset(pulses=1, low_s=0.02, high_s=0.02)
+
+    reader = _create_mfrc522_reader()
+    if reader is None:
+        return False, "Could not initialize MFRC522 reader on SPI0 CE0."
+
+    try:
+        version_reg = int(getattr(reader, "VersionReg", 0x37))
+        value = _read_reader_register(reader, version_reg)
+        if value is None:
+            return False, "Reader API does not expose a known register-read method."
+        if value in {0x00, 0xFF}:
+            return False, (
+                f"SPI probe FAIL: VersionReg=0x{value:02X}. "
+                "Check CE0/SCK/MOSI/MISO wiring, power, and SPI enablement."
+            )
+        return True, f"SPI probe PASS: VersionReg=0x{value:02X}."
+    except Exception as exc:
+        return False, f"SPI probe error: {exc}"
+    finally:
+        _close_reader_spi(reader)
+
+
 def _read_uid_low_level() -> str | None:
     if MFRC522 is None or GPIO is None:
         return None
@@ -86,23 +177,7 @@ def _read_uid_low_level() -> str | None:
     except Exception:
         pass
 
-    reader = None
-    ctor_attempts = (
-        {"bus": 0, "device": 0},
-        {"dev": 0},
-        {"device": 0},
-        {"bus": 0, "dev": 0},
-        {},
-    )
-
-    for kwargs in ctor_attempts:
-        try:
-            reader = MFRC522(**kwargs)
-            break
-        except TypeError:
-            continue
-        except Exception:
-            continue
+    reader = _create_mfrc522_reader()
 
     if reader is None:
         return None
@@ -125,12 +200,7 @@ def _read_uid_low_level() -> str | None:
     except Exception:
         return None
     finally:
-        try:
-            spi_obj = getattr(reader, "spi", None)
-            if spi_obj is not None and hasattr(spi_obj, "close"):
-                spi_obj.close()
-        except Exception:
-            pass
+        _close_reader_spi(reader)
 
     return None
 
@@ -214,6 +284,42 @@ class RFIDTestUI(tk.Tk):  # type: ignore[misc]
             fg="#334155",
         ).pack(anchor="w", pady=(4, 12))
 
+        controls = tk.Frame(wrapper, bg="#f5f7fa")
+        controls.pack(fill=tk.X, pady=(0, 8))
+        tk.Button(
+            controls,
+            text="Pulse RFID RST (GPIO5)",
+            command=self._pulse_rst,
+            font=("Segoe UI", 10, "bold"),
+            bg="#0ea5e9",
+            fg="#ffffff",
+            activebackground="#0284c7",
+            activeforeground="#ffffff",
+            relief=tk.FLAT,
+            padx=12,
+            pady=6,
+        ).pack(side=tk.LEFT)
+        tk.Button(
+            controls,
+            text="Probe SPI Link",
+            command=self._probe_spi,
+            font=("Segoe UI", 10, "bold"),
+            bg="#16a34a",
+            fg="#ffffff",
+            activebackground="#15803d",
+            activeforeground="#ffffff",
+            relief=tk.FLAT,
+            padx=12,
+            pady=6,
+        ).pack(side=tk.LEFT, padx=(8, 0))
+        tk.Label(
+            controls,
+            text="(Safe line to pulse for wiring check)",
+            font=("Segoe UI", 9),
+            bg="#f5f7fa",
+            fg="#475569",
+        ).pack(side=tk.LEFT, padx=(10, 0))
+
         row = tk.Frame(wrapper, bg="#f5f7fa")
         row.pack(fill=tk.X)
         tk.Label(row, text="Status:", font=("Segoe UI", 10, "bold"), bg="#f5f7fa").grid(row=0, column=0, sticky="w")
@@ -285,6 +391,23 @@ class RFIDTestUI(tk.Tk):  # type: ignore[misc]
         except Exception:
             pass
         self.destroy()
+
+    def _pulse_rst(self) -> None:
+        ok, msg = _pulse_reader_reset(pulses=3)
+        if ok:
+            self.status_var.set("RST pulse sent")
+            self._append_log(msg)
+        else:
+            self.status_var.set("RST pulse failed")
+            self._append_log(msg)
+
+    def _probe_spi(self) -> None:
+        ok, msg = _probe_mfrc522_spi_link()
+        if ok:
+            self.status_var.set("SPI link PASS")
+        else:
+            self.status_var.set("SPI link FAIL")
+        self._append_log(msg)
 
 
 def _run_cli(interval_s: float, no_db_lookup: bool, once: bool) -> int:
@@ -359,6 +482,17 @@ def main() -> int:
         action="store_true",
         help="Launch a simple touchscreen-friendly UI instead of console output.",
     )
+    parser.add_argument(
+        "--pulse-rst",
+        type=int,
+        default=0,
+        help="Pulse RFID reset line (GPIO5) N times, then exit (safe wiring check).",
+    )
+    parser.add_argument(
+        "--probe-spi",
+        action="store_true",
+        help="Probe MFRC522 version register over SPI and print PASS/FAIL.",
+    )
     args = parser.parse_args()
 
     if MFRC522 is None and SimpleMFRC522 is None:
@@ -370,6 +504,16 @@ def main() -> int:
     if not ok:
         print(err_msg)
         return 1
+
+    if args.pulse_rst > 0:
+        ok, msg = _pulse_reader_reset(pulses=args.pulse_rst)
+        print(msg)
+        return 0 if ok else 1
+
+    if args.probe_spi:
+        ok, msg = _probe_mfrc522_spi_link()
+        print(msg)
+        return 0 if ok else 1
 
     try:
         if args.ui:

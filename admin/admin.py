@@ -541,6 +541,7 @@ class AdminMixin:
             return b
 
         nav_btn("Overview", lambda: self.show_admin_dashboard(staff_user))
+        nav_btn("Card Enrollment", self.show_card_enrollment_screen)
         nav_btn("RFID Roles", self.show_rfid_roles_screen)
         nav_btn("Cash Pulse Settings", self.show_cash_pulse_settings_screen)
         nav_btn("Hardware Diagnostics", self.show_hardware_diagnostics_screen)
@@ -817,6 +818,217 @@ class AdminMixin:
 
         self.add_theme_toggle_footer()
 
+    def show_card_enrollment_screen(self):
+        """Register a new RFID card for customer/restocker/troubleshooter roles."""
+        self._current_screen_builder = self.show_card_enrollment_screen
+        self.clear_screen()
+
+        frame = ctk.CTkFrame(self.content_holder, fg_color=self.current_theme["bg"])
+        frame.pack(expand=True, fill=tk.BOTH, padx=20, pady=16)
+
+        ctk.CTkLabel(
+            frame,
+            text="Card Enrollment",
+            font=(UI_FONT, 20, "bold"),
+            text_color=self.current_theme["fg"],
+        ).pack(pady=(0, 8))
+
+        ctk.CTkLabel(
+            frame,
+            text="Register RFID cards for customer, restocker, or troubleshooter access.",
+            font=UI_FONT_SMALL,
+            text_color=self.current_theme.get("muted", self.current_theme["fg"]),
+        ).pack(pady=(0, 12))
+
+        card = ctk.CTkFrame(
+            frame,
+            fg_color=self.current_theme.get("card_bg", self.current_theme["button_bg"]),
+            border_width=1,
+            border_color=self.current_theme.get("card_border", "#e2e8f0"),
+            corner_radius=10,
+        )
+        card.pack(fill=tk.X, padx=8, pady=6)
+
+        inner = ctk.CTkFrame(card, fg_color=self.current_theme.get("card_bg", self.current_theme["button_bg"]))
+        inner.pack(fill=tk.X, padx=14, pady=14)
+
+        uid_var = tk.StringVar(value="")
+        name_var = tk.StringVar(value="")
+        role_var = tk.StringVar(value="customer")
+        balance_var = tk.StringVar(value="50.00")
+        status_var = tk.StringVar(value="")
+
+        ctk.CTkLabel(inner, text="RFID UID:", font=UI_FONT_BODY, text_color=self.current_theme["fg"]).pack(anchor="w")
+        uid_entry = ctk.CTkEntry(
+            inner,
+            textvariable=uid_var,
+            width=320,
+            fg_color=self.current_theme.get("search_bg", "#f2f2f7"),
+            text_color=self.current_theme["fg"],
+            border_color=self.current_theme.get("search_border", "#d1d1d6"),
+        )
+        uid_entry.pack(anchor="w", pady=(4, 8))
+
+        def read_from_reader():
+            uid = self.read_rfid_uid("payment")
+            if uid:
+                uid_var.set(uid.strip().upper())
+                status_var.set("RFID tap captured from shared reader.")
+            else:
+                status_var.set("No RFID tap detected. You can type UID manually.")
+
+        ctk.CTkButton(
+            inner,
+            text="Read from Shared RFID Reader",
+            command=read_from_reader,
+            fg_color=self.current_theme.get("button_bg", "#ffffff"),
+            hover_color=self.current_theme.get("card_border", "#d1d1d6"),
+            text_color=self.current_theme.get("button_fg", "#1c1c1e"),
+            border_width=1,
+            border_color=self.current_theme.get("card_border", "#d1d1d6"),
+            corner_radius=8,
+            height=34,
+        ).pack(anchor="w", pady=(0, 12))
+
+        ctk.CTkLabel(inner, text="Display Name (optional):", font=UI_FONT_BODY, text_color=self.current_theme["fg"]).pack(anchor="w")
+        ctk.CTkEntry(
+            inner,
+            textvariable=name_var,
+            width=320,
+            fg_color=self.current_theme.get("search_bg", "#f2f2f7"),
+            text_color=self.current_theme["fg"],
+            border_color=self.current_theme.get("search_border", "#d1d1d6"),
+        ).pack(anchor="w", pady=(4, 10))
+
+        ctk.CTkLabel(inner, text="Role:", font=UI_FONT_BODY, text_color=self.current_theme["fg"]).pack(anchor="w")
+
+        def _default_balance_for_role(role: str) -> str:
+            return "50.00" if role == "customer" else "0.00"
+
+        def on_role_change(selected: str):
+            role_value = (selected or "customer").strip().lower()
+            role_var.set(role_value)
+            balance_var.set(_default_balance_for_role(role_value))
+
+        ctk.CTkOptionMenu(
+            inner,
+            variable=role_var,
+            values=["customer", "restocker", "troubleshooter"],
+            command=on_role_change,
+            width=220,
+            fg_color=self.current_theme.get("accent", "#10b981"),
+            button_color=self.current_theme.get("accent_hover", "#059669"),
+            button_hover_color=self.current_theme.get("accent_hover", "#059669"),
+            text_color="#ffffff",
+        ).pack(anchor="w", pady=(4, 10))
+
+        ctk.CTkLabel(inner, text="Initial Balance (PHP):", font=UI_FONT_BODY, text_color=self.current_theme["fg"]).pack(anchor="w")
+        ctk.CTkEntry(
+            inner,
+            textvariable=balance_var,
+            width=220,
+            fg_color=self.current_theme.get("search_bg", "#f2f2f7"),
+            text_color=self.current_theme["fg"],
+            border_color=self.current_theme.get("search_border", "#d1d1d6"),
+        ).pack(anchor="w", pady=(4, 10))
+
+        ctk.CTkLabel(
+            inner,
+            textvariable=status_var,
+            font=UI_FONT_SMALL,
+            text_color=self.current_theme.get("muted", self.current_theme["fg"]),
+            wraplength=520,
+            justify="left",
+        ).pack(anchor="w", pady=(2, 8))
+
+        def enroll_card():
+            uid = uid_var.get().strip().upper()
+            if not uid:
+                status_var.set("RFID UID is required.")
+                return
+
+            role = role_var.get().strip().lower() or "customer"
+            name = name_var.get().strip() or None
+
+            try:
+                initial_balance = float(balance_var.get().strip())
+            except Exception:
+                status_var.set("Initial balance must be a valid number.")
+                return
+
+            if initial_balance < 0:
+                status_var.set("Initial balance cannot be negative.")
+                return
+
+            existing = self.get_user_by_uid_data(uid)
+            if existing:
+                status_var.set(
+                    f"UID already registered (role={existing['role']}, balance=PHP {float(existing['balance']):.2f})."
+                )
+                return
+
+            is_staff = 1 if role in {"restocker", "admin", "staff"} else 0
+            try:
+                self.create_rfid_user_data(
+                    uid,
+                    name=name,
+                    is_staff=is_staff,
+                    initial_balance=initial_balance,
+                    role=role,
+                )
+            except Exception as exc:
+                status_var.set(f"Enrollment failed: {exc}")
+                return
+
+            status_var.set(f"Card enrolled: UID={uid}, role={role}, balance=PHP {initial_balance:.2f}")
+            uid_var.set("")
+            name_var.set("")
+            on_role_change("customer")
+            uid_entry.focus_set()
+
+        btn_row = ctk.CTkFrame(inner, fg_color=self.current_theme.get("card_bg", self.current_theme["button_bg"]))
+        btn_row.pack(fill=tk.X, pady=(6, 0))
+
+        ctk.CTkButton(
+            btn_row,
+            text="Enroll Card",
+            font=(UI_FONT, 11, "bold"),
+            command=enroll_card,
+            fg_color=self.current_theme.get("accent", "#10b981"),
+            hover_color=self.current_theme.get("accent_hover", "#059669"),
+            text_color="#ffffff",
+            corner_radius=8,
+            height=36,
+        ).pack(side=tk.LEFT, padx=(0, 8))
+
+        ctk.CTkButton(
+            btn_row,
+            text="Open RFID Roles",
+            font=(UI_FONT, 11, "bold"),
+            command=self.show_rfid_roles_screen,
+            fg_color=self.current_theme.get("button_bg", "#ffffff"),
+            hover_color=self.current_theme.get("card_border", "#d1d1d6"),
+            text_color=self.current_theme.get("button_fg", "#1c1c1e"),
+            corner_radius=8,
+            border_width=1,
+            border_color=self.current_theme.get("card_border", "#d1d1d6"),
+            height=36,
+        ).pack(side=tk.LEFT)
+
+        ctk.CTkButton(
+            frame,
+            text="Back to Admin Dashboard",
+            font=UI_FONT_BODY,
+            command=lambda: self.show_admin_dashboard(getattr(self, "_current_admin_user", {"name": "admin", "rfid_uid": ""})),
+            fg_color=self.current_theme["button_bg"],
+            hover_color=self.current_theme.get("accent", "#10b981"),
+            text_color=self.current_theme["button_fg"],
+            corner_radius=8,
+            height=38,
+        ).pack(pady=12)
+
+        self.add_theme_toggle_footer()
+
     def show_rfid_roles_screen(self):
         """Manage RFID user roles for door access control."""
         self._current_screen_builder = self.show_rfid_roles_screen
@@ -1062,6 +1274,14 @@ class AdminMixin:
         uid_lbl = ctk.CTkLabel(card, text="Last RFID UID: (none)", font=UI_FONT_BODY, text_color=self.current_theme["fg"])
         uid_lbl.pack(anchor="w", padx=14, pady=4)
 
+        spi_health_lbl = ctk.CTkLabel(
+            card,
+            text="RFID SPI Health: Not checked",
+            font=UI_FONT_SMALL,
+            text_color=self.current_theme.get("muted", self.current_theme["fg"]),
+        )
+        spi_health_lbl.pack(anchor="w", padx=14, pady=(0, 4))
+
         result_lbl = ctk.CTkLabel(card, text="", font=UI_FONT_SMALL, text_color=self.current_theme.get("muted", self.current_theme["fg"]))
         result_lbl.pack(anchor="w", padx=14, pady=(0, 8))
 
@@ -1084,6 +1304,20 @@ class AdminMixin:
             else:
                 result_lbl.configure(text="No RFID tap detected (door auth flow).")
 
+        def probe_spi():
+            ok, msg = self.probe_rfid_spi_link()
+            if ok:
+                spi_health_lbl.configure(
+                    text=f"RFID SPI Health: PASS ({msg.split(':', 1)[-1].strip()})",
+                    text_color=self.current_theme.get("status_success", "#16a34a"),
+                )
+            else:
+                spi_health_lbl.configure(
+                    text=f"RFID SPI Health: FAIL ({msg.split(':', 1)[-1].strip()})",
+                    text_color=self.current_theme.get("status_error", "#dc2626"),
+                )
+            result_lbl.configure(text=msg)
+
         ctk.CTkButton(
             btn_row,
             text="Read RFID (Payment Flow)",
@@ -1105,6 +1339,17 @@ class AdminMixin:
             corner_radius=8,
             width=150,
         ).pack(side=tk.LEFT)
+
+        ctk.CTkButton(
+            btn_row,
+            text="Probe RFID SPI Link",
+            command=probe_spi,
+            fg_color=self.current_theme.get("accent", "#10b981"),
+            hover_color=self.current_theme.get("accent_hover", "#059669"),
+            text_color="#ffffff",
+            corner_radius=8,
+            width=150,
+        ).pack(side=tk.LEFT, padx=(8, 0))
 
         def refresh_counts():
             if not frame.winfo_exists():

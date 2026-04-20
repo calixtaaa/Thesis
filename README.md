@@ -206,6 +206,18 @@ For a touchscreen-friendly UI tester:
 python rfid_single_reader_test.py --ui
 ```
 
+For a quick reset-wire pulse check (GPIO5) without opening UI:
+
+```bash
+python rfid_single_reader_test.py --pulse-rst 5
+```
+
+For a direct SPI link PASS/FAIL probe (MFRC522 VersionReg):
+
+```bash
+python rfid_single_reader_test.py --probe-spi
+```
+
 On Raspberry Pi with a 7" touchscreen, the app can run fullscreen; on Windows it uses a resizable window (e.g. 800×480).
 
 ### Website (Development)
