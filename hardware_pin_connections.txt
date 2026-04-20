@@ -11,7 +11,7 @@ IMPORTANT:
 Shared SPI lines:
 - SCK  -> GPIO11 (Physical pin 23)
 - MOSI -> GPIO10 (Physical pin 19)
-- MISO -> GPIO9  (Physical pin 21)
+- MISO -> GPIO9  (Physical pin 21) 
 - VCC  -> 3.3V
 - GND  -> GND
 
