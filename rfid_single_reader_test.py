@@ -259,17 +259,27 @@ class RFIDTestUI(tk.Tk):  # type: ignore[misc]
         self.no_db_lookup = no_db_lookup
         self.last_uid = None
         self.last_ts = 0.0
+        self.spi_probe_running = False
+        self.spi_probe_interval_ms = 350
+        self.last_spi_probe_state = None
+        self.spi_probe_toggle_btns = []
+        self.spi_probe_pass_count = 0
+        self.spi_probe_fail_count = 0
+        self.spi_probe_last_fail = "-"
 
         self.status_var = tk.StringVar(value="Waiting for RFID taps...")
         self.uid_var = tk.StringVar(value="-")
         self.role_var = tk.StringVar(value="-")
         self.balance_var = tk.StringVar(value="-")
+        self.spi_pass_var = tk.StringVar(value="0")
+        self.spi_fail_var = tk.StringVar(value="0")
+        self.spi_last_fail_var = tk.StringVar(value="-")
 
-        wrapper = tk.Frame(self, bg="#f5f7fa")
-        wrapper.pack(fill=tk.BOTH, expand=True, padx=14, pady=14)
+        self.main_screen = tk.Frame(self, bg="#f5f7fa")
+        self.main_screen.pack(fill=tk.BOTH, expand=True, padx=14, pady=14)
 
         tk.Label(
-            wrapper,
+            self.main_screen,
             text="Single MFRC522 Reader Test",
             font=("Segoe UI", 18, "bold"),
             bg="#f5f7fa",
@@ -277,14 +287,14 @@ class RFIDTestUI(tk.Tk):  # type: ignore[misc]
         ).pack(anchor="w")
 
         tk.Label(
-            wrapper,
+            self.main_screen,
             text="Wiring: CE0(GPIO8), RST(GPIO5), SCK(11), MOSI(10), MISO(9)",
             font=("Segoe UI", 10),
             bg="#f5f7fa",
             fg="#334155",
         ).pack(anchor="w", pady=(4, 12))
 
-        controls = tk.Frame(wrapper, bg="#f5f7fa")
+        controls = tk.Frame(self.main_screen, bg="#f5f7fa")
         controls.pack(fill=tk.X, pady=(0, 8))
         tk.Button(
             controls,
@@ -312,6 +322,34 @@ class RFIDTestUI(tk.Tk):  # type: ignore[misc]
             padx=12,
             pady=6,
         ).pack(side=tk.LEFT, padx=(8, 0))
+        main_spi_toggle_btn = tk.Button(
+            controls,
+            text="Start Continuous SPI Probe",
+            command=self._toggle_spi_probe,
+            font=("Segoe UI", 10, "bold"),
+            bg="#f59e0b",
+            fg="#111827",
+            activebackground="#d97706",
+            activeforeground="#111827",
+            relief=tk.FLAT,
+            padx=12,
+            pady=6,
+        )
+        main_spi_toggle_btn.pack(side=tk.LEFT, padx=(8, 0))
+        self.spi_probe_toggle_btns.append(main_spi_toggle_btn)
+        tk.Button(
+            controls,
+            text="Troubleshooting Screen",
+            command=self._show_troubleshooting_screen,
+            font=("Segoe UI", 10, "bold"),
+            bg="#334155",
+            fg="#ffffff",
+            activebackground="#1e293b",
+            activeforeground="#ffffff",
+            relief=tk.FLAT,
+            padx=12,
+            pady=6,
+        ).pack(side=tk.LEFT, padx=(8, 0))
         tk.Label(
             controls,
             text="(Safe line to pulse for wiring check)",
@@ -320,7 +358,7 @@ class RFIDTestUI(tk.Tk):  # type: ignore[misc]
             fg="#475569",
         ).pack(side=tk.LEFT, padx=(10, 0))
 
-        row = tk.Frame(wrapper, bg="#f5f7fa")
+        row = tk.Frame(self.main_screen, bg="#f5f7fa")
         row.pack(fill=tk.X)
         tk.Label(row, text="Status:", font=("Segoe UI", 10, "bold"), bg="#f5f7fa").grid(row=0, column=0, sticky="w")
         tk.Label(row, textvariable=self.status_var, font=("Segoe UI", 10), bg="#f5f7fa", fg="#0f766e").grid(row=0, column=1, sticky="w", padx=(8, 0))
@@ -332,7 +370,7 @@ class RFIDTestUI(tk.Tk):  # type: ignore[misc]
         tk.Label(row, textvariable=self.balance_var, font=("Segoe UI", 10), bg="#f5f7fa").grid(row=3, column=1, sticky="w", padx=(8, 0), pady=(8, 0))
 
         tk.Label(
-            wrapper,
+            self.main_screen,
             text="Detected Tap Log",
             font=("Segoe UI", 11, "bold"),
             bg="#f5f7fa",
@@ -340,7 +378,7 @@ class RFIDTestUI(tk.Tk):  # type: ignore[misc]
         ).pack(anchor="w", pady=(16, 6))
 
         self.log_text = tk.Text(
-            wrapper,
+            self.main_screen,
             height=11,
             bg="#ffffff",
             fg="#0f172a",
@@ -351,9 +389,134 @@ class RFIDTestUI(tk.Tk):  # type: ignore[misc]
         )
         self.log_text.pack(fill=tk.BOTH, expand=True)
 
+        self.troubleshoot_screen = self._build_troubleshooting_screen()
+
         self._append_log("RFID UI test started. Tap a card/tag to the reader.")
         self.protocol("WM_DELETE_WINDOW", self._on_close)
         self.after(120, self._poll_rfid)
+
+    def _build_troubleshooting_screen(self) -> tk.Frame:
+        frame = tk.Frame(self, bg="#eef2ff")
+
+        tk.Label(
+            frame,
+            text="Troubleshooting Screen",
+            font=("Segoe UI", 18, "bold"),
+            bg="#eef2ff",
+            fg="#0f172a",
+        ).pack(anchor="w", padx=14, pady=(14, 2))
+
+        tk.Label(
+            frame,
+            text="Use this while physically probing wires and connectors.",
+            font=("Segoe UI", 10),
+            bg="#eef2ff",
+            fg="#334155",
+        ).pack(anchor="w", padx=14, pady=(0, 12))
+
+        tools = tk.Frame(frame, bg="#eef2ff")
+        tools.pack(fill=tk.X, padx=14, pady=(0, 10))
+
+        tk.Button(
+            tools,
+            text="Pulse RFID RST (GPIO5)",
+            command=self._pulse_rst,
+            font=("Segoe UI", 10, "bold"),
+            bg="#0ea5e9",
+            fg="#ffffff",
+            activebackground="#0284c7",
+            activeforeground="#ffffff",
+            relief=tk.FLAT,
+            padx=12,
+            pady=6,
+        ).pack(side=tk.LEFT)
+
+        tk.Button(
+            tools,
+            text="Probe SPI Link",
+            command=self._probe_spi,
+            font=("Segoe UI", 10, "bold"),
+            bg="#16a34a",
+            fg="#ffffff",
+            activebackground="#15803d",
+            activeforeground="#ffffff",
+            relief=tk.FLAT,
+            padx=12,
+            pady=6,
+        ).pack(side=tk.LEFT, padx=(8, 0))
+
+        troubleshoot_spi_toggle_btn = tk.Button(
+            tools,
+            text="Start Continuous SPI Probe",
+            command=self._toggle_spi_probe,
+            font=("Segoe UI", 10, "bold"),
+            bg="#f59e0b",
+            fg="#111827",
+            activebackground="#d97706",
+            activeforeground="#111827",
+            relief=tk.FLAT,
+            padx=12,
+            pady=6,
+        )
+        troubleshoot_spi_toggle_btn.pack(side=tk.LEFT, padx=(8, 0))
+        self.spi_probe_toggle_btns.append(troubleshoot_spi_toggle_btn)
+
+        status_row = tk.Frame(frame, bg="#eef2ff")
+        status_row.pack(fill=tk.X, padx=14, pady=(0, 8))
+        tk.Label(status_row, text="Live Status:", font=("Segoe UI", 10, "bold"), bg="#eef2ff", fg="#0f172a").pack(side=tk.LEFT)
+        tk.Label(status_row, textvariable=self.status_var, font=("Segoe UI", 10), bg="#eef2ff", fg="#0f766e").pack(side=tk.LEFT, padx=(8, 0))
+
+        stats_row = tk.Frame(frame, bg="#eef2ff")
+        stats_row.pack(fill=tk.X, padx=14, pady=(0, 8))
+        tk.Label(stats_row, text="SPI PASS:", font=("Segoe UI", 10, "bold"), bg="#eef2ff", fg="#166534").pack(side=tk.LEFT)
+        tk.Label(stats_row, textvariable=self.spi_pass_var, font=("Consolas", 10, "bold"), bg="#eef2ff", fg="#166534").pack(side=tk.LEFT, padx=(6, 16))
+        tk.Label(stats_row, text="SPI FAIL:", font=("Segoe UI", 10, "bold"), bg="#eef2ff", fg="#991b1b").pack(side=tk.LEFT)
+        tk.Label(stats_row, textvariable=self.spi_fail_var, font=("Consolas", 10, "bold"), bg="#eef2ff", fg="#991b1b").pack(side=tk.LEFT, padx=(6, 16))
+        tk.Label(stats_row, text="Last FAIL:", font=("Segoe UI", 10, "bold"), bg="#eef2ff", fg="#1e293b").pack(side=tk.LEFT)
+        tk.Label(stats_row, textvariable=self.spi_last_fail_var, font=("Consolas", 10), bg="#eef2ff", fg="#1e293b").pack(side=tk.LEFT, padx=(6, 0))
+
+        tips = [
+            "Checklist:",
+            "1) Confirm 3.3V and GND are stable at the reader.",
+            "2) Lightly move CE0/SCK/MOSI/MISO wires while continuous probe is running.",
+            "3) If status flips to FAIL, inspect connectors and re-seat wiring.",
+            "4) Use reset pulse after reseating, then retest taps.",
+        ]
+        tk.Label(
+            frame,
+            text="\n".join(tips),
+            font=("Segoe UI", 10),
+            bg="#eef2ff",
+            fg="#1e293b",
+            justify=tk.LEFT,
+            anchor="w",
+        ).pack(fill=tk.X, padx=14, pady=(0, 12))
+
+        tk.Button(
+            frame,
+            text="Back To RFID Test Screen",
+            command=self._show_main_screen,
+            font=("Segoe UI", 10, "bold"),
+            bg="#334155",
+            fg="#ffffff",
+            activebackground="#1e293b",
+            activeforeground="#ffffff",
+            relief=tk.FLAT,
+            padx=12,
+            pady=8,
+        ).pack(anchor="w", padx=14, pady=(0, 14))
+
+        return frame
+
+    def _show_troubleshooting_screen(self) -> None:
+        self.main_screen.pack_forget()
+        self.troubleshoot_screen.pack(fill=tk.BOTH, expand=True)
+        self.status_var.set("Troubleshooting screen active")
+
+    def _show_main_screen(self) -> None:
+        self.troubleshoot_screen.pack_forget()
+        self.main_screen.pack(fill=tk.BOTH, expand=True, padx=14, pady=14)
+        self.status_var.set("Waiting for RFID taps...")
 
     def _append_log(self, line: str) -> None:
         ts = time.strftime("%H:%M:%S")
@@ -361,30 +524,36 @@ class RFIDTestUI(tk.Tk):  # type: ignore[misc]
         self.log_text.see(tk.END)
 
     def _poll_rfid(self) -> None:
-        uid = _read_uid()
-        now = time.time()
+        try:
+            uid = _read_uid()
+            now = time.time()
 
-        if uid and (uid != self.last_uid or (now - self.last_ts) > 1.5):
-            self.uid_var.set(uid)
-            self.status_var.set("RFID tap detected")
-            role = "(not registered)"
-            balance = "-"
+            if uid and (uid != self.last_uid or (now - self.last_ts) > 1.5):
+                self.uid_var.set(uid)
+                self.status_var.set("RFID tap detected")
+                role = "(not registered)"
+                balance = "-"
 
-            if not self.no_db_lookup:
-                user = _lookup_rfid_user(uid)
-                if user:
-                    role, bal = user
-                    balance = f"{bal:.2f}"
+                if not self.no_db_lookup:
+                    user = _lookup_rfid_user(uid)
+                    if user:
+                        role, bal = user
+                        balance = f"{bal:.2f}"
 
-            self.role_var.set(role)
-            self.balance_var.set(balance)
-            self._append_log(f"UID={uid} role={role} balance={balance}")
-            self.last_uid = uid
-            self.last_ts = now
+                self.role_var.set(role)
+                self.balance_var.set(balance)
+                self._append_log(f"UID={uid} role={role} balance={balance}")
+                self.last_uid = uid
+                self.last_ts = now
+        except KeyboardInterrupt:
+            self._append_log("Ctrl+C received. Closing UI.")
+            self._on_close()
+            return
 
         self.after(self.interval_ms, self._poll_rfid)
 
     def _on_close(self) -> None:
+        self.spi_probe_running = False
         try:
             if GPIO is not None:
                 GPIO.cleanup()
@@ -403,11 +572,65 @@ class RFIDTestUI(tk.Tk):  # type: ignore[misc]
 
     def _probe_spi(self) -> None:
         ok, msg = _probe_mfrc522_spi_link()
+        self._update_spi_probe_stats(ok)
         if ok:
             self.status_var.set("SPI link PASS")
         else:
             self.status_var.set("SPI link FAIL")
         self._append_log(msg)
+
+    def _update_spi_probe_stats(self, ok: bool) -> None:
+        if ok:
+            self.spi_probe_pass_count += 1
+            self.spi_pass_var.set(str(self.spi_probe_pass_count))
+            return
+
+        self.spi_probe_fail_count += 1
+        self.spi_fail_var.set(str(self.spi_probe_fail_count))
+        self.spi_probe_last_fail = time.strftime("%H:%M:%S")
+        self.spi_last_fail_var.set(self.spi_probe_last_fail)
+
+    def _toggle_spi_probe(self) -> None:
+        self.spi_probe_running = not self.spi_probe_running
+        if self.spi_probe_running:
+            for btn in self.spi_probe_toggle_btns:
+                if btn.winfo_exists():
+                    btn.configure(text="Stop Continuous SPI Probe", bg="#ef4444", activebackground="#dc2626")
+            self.status_var.set("Continuous SPI probe running")
+            self._append_log(f"Continuous SPI probe started ({self.spi_probe_interval_ms} ms interval).")
+            self._probe_spi_loop_tick()
+            return
+
+        for btn in self.spi_probe_toggle_btns:
+            if btn.winfo_exists():
+                btn.configure(text="Start Continuous SPI Probe", bg="#f59e0b", activebackground="#d97706")
+        self.status_var.set("Continuous SPI probe stopped")
+        self._append_log("Continuous SPI probe stopped.")
+
+    def _probe_spi_loop_tick(self) -> None:
+        if not self.spi_probe_running:
+            return
+
+        try:
+            ok, msg = _probe_mfrc522_spi_link()
+        except KeyboardInterrupt:
+            self._append_log("Ctrl+C received. Stopping continuous SPI probe.")
+            self.spi_probe_running = False
+            self._on_close()
+            return
+
+        self._update_spi_probe_stats(ok)
+
+        if ok:
+            self.status_var.set("SPI link PASS")
+        else:
+            self.status_var.set("SPI link FAIL")
+
+        if self.last_spi_probe_state is None or self.last_spi_probe_state != ok:
+            self._append_log(msg)
+            self.last_spi_probe_state = ok
+
+        self.after(self.spi_probe_interval_ms, self._probe_spi_loop_tick)
 
 
 def _run_cli(interval_s: float, no_db_lookup: bool, once: bool) -> int:
@@ -437,6 +660,23 @@ def _run_cli(interval_s: float, no_db_lookup: bool, once: bool) -> int:
                 if once:
                     return 0
 
+            time.sleep(max(0.05, interval_s))
+    except KeyboardInterrupt:
+        print("\nStopped by user.")
+        return 0
+
+
+def _run_cli_probe_spi_continuous(interval_s: float) -> int:
+    print("Continuous SPI probe started. Press Ctrl+C to stop.")
+    print(f"Probe interval: {max(0.05, interval_s):.2f}s")
+
+    last_state = None
+    try:
+        while True:
+            ok, msg = _probe_mfrc522_spi_link()
+            if last_state is None or last_state != ok:
+                print(msg)
+                last_state = ok
             time.sleep(max(0.05, interval_s))
     except KeyboardInterrupt:
         print("\nStopped by user.")
@@ -493,6 +733,17 @@ def main() -> int:
         action="store_true",
         help="Probe MFRC522 version register over SPI and print PASS/FAIL.",
     )
+    parser.add_argument(
+        "--probe-spi-continuous",
+        action="store_true",
+        help="Continuously probe MFRC522 SPI link until Ctrl+C.",
+    )
+    parser.add_argument(
+        "--probe-spi-interval",
+        type=float,
+        default=0.35,
+        help="Interval in seconds for --probe-spi-continuous (default: 0.35).",
+    )
     args = parser.parse_args()
 
     if MFRC522 is None and SimpleMFRC522 is None:
@@ -514,6 +765,9 @@ def main() -> int:
         ok, msg = _probe_mfrc522_spi_link()
         print(msg)
         return 0 if ok else 1
+
+    if args.probe_spi_continuous:
+        return _run_cli_probe_spi_continuous(args.probe_spi_interval)
 
     try:
         if args.ui:

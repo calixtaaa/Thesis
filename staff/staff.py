@@ -161,10 +161,7 @@ class StaffMixin:
             if selected_door == "restock":
                 self.show_restock_screen(user)
             else:
-                messagebox.showinfo(
-                    "Door Unlocked",
-                    "Troubleshooting door unlocked successfully.\nProceed with maintenance.",
-                )
+                self.show_troubleshooting_screen(user)
 
         ctk.CTkButton(
             btn_frame,
@@ -281,6 +278,110 @@ class StaffMixin:
                 corner_radius=980,
                 width=100,
             ).pack(side=tk.RIGHT, padx=12, pady=8)
+
+        self._slide_in(frame)
+        self.add_theme_toggle_footer()
+
+    def show_troubleshooting_screen(self, staff_user):
+        self._current_screen_builder = lambda: self.show_troubleshooting_screen(staff_user)
+        self.clear_screen()
+        self._current_staff_user = staff_user
+        theme = self.current_theme
+
+        frame = ctk.CTkFrame(self.content_holder, fg_color=theme["bg"])
+        frame.place(relx=0, rely=0, relwidth=1, relheight=1, anchor="nw")
+
+        inner = ctk.CTkFrame(frame, fg_color=theme["bg"])
+        inner.pack(expand=True, fill=tk.BOTH, padx=20, pady=16)
+
+        ctk.CTkLabel(
+            inner,
+            text=f"Troubleshooting Mode - {staff_user['name'] or staff_user['rfid_uid']}",
+            font=(UI_FONT, 20, "bold"),
+            text_color=theme["fg"],
+        ).pack(pady=(0, 10))
+
+        status_card = ctk.CTkFrame(
+            inner,
+            fg_color=theme.get("card_bg", theme["button_bg"]),
+            corner_radius=14,
+            border_width=1,
+            border_color=theme.get("card_border", "#d1d1d6"),
+        )
+        status_card.pack(fill=tk.X, pady=(0, 10))
+
+        ctk.CTkLabel(
+            status_card,
+            text="Troubleshooting door is unlocked.",
+            font=(UI_FONT, 14, "bold"),
+            text_color=theme.get("accent", "#22c55e"),
+            anchor="w",
+        ).pack(fill=tk.X, padx=14, pady=(12, 2))
+
+        ctk.CTkLabel(
+            status_card,
+            text="Use this screen as your maintenance checklist while diagnostics are in progress.",
+            font=UI_FONT_SMALL,
+            text_color=theme.get("muted", theme["fg"]),
+            anchor="w",
+            justify="left",
+        ).pack(fill=tk.X, padx=14, pady=(0, 12))
+
+        checklist_card = ctk.CTkFrame(
+            inner,
+            fg_color=theme.get("card_bg", theme["button_bg"]),
+            corner_radius=14,
+            border_width=1,
+            border_color=theme.get("card_border", "#d1d1d6"),
+        )
+        checklist_card.pack(fill=tk.BOTH, expand=True)
+
+        checklist_lines = [
+            "1. Verify power rails (3.3V and GND) at the RFID reader.",
+            "2. Verify CE0/SCK/MOSI/MISO continuity and connector fit.",
+            "3. Check that the reader reset line (GPIO5) is stable.",
+            "4. Run RFID probe test from terminal if needed:",
+            "   venv/bin/python rfid_single_reader_test.py --ui",
+            "5. Re-seat connectors, then retry card tap/read flow.",
+            "6. Exit troubleshooting mode when maintenance is complete.",
+        ]
+        ctk.CTkLabel(
+            checklist_card,
+            text="\n".join(checklist_lines),
+            font=UI_FONT_BODY,
+            text_color=theme.get("button_fg", theme["fg"]),
+            anchor="nw",
+            justify="left",
+        ).pack(fill=tk.BOTH, expand=True, padx=14, pady=14)
+
+        action_bar = ctk.CTkFrame(inner, fg_color=theme["bg"], corner_radius=0)
+        action_bar.pack(side=tk.BOTTOM, fill=tk.X, pady=(8, 52))
+
+        ctk.CTkButton(
+            action_bar,
+            text="Back To Staff Login",
+            font=(UI_FONT, 12, "bold"),
+            command=self.enter_restock_mode,
+            fg_color=theme.get("button_bg", "#ffffff"),
+            hover_color=theme.get("card_border", "#d1d1d6"),
+            text_color=theme.get("button_fg", "#1c1c1e"),
+            corner_radius=980,
+            height=40,
+            border_width=1,
+            border_color=theme.get("card_border", "#d1d1d6"),
+        ).pack(side=tk.LEFT, padx=(8, 10))
+
+        ctk.CTkButton(
+            action_bar,
+            text="Exit To Main Menu",
+            font=(UI_FONT, 12, "bold"),
+            command=self.build_main_menu,
+            fg_color=theme.get("nav_bg", "#1c1c1e"),
+            hover_color=theme.get("nav_hover", "#333333"),
+            text_color=theme.get("nav_fg", "#ffffff"),
+            corner_radius=980,
+            height=40,
+        ).pack(side=tk.LEFT)
 
         self._slide_in(frame)
         self.add_theme_toggle_footer()

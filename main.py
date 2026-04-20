@@ -230,6 +230,9 @@ IR_BREAK_BEAM_PIN = 26        # Physical pin 37
 STEPS_PER_PRODUCT = 4096      # 28BYJ-48 output-shaft revolution (8-phase half-step)
 STEP_DELAY = 0.002
 SOLENOID_UNLOCK_SECONDS = 3.0
+# Most low-cost 5V relay modules are active-low (IN=LOW energizes relay).
+# Set to False if your relay board is active-high.
+SOLENOID_ACTIVE_LOW = True
 COINS_PER_SECOND = {
     1: 5,                     # 1-peso hopper fallback rate when no pulse feedback
     5: 5,                     # 5-peso hopper fallback rate when no pulse feedback
@@ -295,6 +298,14 @@ def _payment_pulse_edge_gpio_constant(edge_name: str):
     return GPIO.FALLING
 
 
+def _solenoid_idle_level():
+    return GPIO.HIGH if SOLENOID_ACTIVE_LOW else GPIO.LOW
+
+
+def _solenoid_active_level():
+    return GPIO.LOW if SOLENOID_ACTIVE_LOW else GPIO.HIGH
+
+
 # ======================
 #  HARDWARE ABSTRACTION
 # ======================
@@ -316,7 +327,7 @@ def gpio_init():
     # Solenoid outputs (through relay or MOSFET driver)
     for pin in SOLENOID_PINS.values():
         GPIO.setup(pin, GPIO.OUT)
-        GPIO.output(pin, GPIO.LOW)
+        GPIO.output(pin, _solenoid_idle_level())
 
     # Shared RFID reader reset line
     GPIO.setup(RFID_PINS["reader_rst"], GPIO.OUT)
@@ -449,9 +460,9 @@ def unlock_access_door(door: str):
         raise ValueError(f"Unknown door '{door}'")
 
     print(f"[HW] Unlocking {door} door for {SOLENOID_UNLOCK_SECONDS:.1f}s")
-    GPIO.output(pin, GPIO.HIGH)
+    GPIO.output(pin, _solenoid_active_level())
     time.sleep(SOLENOID_UNLOCK_SECONDS)
-    GPIO.output(pin, GPIO.LOW)
+    GPIO.output(pin, _solenoid_idle_level())
 
 def dispense_change(amount: float):
     amount = int(round(amount))
