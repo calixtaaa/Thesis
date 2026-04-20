@@ -113,7 +113,7 @@ class StaffMixin:
 
         ctk.CTkButton(
             inner,
-            text="Read from Door RFID Reader",
+            text="Read from Shared RFID Reader",
             font=(UI_FONT, 11, "bold"),
             command=read_from_door_reader,
             fg_color=theme.get("button_bg", "#ffffff"),

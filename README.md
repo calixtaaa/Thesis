@@ -71,7 +71,7 @@ A Raspberry Pi–based **personal hygiene vending machine** with an integrated A
 - **Hardware abstraction & UI**
   - Stepper motors per slot (GPIO pins configurable)
   - Coin hopper (for change)
-  - Single shared MFRC522 RFID reader for payment, reload, and staff access taps
+  - Single shared MFRC522 RFID reader for payment, reload, restock-door auth, and troubleshoot-door auth taps
   - GPIO mocked on Windows, real on Raspberry Pi
   - Redesigned Light / Dark theme with smooth transitions
   - Version (v1.0.0) in window title and footer
@@ -145,6 +145,7 @@ A Raspberry Pi–based **personal hygiene vending machine** with an integrated A
   - `openpyxl` (Excel export)
   - `python-dotenv` (environment variables)
   - `requests` (API calls)
+  - `mfrc522` (MFRC522 RFID reader access)
 
 Install dependencies:
 
@@ -187,6 +188,22 @@ From the project directory:
 
 ```bash
 python main.py
+```
+
+### RFID Hardware Smoke Test (Raspberry Pi)
+
+Before running the full app, verify the single shared MFRC522 reader:
+
+```bash
+python rfid_single_reader_test.py
+```
+
+This test script polls the shared reader on CE0 and prints detected UIDs.
+
+For a touchscreen-friendly UI tester:
+
+```bash
+python rfid_single_reader_test.py --ui
 ```
 
 On Raspberry Pi with a 7" touchscreen, the app can run fullscreen; on Windows it uses a resizable window (e.g. 800×480).

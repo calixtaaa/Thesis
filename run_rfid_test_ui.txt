@@ -1,0 +1,4 @@
+source venv/bin/activate
+export DISPLAY=:0
+export PYTHONNOUSERSITE=1
+venv/bin/python rfid_single_reader_test.py --ui

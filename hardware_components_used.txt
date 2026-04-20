@@ -12,7 +12,9 @@ Vending Motors
 
 RFID Modules
 - 1x MFRC522 13.56 MHz RFID reader (shared)
-  - Shared for card payment/reload and access door authentication/unlock flows
+  - Shared for card payment/reload and both door authentication/unlock flows:
+    - Restock door
+    - Troubleshooting/wiring door
 
 Door Access Hardware
 - 2x 12V solenoid locks (Model 102)

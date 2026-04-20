@@ -185,15 +185,13 @@ def _hover_scale_btn(btn, normal_padx=10, normal_pady=6, hover_padx=14, hover_pa
     btn.bind("<Leave>", on_leave)
 
 # Raspberry Pi 5 (BCM numbering) pin map.
-# NOTE: MFRC522 readers share SPI0 and use separate CS + RST lines.
+# NOTE: Single shared MFRC522 reader on SPI0 CE0 for payment/reload/door auth flows.
 RFID_PINS = {
     "spi_sclk": 11,              # Physical pin 23
     "spi_mosi": 10,              # Physical pin 19
     "spi_miso": 9,               # Physical pin 21
-    "payment_reader_cs": 8,      # Physical pin 24 (CE0)
-    "door_reader_cs": 7,         # Physical pin 26 (CE1)
-    "payment_reader_rst": 5,     # Physical pin 29
-    "door_reader_rst": 1,        # Physical pin 28
+    "reader_cs": 8,              # Physical pin 24 (CE0)
+    "reader_rst": 5,             # Physical pin 29
 }
 
 # ULN2003 IN1..IN4 mapping per tray motor (28BYJ-48), keyed by DB `slot_number` (1..10).
@@ -320,11 +318,9 @@ def gpio_init():
         GPIO.setup(pin, GPIO.OUT)
         GPIO.output(pin, GPIO.LOW)
 
-    # RFID reader reset lines
-    GPIO.setup(RFID_PINS["payment_reader_rst"], GPIO.OUT)
-    GPIO.setup(RFID_PINS["door_reader_rst"], GPIO.OUT)
-    GPIO.output(RFID_PINS["payment_reader_rst"], GPIO.HIGH)
-    GPIO.output(RFID_PINS["door_reader_rst"], GPIO.HIGH)
+    # Shared RFID reader reset line
+    GPIO.setup(RFID_PINS["reader_rst"], GPIO.OUT)
+    GPIO.output(RFID_PINS["reader_rst"], GPIO.HIGH)
 
     # Coin hopper outputs
     for pin in COIN_HOPPER_PINS.values():
@@ -879,7 +875,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         if not ON_RPI:
             return None
 
-        uid = self._read_rfid_uid_dual_backend(reader_name)
+        uid = self._read_rfid_uid_shared_backend(reader_name)
         if uid:
             return uid
 
@@ -887,7 +883,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             return None
 
         # Most SimpleMFRC522 setups map to CE0; this still enables live tap reads.
-        # Kept as fallback when low-level dual backend is unavailable.
+        # Kept as fallback when low-level backend is unavailable.
         _ = reader_name
         try:
             reader = SimpleMFRC522()
@@ -898,16 +894,17 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             return None
         return None
 
-    def _read_rfid_uid_dual_backend(self, reader_name: str) -> str | None:
-        """Read RFID UID from selected SPI CE device (payment=CE0, door=CE1)."""
+    def _read_rfid_uid_shared_backend(self, reader_name: str) -> str | None:
+        """Read RFID UID from the single shared MFRC522 reader on CE0."""
         if MFRC522 is None:
             return None
 
-        spi_device = 0 if reader_name == "payment" else 1
-        rst_pin = RFID_PINS["payment_reader_rst"] if reader_name == "payment" else RFID_PINS["door_reader_rst"]
+        _ = reader_name
+        spi_device = 0
+        rst_pin = RFID_PINS["reader_rst"]
 
         try:
-            # Reset only the selected reader before a poll.
+            # Reset shared reader before each poll.
             GPIO.output(rst_pin, GPIO.LOW)
             time.sleep(0.01)
             GPIO.output(rst_pin, GPIO.HIGH)
@@ -2733,6 +2730,11 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
 def main():
     global ON_RPI, GPIO
     init_db()
+    if ON_RPI:
+        print(f"[HW] GPIO backend module: {getattr(GPIO, '__file__', 'unknown')}")
+        print(f"[HW] GPIO backend version: {getattr(GPIO, 'VERSION', 'unknown')}")
+    else:
+        print("[HW] GPIO backend: simulation (RPi.GPIO import unavailable)")
     try:
         gpio_init()
         print("[HW] GPIO mode: live (RPi.GPIO)")

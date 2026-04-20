@@ -1072,21 +1072,21 @@ class AdminMixin:
             uid = self.read_rfid_uid("payment")
             if uid:
                 uid_lbl.configure(text=f"Last RFID UID: {uid}")
-                result_lbl.configure(text="Payment reader tap detected.")
+                result_lbl.configure(text="Shared RFID tap detected for payment flow.")
             else:
-                result_lbl.configure(text="No payment RFID tap detected.")
+                result_lbl.configure(text="No RFID tap detected (payment flow).")
 
         def tap_door():
             uid = self.read_rfid_uid("door")
             if uid:
                 uid_lbl.configure(text=f"Last RFID UID: {uid}")
-                result_lbl.configure(text="Door reader tap detected.")
+                result_lbl.configure(text="Shared RFID tap detected for door auth flow.")
             else:
-                result_lbl.configure(text="No door RFID tap detected.")
+                result_lbl.configure(text="No RFID tap detected (door auth flow).")
 
         ctk.CTkButton(
             btn_row,
-            text="Read Payment RFID",
+            text="Read RFID (Payment Flow)",
             command=tap_payment,
             fg_color=self.current_theme.get("accent", "#10b981"),
             hover_color=self.current_theme.get("accent_hover", "#059669"),
@@ -1097,7 +1097,7 @@ class AdminMixin:
 
         ctk.CTkButton(
             btn_row,
-            text="Read Door RFID",
+            text="Read RFID (Door Auth Flow)",
             command=tap_door,
             fg_color=self.current_theme.get("accent", "#10b981"),
             hover_color=self.current_theme.get("accent_hover", "#059669"),

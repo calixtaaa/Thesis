@@ -110,10 +110,8 @@ RFID_PINS = {
     "spi_sclk": 11,
     "spi_mosi": 10,
     "spi_miso": 9,
-    "payment_reader_cs": 8,
-    "door_reader_cs": 7,
-    "payment_reader_rst": 5,
-    "door_reader_rst": 1,
+    "reader_cs": 8,
+    "reader_rst": 5,
 }
 
 _STEPPER_BANK_A = {"in1": 17, "in2": 27, "in3": 22, "in4": 23}
@@ -148,10 +146,8 @@ IR_BREAK_BEAM_PIN = 26
 ALL_OUTPUT_PINS = {
     "RFID SPI SCLK (11)": 11,
     "RFID SPI MOSI (10)": 10,
-    "RFID Payment CS (8)": 8,
-    "RFID Door CS (7)": 7,
-    "RFID Payment RST (5)": 5,
-    "RFID Door RST (1)": 1,
+    "RFID Reader CS (8)": 8,
+    "RFID Reader RST (5)": 5,
     "Motor bank A (slots 1,3,5,7,9) IN1 (17)": 17,
     "Motor bank A (slots 1,3,5,7,9) IN2 (27)": 27,
     "Motor bank A (slots 1,3,5,7,9) IN3 (22)": 22,

@@ -6,7 +6,7 @@ IMPORTANT:
 - Use ULN2003 boards for 28BYJ-48 steppers and relay/MOSFET drivers for solenoids/hoppers.
 
 ========================================
-1) MFRC522 RFID Reader (single module, shared by all flows)
+1) MFRC522 RFID Reader (single module, shared by all RFID flows)
 ========================================
 Shared SPI lines:
 - SCK  -> GPIO11 (Physical pin 23)
@@ -18,6 +18,16 @@ Shared SPI lines:
 Shared RFID Reader:
 - SDA/SS -> GPIO8  (Physical pin 24, CE0)
 - RST    -> GPIO5  (Physical pin 29)
+
+RFID flow usage on this single reader:
+- RFID payment tap
+- RFID card balance/reload tap
+- Restock door unlock authorization tap
+- Troubleshoot door unlock authorization tap
+
+Important:
+- Do not wire a second MFRC522 CS line (CE1) or second RST for this setup.
+- Keep only one MFRC522 module connected to SPI0 CE0.
 
 ========================================
 2) Tray Stepper Motors (28BYJ-48 + ULN2003)
