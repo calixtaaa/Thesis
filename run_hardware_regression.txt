@@ -1,0 +1,12 @@
+source venv/bin/activate
+export DISPLAY=:0
+export PYTHONNOUSERSITE=1
+
+# Basic regression run (RFID probe + stepper pulse test)
+venv/bin/python hardware_regression_checklist.py
+
+# Include loopback checks only when output->input jumper pairs are connected:
+# venv/bin/python hardware_regression_checklist.py --enable-loopback
+
+# Example with explicit slots and higher pulse count:
+# venv/bin/python hardware_regression_checklist.py --slots 2,3 --stepper-steps 32

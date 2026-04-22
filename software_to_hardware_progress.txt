@@ -1,0 +1,226 @@
+Software to Hardware Integration Progress (Raspberry Pi 5)
+Date: 23 April 2026
+Project: Personal Hygiene Vending Machine
+
+Scope
+- This document summarizes current progress of implementing physical hardware components into software.
+- Status is based on existing repository code and hardware notes.
+
+Overall Status Summary
+- Core hardware control layer is implemented in main.py and actively used in purchase and staff flows.
+- Multiple hardware diagnostics tools exist (gpio_test_tool.py, stepper.py, rfid_single_reader_test.py).
+- Main app supports simulation fallback when GPIO/RFID stack is unavailable.
+- Integration is functional for prototype use, with a few wiring/documentation mismatches and some still-simulated business flows.
+
+----------------------------------------------------------------
+1) RFID Reader (MFRC522, single shared reader)
+----------------------------------------------------------------
+Status: IMPLEMENTED IN MAIN APP + TESTED VIA DEDICATED TOOL
+
+What is implemented
+- Shared reader pin map is defined (SPI CE0 + RST GPIO5).
+- RFID read helper methods are implemented with:
+  - low-level MFRC522 request/anticollision path
+  - alternate fallback read methods
+- RFID reads are wired into user flows:
+  - RFID payment flow
+  - RFID reload flow
+  - Staff door authorization flow
+- SPI probe function exists to verify VersionReg communication.
+
+Evidence
+- main.py: RFID_PINS, read_rfid_uid(), probe_rfid_spi_link()
+- staff/staff.py: uses read_rfid_uid("door") for unlock authorization
+- rfid_single_reader_test.py: dedicated CE0 shared-reader smoke test and UI test
+
+Progress notes
+- Raspberry Pi 5 backend issue handling is documented in test script (legacy RPi.GPIO error guidance).
+- Shared-reader architecture is consistently reflected in code and wiring notes.
+
+Remaining gap
+- Buy-card flow still creates a simulated UID using uuid rather than requiring physical RFID card tap for card issuance.
+
+----------------------------------------------------------------
+2) Stepper Motors (28BYJ-48 + ULN2003)
+----------------------------------------------------------------
+Status: IMPLEMENTED IN MAIN APP + STANDALONE TEST TOOL
+
+What is implemented
+- Stepper sequence, step timing, and dispense routine are implemented.
+- Slot-to-pin mapping exists for slots 1..10.
+- Main app calls physical dispense during both:
+  - cash purchase completion
+  - RFID purchase completion
+- Coils are de-energized after dispense to reduce heat.
+
+Evidence
+- main.py: PRODUCT_STEPPER_PINS, ULN2003_SEQUENCE, dispense_from_slot()
+- main.py: _do_dispense_cash(), _do_dispense_rfid() invoke dispense_from_slot()
+- stepper.py: independent stepper test utility and UI
+
+Progress notes
+- Current mapping uses two shared banks (odd slots bank A, even slots bank B), suitable for current wiring constraints.
+- This is a practical prototype mapping, not full independent motor-per-slot wiring.
+
+Remaining gap
+- For true independent 10-slot motor control, hardware expansion (GPIO expander/motor controller) and updated pin mapping are still needed.
+
+----------------------------------------------------------------
+3) IR Break-Beam Vend Confirmation
+----------------------------------------------------------------
+Status: IMPLEMENTED IN MAIN APP FLOW
+
+What is implemented
+- Input pin configured in GPIO init.
+- Vend confirmation wait loop checks active-low beam break.
+- Called after each product dispense in cash and RFID purchase flows.
+
+Evidence
+- main.py: IR_BREAK_BEAM_PIN, wait_for_vend_confirmation()
+- main.py: _do_dispense_cash(), _do_dispense_rfid()
+
+Progress notes
+- Current behavior logs warning when no confirmation is detected, but transaction flow still proceeds.
+
+Remaining gap
+- Optional future hard-stop/retry logic can be added if no vend confirmation pulse is seen.
+
+----------------------------------------------------------------
+4) Solenoid Door Locks (Restock + Troubleshoot)
+----------------------------------------------------------------
+Status: IMPLEMENTED IN MAIN APP + STAFF AUTH FLOW
+
+What is implemented
+- Two solenoid output pins are defined and initialized.
+- Unlock pulse timing is implemented.
+- Role-based authorization logic is implemented before unlock.
+- Staff UI supports selecting door (restock/troubleshoot) and tapping/typing RFID ID.
+
+Evidence
+- main.py: SOLENOID_PINS, unlock_access_door(), is_user_authorized_for_door()
+- staff/staff.py: enter_restock_mode() door unlock workflow
+
+Progress notes
+- Door security is software-enforced by role and staff flags.
+
+Remaining gap
+- No explicit hardware feedback sensor for door-open/door-closed state is currently integrated.
+
+----------------------------------------------------------------
+5) Cash Inputs (Bill/Coin Acceptor Pulses)
+----------------------------------------------------------------
+Status: PARTIALLY IMPLEMENTED (LIVE PULSE INPUTS + SIMULATION UI)
+
+What is implemented
+- Pulse input pins are configured with event detection and debounce.
+- Pulse counters are converted into monetary value.
+- Cash polling loop updates payment/reload screens using live pulse counts.
+
+Evidence
+- main.py: PAYMENT_INPUT_PINS, _payment_pulse_callback(), consume_payment_pulse_amount()
+- main.py: start_cash_pulse_monitor()
+
+Progress notes
+- App currently supports both:
+  - simulated +amount UI buttons (development convenience)
+  - live pulse accumulation from acceptors
+
+Remaining gap
+- Full production behavior should remove or lock simulation buttons when running live machine mode.
+
+----------------------------------------------------------------
+6) Coin Hoppers (Change Dispensing + Pulse Feedback)
+----------------------------------------------------------------
+Status: IMPLEMENTED IN MAIN APP
+
+What is implemented
+- Hopper control output pins are defined and initialized.
+- Feedback pulse pins are configured and counted.
+- Change algorithm dispenses higher denomination first (5, then 1).
+- Dispense routine uses pulse counting with timeout and warning handling.
+- Off-Pi fallback timing logic exists for simulation/dev.
+
+Evidence
+- main.py: COIN_HOPPER_PINS, HOPPER_FEEDBACK_PINS, _hopper_pulse_callback()
+- main.py: dispense_change()
+
+Progress notes
+- Feedback-based dispensing is better than time-only dispensing and is already implemented.
+
+Remaining gap
+- Final calibration per hopper board (pulse per coin and timeout tuning) still needs live hardware validation.
+
+----------------------------------------------------------------
+7) GPIO Bring-Up, Diagnostics, and Test Utilities
+----------------------------------------------------------------
+Status: STRONG TOOLING IN PLACE
+
+What is implemented
+- Full GPIO pin test utility with event logging and loopback tests.
+- Standalone stepper motion test app.
+- Standalone single-reader RFID smoke test app and CLI probes.
+- New consolidated hardware regression checklist runner that executes repeatable smoke checks and writes reports to debug_logs.
+- Launcher scripts for running main app and test tools.
+
+Evidence
+- gpio_test_tool.py
+- stepper.py
+- rfid_single_reader_test.py
+- hardware_regression_checklist.py
+- run_main.txt, run_stepper.txt, run_rfid_test.txt, run_rfid_test_ui.txt, run_hardware_regression.txt
+
+Progress notes
+- Tooling significantly reduces integration risk and speeds field debugging.
+
+----------------------------------------------------------------
+8) Important Alignment Issues Found
+----------------------------------------------------------------
+A) Coin acceptor pin mismatch between docs and code
+- hardware_pin_connections.txt lists coin acceptor pulse on GPIO13.
+- main.py and gpio_test_tool.py currently use coin acceptor on GPIO19.
+
+Impact
+- If wiring follows hardware_pin_connections.txt while software expects GPIO19, coin pulses will not be counted.
+
+Action needed
+- Choose one canonical pin (13 or 19), then update either wiring docs or software constants so all files match.
+
+B) README has older wording about simulated cash flow
+- README still references cash as simulated buttons, while main.py already includes live pulse monitoring.
+
+Impact
+- Documentation does not fully reflect current implementation progress.
+
+Action needed
+- Refresh README hardware status section to match actual code behavior.
+
+----------------------------------------------------------------
+9) Raspberry Pi 5 Compatibility Readiness
+----------------------------------------------------------------
+Current readiness level: PROTOTYPE READY / PRE-PRODUCTION
+
+What is ready now
+- Main app can initialize GPIO and run hardware routines directly.
+- RFID, steppers, solenoids, hoppers, and pulse inputs are wired in software.
+- Fallback simulation mode prevents full app failure when GPIO init fails.
+
+What still needs completion for production confidence
+- Resolve pin-map mismatch (coin acceptor).
+- Replace simulated RFID card issuance with physical-card tap workflow.
+- Remove or gate simulated cash buttons in production mode.
+- Perform full end-to-end calibration tests on actual machine:
+  - pulse scaling (coin/bill)
+  - hopper pulse reliability
+  - vend confirmation timing
+  - stepper step count per product lane
+
+----------------------------------------------------------------
+10) Suggested Next Milestone (Implementation Order)
+----------------------------------------------------------------
+1. Normalize hardware pin mapping across main.py, gpio_test_tool.py, and hardware_pin_connections.txt.
+2. Add production mode flag to disable all simulated money input buttons.
+3. Change buy-card flow to require real RFID tap and register actual UID.
+4. Execute hardware_regression_checklist.py on Pi 5 before each deployment candidate and archive report artifacts.
+5. Update README hardware integration section after pin-map normalization and production-mode gating are complete.
+
+End of document.
