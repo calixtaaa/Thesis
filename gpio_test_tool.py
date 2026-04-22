@@ -126,18 +126,7 @@ SOLENOID_PINS = {
 }
 
 PAYMENT_INPUT_PINS = {
-    "bill_acceptor": 6,
     "coin_acceptor": 19,
-}
-
-COIN_HOPPER_PINS = {
-    1: 12,
-    5: 21,
-}
-
-HOPPER_FEEDBACK_PINS = {
-    1: 24,
-    5: 25,
 }
 
 IR_BREAK_BEAM_PIN = 26
@@ -157,8 +146,6 @@ ALL_OUTPUT_PINS = {
     "Motor bank B (slots 2,4,6,8,10) IN4 (14)": 14,
     "Solenoid Restock (16)": 16,
     "Solenoid Troubleshoot (20)": 20,
-    "Coin Hopper 1-peso (12)": 12,
-    "Coin Hopper 5-peso (21)": 21,
 }
 
 # Reserved by the SPI driver for MFRC522 CE0. Do not toggle as a generic GPIO output.
@@ -167,10 +154,7 @@ RESERVED_PINS = {
 }
 
 ALL_INPUT_PINS = {
-    "Bill Acceptor Pulse (6)": 6,
     "Coin Acceptor Pulse (19)": 19,
-    "Hopper 1-peso Feedback (24)": 24,
-    "Hopper 5-peso Feedback (25)": 25,
     "IR Break Beam (26)": 26,
     "RFID SPI MISO (9)": 9,
 }
@@ -178,10 +162,16 @@ ALL_INPUT_PINS = {
 OUTPUT_PIN_TO_LABEL = {pin: label for label, pin in ALL_OUTPUT_PINS.items()}
 INPUT_PIN_TO_LABEL = {pin: label for label, pin in ALL_INPUT_PINS.items()}
 
-DEFAULT_LOOPBACK_TESTS = [
-    ("Coin Hopper 1-peso (12)", "Hopper 1-peso Feedback (24)"),
-    ("Coin Hopper 5-peso (21)", "Hopper 5-peso Feedback (25)"),
-]
+DEFAULT_LOOPBACK_TESTS = []
+
+STEPPER_BACKEND = os.getenv("STEPPER_BACKEND", "mcp23017" if Path("/dev/i2c-1").exists() else "native_gpio").strip().lower()
+
+
+def _describe_stepper_backend() -> str:
+    i2c_ready = Path("/dev/i2c-1").exists()
+    if STEPPER_BACKEND == "mcp23017":
+        return "MCP23017 preferred (I2C ready)" if i2c_ready else "MCP23017 preferred (I2C missing, native GPIO test mode)"
+    return "native GPIO stepper mode"
 
 UI_FONT = "Segoe UI"
 UI_FONT_BOLD = (UI_FONT, 12, "bold")
@@ -277,6 +267,7 @@ class GPIOTestTool(ctk.CTk):
             print(f"[GPIO Test Tool] GPIO mode: live ({GPIO_LIBRARY})")
         else:
             print("[GPIO Test Tool] GPIO mode: simulation")
+        print(f"[GPIO Test Tool] Stepper backend: {_describe_stepper_backend()}")
         print(f"[GPIO Test Tool] Window mode: {'fullscreen' if self._fill_screen else 'windowed'}")
         
         # Build UI

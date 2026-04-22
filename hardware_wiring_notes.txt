@@ -2,40 +2,42 @@ Hardware Wiring Notes and Electrical Safety
 
 1) Power Distribution
 - Raspberry Pi 5 runs on its own regulated 5V supply.
-- 12V devices (solenoids, hoppers, some acceptors) need a separate 12V PSU.
+- 12V devices (solenoids and stepper motors) need a separate 12V PSU.
 - Your 28BYJ-48 dispensing motor is the 12V variant, so each ULN2003AN board motor supply should be 12V.
 - ULN2003AN inputs are controlled by 3.3V Raspberry Pi GPIO, but motor power is external.
 - Tie all grounds together: Pi GND, 12V driver board GND, ULN2003 GND, sensor GND.
 
-2) Solenoid and Hopper Driving
-- Solenoid locks and coin hoppers are inductive loads.
+2) Solenoid Driving
+- Solenoid locks are inductive loads.
 - Drive these through relay modules or logic-level MOSFET driver boards.
 - Add flyback diode protection if your driver board does not include it.
 - Never wire Pi GPIO directly to 12V loads.
-- Hopper motor-control input and hopper pulse-feedback output are separate signals.
 
-3) MFRC522 Reader Notes
+3) MCP23017 Expansion for Stepper Control
+- Stepper coil control signals are expanded through MCP23017 chips over I2C.
+- Use Pi I2C-1 (GPIO2 SDA, GPIO3 SCL).
+- Keep MCP23017 logic supply at 3.3V.
+- Configure A0/A1/A2 address pins for unique addresses (0x20, 0x21, 0x22 in current code).
+- Each ULN2003 channel uses four expander outputs (IN1..IN4).
+- Keep I2C wiring short and use proper pull-ups for stable bus operation.
+
+4) MFRC522 Reader Notes
 - MFRC522 is 3.3V logic. Do not feed 5V logic into Pi SPI lines.
 - One reader is shared across payment/reload and both door unlock authorization flows.
 - Reader uses SPI CE0 as chip select and a single reset pin.
 - For this design, do not wire a second reader on CE1.
 
-4) Bill/Coin Acceptor Pulse Inputs
-- Verify pulse output voltage from TB74 and WEIYU modules.
+5) Coin Acceptor Pulse Input (coin-only)
+- Verify pulse output voltage from your coin acceptor.
 - If pulse output is above 3.3V, use level shifter or divider before Pi GPIO input.
-- Inputs in code are configured with pull-up, expecting pulse-to-ground style signaling.
+- Input in code is configured with pull-up, expecting pulse-to-ground style signaling.
+- Bill acceptor and coin hopper feedback lines are not used in the current build.
 
-4.1) Coin Hopper Pulse Feedback Inputs
-- Wire each hopper coin-out pulse line to its dedicated Pi GPIO input.
-- Hopper pulse output is often open-collector; use correct pull-up and common ground.
-- Confirm pulse-per-coin ratio on your hopper controller board (usually 1 pulse per coin).
-- Software now dispenses change by counting hopper pulses, not only by time.
-
-5) IR Break-Beam Sensor
+6) IR Break-Beam Sensor
 - Code expects active-low trigger on GPIO26 for vend confirmation.
 - Adjust logic in software if your sensor outputs active-high.
 
-6) Stepper Motion Parameters
+7) Stepper Motion Parameters
 - Current software uses ULN2003 8-phase half-step sequence.
 - Current code constants in main.py:
 	- STEPS_PER_PRODUCT = 4096
@@ -43,8 +45,8 @@ Hardware Wiring Notes and Electrical Safety
 - Treat STEPS_PER_PRODUCT as a calibration value for one dispense cycle (not always one full output-shaft revolution in every mechanism).
 - Tune STEP_DELAY and STEPS_PER_PRODUCT in main.py based on your spiral/dispenser geometry.
 
-7) Raspberry Pi Implementation Checklist (28BYJ-48 12V + ULN2003AN)
-- Wire ULN2003 IN1..IN4 to the exact BCM pins defined in hardware_pin_connections.txt.
+8) Raspberry Pi Implementation Checklist (28BYJ-48 12V + ULN2003AN + MCP23017)
+- Wire ULN2003 IN1..IN4 to MCP23017 outputs based on hardware_pin_connections.txt slot mapping.
 - Keep motor power (12V) separate from Pi power (5V), but keep common ground.
 - Verify PRODUCT_STEPPER_PINS in main.py matches your physical wiring before live testing.
 - Start with low-risk test runs using the GPIO test utility before full vending:
@@ -55,7 +57,6 @@ Hardware Wiring Notes and Electrical Safety
 - After GPIO test passes, run the main app and perform one-item dispense tests per slot.
 - If motor stalls/skips: reduce speed first (increase STEP_DELAY), then fine-tune STEPS_PER_PRODUCT.
 
-8) Expansion for Many Trays
-- Direct GPIO wiring is limited for many ULN2003 channels.
-- For full multi-tray deployments, consider GPIO expanders or dedicated motor controllers.
-- Keep one tray-per-slot software mapping aligned with database slot_number.
+9) Legacy/Removed Hardware Notes
+- Direct GPIO banked stepper mode is still available via STEPPER_BACKEND=native_gpio for troubleshooting.
+- Bill acceptor and coin hopper wiring notes were removed because those modules are not part of the active build.

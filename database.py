@@ -169,7 +169,6 @@ def init_db():
             "INSERT INTO hardware_settings (setting_key, setting_value) VALUES (?, ?)",
             [
                 ("coin_pulse_value", "1.0"),
-                ("bill_pulse_value", "20.0"),
             ],
         )
         conn.commit()

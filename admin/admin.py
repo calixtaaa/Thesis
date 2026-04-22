@@ -1125,7 +1125,7 @@ class AdminMixin:
         self.add_theme_toggle_footer()
 
     def show_cash_pulse_settings_screen(self):
-        """Configure bill/coin acceptor pulse-to-value mappings."""
+        """Configure coin acceptor pulse-to-value mapping."""
         self._current_screen_builder = self.show_cash_pulse_settings_screen
         self.clear_screen()
 
@@ -1141,7 +1141,7 @@ class AdminMixin:
 
         ctk.CTkLabel(
             frame,
-            text="Set how much peso value each input pulse represents.",
+            text="Set how much peso value each coin-acceptor pulse represents.",
             font=UI_FONT_SMALL,
             text_color=self.current_theme.get("muted", self.current_theme["fg"]),
         ).pack(pady=(0, 12))
@@ -1159,7 +1159,6 @@ class AdminMixin:
         inner.pack(fill=tk.X, padx=14, pady=14)
 
         coin_var = tk.StringVar(value=str(getattr(self, "coin_pulse_value", 1.0)))
-        bill_var = tk.StringVar(value=str(getattr(self, "bill_pulse_value", 20.0)))
         current_edge = "falling"
         try:
             current_edge = str(self.get_hardware_setting_data("payment_pulse_edge", "falling") or "falling").strip().lower()
@@ -1172,10 +1171,6 @@ class AdminMixin:
         ctk.CTkLabel(inner, text="Coin acceptor pulse value (PHP):", font=UI_FONT_BODY, text_color=self.current_theme["fg"]).pack(anchor="w")
         coin_entry = ctk.CTkEntry(inner, textvariable=coin_var, width=220)
         coin_entry.pack(anchor="w", pady=(4, 10))
-
-        ctk.CTkLabel(inner, text="Bill acceptor pulse value (PHP):", font=UI_FONT_BODY, text_color=self.current_theme["fg"]).pack(anchor="w")
-        bill_entry = ctk.CTkEntry(inner, textvariable=bill_var, width=220)
-        bill_entry.pack(anchor="w", pady=(4, 10))
 
         ctk.CTkLabel(inner, text="Payment pulse edge:", font=UI_FONT_BODY, text_color=self.current_theme["fg"]).pack(anchor="w")
         edge_menu = ctk.CTkOptionMenu(
@@ -1196,17 +1191,14 @@ class AdminMixin:
         def save_values():
             try:
                 coin_val = float((coin_var.get() or "").strip())
-                bill_val = float((bill_var.get() or "").strip())
                 edge_val = str(pulse_edge_var.get() or "falling").strip().lower()
-                if coin_val <= 0 or bill_val <= 0:
-                    raise ValueError("Values must be positive numbers.")
+                if coin_val <= 0:
+                    raise ValueError("Value must be a positive number.")
                 if edge_val not in {"falling", "rising"}:
                     raise ValueError("Pulse edge must be either 'falling' or 'rising'.")
 
                 self.coin_pulse_value = coin_val
-                self.bill_pulse_value = bill_val
                 self.set_hardware_setting_data("coin_pulse_value", str(coin_val))
-                self.set_hardware_setting_data("bill_pulse_value", str(bill_val))
                 self.set_hardware_setting_data("payment_pulse_edge", edge_val)
                 status_lbl.configure(
                     text="Saved. Restart app to apply pulse-edge change.",
@@ -1267,9 +1259,6 @@ class AdminMixin:
 
         coin_lbl = ctk.CTkLabel(card, text="Coin pulses: 0", font=UI_FONT_BODY, text_color=self.current_theme["fg"])
         coin_lbl.pack(anchor="w", padx=14, pady=(12, 4))
-
-        bill_lbl = ctk.CTkLabel(card, text="Bill pulses: 0", font=UI_FONT_BODY, text_color=self.current_theme["fg"])
-        bill_lbl.pack(anchor="w", padx=14, pady=4)
 
         uid_lbl = ctk.CTkLabel(card, text="Last RFID UID: (none)", font=UI_FONT_BODY, text_color=self.current_theme["fg"])
         uid_lbl.pack(anchor="w", padx=14, pady=4)
@@ -1356,7 +1345,6 @@ class AdminMixin:
                 return
             counts = self.get_payment_pulse_counts_data()
             coin_lbl.configure(text=f"Coin pulses: {counts['coin_acceptor']}")
-            bill_lbl.configure(text=f"Bill pulses: {counts['bill_acceptor']}")
             frame.after(500, refresh_counts)
 
         refresh_counts()

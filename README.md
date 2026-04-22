@@ -27,7 +27,7 @@ A Raspberry Pi–based **personal hygiene vending machine** with an integrated A
   - Product list with available stock and price
   - Greyed-out / disabled buttons if product is out of stock
   - Quantity selection per product
-  - Cash payment (simulated buttons; later replace with coin/bill acceptors)
+  - Coin payment (coin acceptor pulse input + simulated top-up buttons for development)
   - RFID cashless payment (balance deducted from card)
   - Smart product recommendations based on purchase history
 
@@ -69,8 +69,7 @@ A Raspberry Pi–based **personal hygiene vending machine** with an integrated A
     - Customer insights
 
 - **Hardware abstraction & UI**
-  - Stepper motors per slot (GPIO pins configurable)
-  - Coin hopper (for change)
+  - Stepper motors per slot via MCP23017 GPIO expander mapping (with native GPIO fallback)
   - Single shared MFRC522 RFID reader for payment, reload, restock-door auth, and troubleshoot-door auth taps
   - GPIO mocked on Windows, real on Raspberry Pi
   - Redesigned Light / Dark theme with smooth transitions

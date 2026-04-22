@@ -122,12 +122,12 @@ TROUBLESHOOTING = {
         "Please try another product or report the issue."
     ),
     "payment": (
-        "The machine accepts coins and bills through the physical slots, or RFID card payments. "
+        "The machine accepts coins through the physical slot, or RFID card payments. "
         "Insert your payment and the screen will update automatically."
     ),
     "change": (
-        "The machine will dispense your change automatically after purchase using our coin hoppers. "
-        "If you did not receive your change, please tap 'Report' on the main menu."
+        "This build runs without automatic coin hoppers, so please use exact payment when possible. "
+        "If you inserted too much, please tap 'Report' on the main menu so staff can assist."
     ),
     "error": (
         "If you see an error message, try restarting your order. "

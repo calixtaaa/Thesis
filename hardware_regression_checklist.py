@@ -37,13 +37,45 @@ class ChecklistError(Exception):
 class StepperDriver:
     """Minimal stepper driver for ULN2003 test pulses without opening UI tools."""
 
-    def __init__(self, pins: dict[str, int]):
+    def __init__(self, pins: dict):
         self.pins = pins
         self.backend = None
         self.devices = {}
         self.gpio = None
+        self.bus = None
+        self.olat_a = 0x00
+        self.olat_b = 0x00
+
+    def _setup_mcp23017(self) -> bool:
+        if str(self.pins.get("backend", "")).strip().lower() != "mcp23017":
+            return False
+        address = self.pins.get("address")
+        if address is None:
+            raise ChecklistError("MCP23017 mapping is missing 'address'.")
+
+        try:
+            from smbus2 import SMBus  # type: ignore
+        except Exception:
+            try:
+                from smbus import SMBus  # type: ignore
+            except Exception as exc:
+                raise ChecklistError("Install smbus2 (or smbus) for MCP23017 tests.") from exc
+
+        self.backend = "mcp23017"
+        self.bus = SMBus(1)
+        addr = int(address)
+        self.bus.write_byte_data(addr, 0x00, 0x00)  # IODIRA outputs
+        self.bus.write_byte_data(addr, 0x01, 0x00)  # IODIRB outputs
+        self.bus.write_byte_data(addr, 0x14, 0x00)  # OLATA
+        self.bus.write_byte_data(addr, 0x15, 0x00)  # OLATB
+        self.olat_a = 0x00
+        self.olat_b = 0x00
+        return True
 
     def setup(self) -> None:
+        if self._setup_mcp23017():
+            return
+
         try:
             from gpiozero import OutputDevice  # type: ignore
 
@@ -68,6 +100,26 @@ class StepperDriver:
             raise ChecklistError(f"Stepper GPIO setup failed: {exc}") from exc
 
     def set_phase(self, phase: tuple[int, int, int, int]) -> None:
+        if self.backend == "mcp23017" and self.bus is not None:
+            addr = int(self.pins["address"])
+            for pin_name, value in zip(("in1", "in2", "in3", "in4"), phase):
+                pin = int(self.pins[pin_name])
+                if pin < 8:
+                    if value:
+                        self.olat_a |= 1 << pin
+                    else:
+                        self.olat_a &= ~(1 << pin)
+                else:
+                    bit = pin - 8
+                    if value:
+                        self.olat_b |= 1 << bit
+                    else:
+                        self.olat_b &= ~(1 << bit)
+
+            self.bus.write_byte_data(addr, 0x14, self.olat_a & 0xFF)
+            self.bus.write_byte_data(addr, 0x15, self.olat_b & 0xFF)
+            return
+
         if self.backend == "gpiozero":
             for pin_name, value in zip(("in1", "in2", "in3", "in4"), phase):
                 self.devices[self.pins[pin_name]].value = bool(value)
@@ -87,7 +139,16 @@ class StepperDriver:
 
     def cleanup(self) -> None:
         try:
-            if self.backend == "gpiozero":
+            if self.backend == "mcp23017" and self.bus is not None:
+                try:
+                    addr = int(self.pins["address"])
+                    self.bus.write_byte_data(addr, 0x14, 0x00)
+                    self.bus.write_byte_data(addr, 0x15, 0x00)
+                except Exception:
+                    pass
+                self.bus.close()
+                self.bus = None
+            elif self.backend == "gpiozero":
                 for dev in self.devices.values():
                     try:
                         dev.close()
@@ -203,9 +264,9 @@ def parse_slots(slot_text: str) -> list[int]:
 
 def stepper_spin(slot: int, steps: int, delay_s: float) -> tuple[str, str]:
     try:
-        from stepper import PRODUCT_STEPPER_PINS, ULN2003_SEQUENCE
+        from main import PRODUCT_STEPPER_PINS, ULN2003_SEQUENCE
     except Exception as exc:
-        return "FAIL", f"Could not import stepper mappings: {exc}"
+        return "FAIL", f"Could not import runtime stepper mappings: {exc}"
 
     pins = PRODUCT_STEPPER_PINS.get(slot)
     if not pins:
@@ -429,8 +490,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--loopback-pairs",
-        default="12:24,21:25",
-        help="Output:input comma list for loopback, e.g. 12:24,21:25.",
+        default="",
+        help="Output:input comma list for loopback, e.g. 17:6.",
     )
     parser.add_argument(
         "--loopback-pulses",

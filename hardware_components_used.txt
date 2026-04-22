@@ -6,9 +6,12 @@ Core Controller
 Vending Motors
 - 28BYJ-48 stepper motor (12V variant for product dispensing)
 - ULN2003AN stepper motor driver board (one per tray/lane)
-  - ULN2003 IN1..IN4 are driven by Raspberry Pi GPIO
+  - ULN2003 IN1..IN4 are driven by MCP23017 GPIO expander outputs
   - ULN2003 board power input is supplied by external 12V PSU for the 12V motor
   - Raspberry Pi and 12V PSU grounds are tied together (common ground)
+- 3x MCP23017-E/SP I2C GPIO expander
+  - Addresses used: 0x20, 0x21, 0x22
+  - Provides independent IN1..IN4 control lines for slots 1..10
 
 RFID Modules
 - 1x MFRC522 13.56 MHz RFID reader (shared)
@@ -22,14 +25,11 @@ Door Access Hardware
   - Troubleshooting/wiring door
 
 Cash Inputs
-- TB74 bill acceptor
 - WEIYU Universal Coin Slot (1239/1239A)
 
-Change Dispensing
-- 2x Allan coin hopper (blue plastic)
-  - Hopper for 1 peso coins
-  - Hopper for 5 peso coins
-  - Hopper pulse-out feedback lines wired to Pi for pulse-counted dispensing
+Removed from current build
+- TB74 bill acceptor
+- Allan coin hopper modules and hopper pulse feedback wiring
 
 Vend Confirmation
 - IR Break-Beam sensor at product drop path

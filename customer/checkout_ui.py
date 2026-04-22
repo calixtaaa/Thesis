@@ -200,7 +200,7 @@ def build_payment_method_content(app, parent, items, total):
     ctk.CTkLabel(card, text=summary_text, font=app._ui_font_body, text_color=app.current_theme["button_fg"], wraplength=360, justify="center").pack(pady=(20, 8), padx=20)
     ctk.CTkLabel(card, text=f"Total: ₱{total:.2f}", font=app._ui_font_title, text_color=app.current_theme["button_fg"]).pack(pady=(0, 16), padx=20)
 
-    ctk.CTkButton(card, text="Pay with Cash\nInsert coins or bills", font=app._ui_font_button, fg_color=app.current_theme.get("accent", "#1A948E"), hover_color=app.current_theme.get("accent_hover", "#15857B"), text_color=app.current_theme.get("on_accent", "#ffffff"), corner_radius=10, height=60, command=lambda: app.cash_payment_flow(total)).pack(pady=8, padx=20, fill=tk.X)
+    ctk.CTkButton(card, text="Pay with Coins\nCoin acceptor only", font=app._ui_font_button, fg_color=app.current_theme.get("accent", "#1A948E"), hover_color=app.current_theme.get("accent_hover", "#15857B"), text_color=app.current_theme.get("on_accent", "#ffffff"), corner_radius=10, height=60, command=lambda: app.cash_payment_flow(total)).pack(pady=8, padx=20, fill=tk.X)
     ctk.CTkButton(card, text="Pay with RFID Card\nCashless payment", font=app._ui_font_button, fg_color=app.current_theme.get("accent", "#1A948E"), hover_color=app.current_theme.get("accent_hover", "#15857B"), text_color=app.current_theme.get("on_accent", "#ffffff"), corner_radius=10, height=60, command=lambda: app.rfid_payment_flow(total)).pack(pady=(8, 20), padx=20, fill=tk.X)
     ctk.CTkButton(parent, text="Back", font=app._ui_font_body, fg_color=app.current_theme["button_bg"], hover_color=app.current_theme.get("accent", "#1A948E"), text_color=app.current_theme["button_fg"], corner_radius=8, height=36, command=app.go_back_from_payment_method).pack(pady=10)
 
@@ -215,10 +215,10 @@ def build_cash_payment_content(app, parent, total_amount: float):
     action_bar = ctk.CTkFrame(content, fg_color=app.current_theme["bg"], corner_radius=0)
     action_bar.pack(side=tk.BOTTOM, fill=tk.X, pady=(0, 4))
 
-    ctk.CTkLabel(content, text="Pay with Cash", font=app._ui_font_bold, text_color=app.current_theme["fg"]).pack(pady=(8, 4))
+    ctk.CTkLabel(content, text="Pay with Coins", font=app._ui_font_bold, text_color=app.current_theme["fg"]).pack(pady=(8, 4))
     helper_var = tk.StringVar(
         value=(
-            "Cash pulses from bill/coin acceptors are read from GPIO. "
+            "Coin pulses from the coin acceptor are read from GPIO. "
             f"{app.format_payment_pulse_debug_text()}"
         )
     )
@@ -249,7 +249,7 @@ def build_cash_payment_content(app, parent, total_amount: float):
 
     def _refresh_pulse_debug():
         helper_var.set(
-            "Cash pulses from bill/coin acceptors are read from GPIO. "
+            "Coin pulses from the coin acceptor are read from GPIO. "
             f"{app.format_payment_pulse_debug_text()}"
         )
 
@@ -258,7 +258,7 @@ def build_cash_payment_content(app, parent, total_amount: float):
     tk.Label(card, textvariable=amount_display_var, font=(app._ui_font_name, 22, "bold"), bg=app.current_theme["button_bg"], fg=app.current_theme["button_fg"]).pack()
     ctk.CTkLabel(card, text="Remaining:", font=app._ui_font_body, text_color=app.current_theme["button_fg"]).pack(pady=(10, 4), padx=20)
     tk.Label(card, textvariable=remaining_display_var, font=(app._ui_font_name, 22, "bold"), bg=app.current_theme["button_bg"], fg=app.current_theme["button_fg"]).pack()
-    ctk.CTkLabel(card, text="Change:", font=app._ui_font_body, text_color=app.current_theme["button_fg"]).pack(pady=(10, 4), padx=20)
+    ctk.CTkLabel(card, text="Overpay amount:", font=app._ui_font_body, text_color=app.current_theme["button_fg"]).pack(pady=(10, 4), padx=20)
     tk.Label(card, textvariable=change_display_var, font=(app._ui_font_name, 22, "bold"), bg=app.current_theme["button_bg"], fg=app.current_theme.get("accent", app.current_theme["button_fg"])).pack()
 
     ctk.CTkLabel(content, text="Quick Insert:", font=app._ui_font_small, text_color=app.current_theme.get("muted", app.current_theme["fg"])).pack(side=tk.BOTTOM, anchor="w", padx=24, pady=(0, 2))

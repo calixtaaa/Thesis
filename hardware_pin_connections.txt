@@ -1,100 +1,95 @@
-Raspberry Pi 5 GPIO Pin Connections (BCM numbering)
+Raspberry Pi 5 GPIO and MCP23017 Connections
 
 IMPORTANT:
 - Use a common GND between Raspberry Pi and all external 12V driver supplies.
 - Do NOT drive motors/solenoids directly from Pi GPIO.
-- Use ULN2003 boards for 28BYJ-48 steppers and relay/MOSFET drivers for solenoids/hoppers.
+- ULN2003 controls the motor coils; MCP23017 provides extra control pins for ULN2003 IN1..IN4.
 
 ========================================
-1) MFRC522 RFID Reader (single module, shared by all RFID flows)
+1) MFRC522 RFID Reader (single shared module)
 ========================================
 Shared SPI lines:
 - SCK  -> GPIO11 (Physical pin 23)
 - MOSI -> GPIO10 (Physical pin 19)
-- MISO -> GPIO9  (Physical pin 21) 
+- MISO -> GPIO9  (Physical pin 21)
 - VCC  -> 3.3V
 - GND  -> GND
 
-Shared RFID Reader:
+Shared reader control:
 - SDA/SS -> GPIO8  (Physical pin 24, CE0)
 - RST    -> GPIO5  (Physical pin 29)
 
-RFID flow usage on this single reader:
-- RFID payment tap
-- RFID card balance/reload tap
+RFID flow usage:
+- Payment tap
+- Card reload tap
 - Restock door unlock authorization tap
 - Troubleshoot door unlock authorization tap
 
-Important:
-- Do not wire a second MFRC522 CS line (CE1) or second RST for this setup.
-- Keep only one MFRC522 module connected to SPI0 CE0.
-
 ========================================
-2) Tray Stepper Motors (28BYJ-48 + ULN2003)
+2) Stepper Expansion (28BYJ-48 + ULN2003 + MCP23017-E/SP)
 ========================================
-Per ULN2003AN board wiring (12V 28BYJ-48 setup):
-- Motor 5-wire connector -> ULN2003 motor socket
-- ULN2003 V+ / DC+ -> +12V from external PSU
+Per ULN2003 board (12V motor variant):
+- Motor connector -> ULN2003 motor socket
+- ULN2003 V+ / DC+ -> +12V external PSU
 - ULN2003 GND / DC- -> PSU GND
-- Raspberry Pi GND -> same PSU GND (common ground)
-- Raspberry Pi GPIO pins -> ULN2003 IN1, IN2, IN3, IN4
-- Do NOT connect ULN2003 motor supply pin to Raspberry Pi 5V when using the 12V motor variant
+- Pi GND -> same PSU GND (common ground)
+- MCP23017 GPIO -> ULN2003 IN1, IN2, IN3, IN4
 
-Tray/Slot 1 ULN2003 inputs:
-- IN1 -> GPIO17 (Physical pin 11)
-- IN2 -> GPIO27 (Physical pin 13)
-- IN3 -> GPIO22 (Physical pin 15)
-- IN4 -> GPIO23 (Physical pin 16)
+MCP23017 bus wiring:
+- Pi GPIO2  (Physical pin 3)  -> SDA
+- Pi GPIO3  (Physical pin 5)  -> SCL
+- 3.3V -> VDD
+- GND  -> VSS
+- RESET -> 3.3V (pull-up)
+- A0/A1/A2 set per chip address
 
-Tray/Slot 2 ULN2003 inputs:
-- IN1 -> GPIO4  (Physical pin 7)
-- IN2 -> GPIO18 (Physical pin 12)
-- IN3 -> GPIO15 (Physical pin 10)
-- IN4 -> GPIO14 (Physical pin 8)
+Configured expander addresses in software:
+- MCP #1: 0x20
+- MCP #2: 0x21
+- MCP #3: 0x22
 
-Note:
-- Current code uses two stepper banks and maps odd slots to bank A, even slots to bank B:
-	- Bank A: GPIO17, GPIO27, GPIO22, GPIO23
-	- Bank B: GPIO4, GPIO18, GPIO15, GPIO14
-- This lets slot_number 1..10 run with shared bank wiring in software.
-- For unique per-slot motor wiring across many trays, add GPIO expanders (for example MCP23017) or dedicated motor controllers and update PRODUCT_STEPPER_PINS in main.py.
+Slot to expander pin mapping (main.py default):
+- Slot 1:  0x20 GP0..GP3
+- Slot 2:  0x20 GP4..GP7
+- Slot 3:  0x20 GP8..GP11
+- Slot 4:  0x20 GP12..GP15
+- Slot 5:  0x21 GP0..GP3
+- Slot 6:  0x21 GP4..GP7
+- Slot 7:  0x21 GP8..GP11
+- Slot 8:  0x21 GP12..GP15
+- Slot 9:  0x22 GP0..GP3
+- Slot 10: 0x22 GP4..GP7
+
+Notes:
+- Runtime selects MCP mode by default on Raspberry Pi.
+- To force old direct GPIO stepper mode, set STEPPER_BACKEND=native_gpio before launching.
 
 ========================================
 3) Solenoid Locks (12V Solenoid Model 102)
 ========================================
 Through relay/MOSFET driver board:
-- Restock door unlock control       -> GPIO16 (Physical pin 36)
+- Restock door unlock control        -> GPIO16 (Physical pin 36)
 - Troubleshooting door unlock control -> GPIO20 (Physical pin 38)
 
 ========================================
-4) Cash Inputs
+4) Cash Input (coin-only)
 ========================================
-TB74 Bill Acceptor pulse output:
-- Pulse OUT -> GPIO6  (Physical pin 31)
+Coin acceptor pulse output:
+- Pulse OUT -> GPIO19 (Physical pin 35)
 
-WEIYU Coin Acceptor pulse output:
-- Pulse OUT -> GPIO13 (Physical pin 33)
-
-========================================
-5) Change Dispensing Coin Hoppers
-========================================
-Through relay/MOSFET driver board (motor control outputs):
-- Hopper A (1 peso coins) motor ctrl -> GPIO12 (Physical pin 32)
-- Hopper B (5 peso coins) motor ctrl -> GPIO21 (Physical pin 40)
-
-Hopper pulse feedback inputs (coin-out sensor pulse lines):
-- Hopper A (1 peso) pulse OUT -> GPIO24 (Physical pin 18)
-- Hopper B (5 peso) pulse OUT -> GPIO25 (Physical pin 22)
+Removed hardware in current build:
+- Bill acceptor (not used)
+- Coin change hopper(s) and hopper pulse feedback lines (not used)
 
 ========================================
-6) IR Break-Beam Sensor (vend confirm)
+5) IR Break-Beam Sensor (vend confirmation)
 ========================================
 - Sensor digital OUT -> GPIO26 (Physical pin 37)
-- VCC based on module spec (most are 3.3V/5V compatible; check your model)
+- VCC based on module spec (3.3V/5V compatible module recommended)
 - GND -> GND
 
 ========================================
-GPIO Reserved Summary
+GPIO Reserved Summary (current build)
 ========================================
-GPIO used in this project now:
-4,5,6,8,9,10,11,12,13,14,15,16,17,18,20,21,22,23,24,25,26,27
+GPIO used by active runtime:
+2,3,5,8,9,10,11,16,19,20,26

@@ -6,7 +6,10 @@ export PYTHONNOUSERSITE=1
 venv/bin/python hardware_regression_checklist.py
 
 # Include loopback checks only when output->input jumper pairs are connected:
-# venv/bin/python hardware_regression_checklist.py --enable-loopback
+# venv/bin/python hardware_regression_checklist.py --enable-loopback --loopback-pairs 17:6
 
 # Example with explicit slots and higher pulse count:
 # venv/bin/python hardware_regression_checklist.py --slots 2,3 --stepper-steps 32
+
+# Force native GPIO stepper mode if MCP23017 is not wired yet:
+# STEPPER_BACKEND=native_gpio venv/bin/python hardware_regression_checklist.py --slots 2

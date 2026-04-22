@@ -50,7 +50,7 @@ PATCH_v0_01 = {
     "future": [
         "Resolve TclError on main menu rebuild (search/scroll/theme interactions) if it recurs.",
         "Optional: SMS low-stock alerts via PhilSMS when stock falls below threshold.",
-        "Optional: real hardware integration (RPi.GPIO stepper/coin hopper) on Raspberry Pi.",
+        "Optional: expanded hardware integration (MCP23017 stepper mapping and additional diagnostics) on Raspberry Pi.",
         "Optional: backup/restore for admin credentials and product list.",
     ],
 }
@@ -70,7 +70,7 @@ PATCH_v0_02 = {
     ],
     "future": [
         "Optional: SMS low-stock alerts via PhilSMS when stock falls below threshold.",
-        "Optional: real hardware integration (RPi.GPIO stepper/coin hopper) on Raspberry Pi.",
+        "Optional: expanded hardware integration (MCP23017 stepper mapping and additional diagnostics) on Raspberry Pi.",
         "Optional: backup/restore for admin credentials and product list.",
     ],
 }

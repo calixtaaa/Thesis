@@ -195,16 +195,49 @@ RFID_PINS = {
 }
 
 # ULN2003 IN1..IN4 mapping per tray motor (28BYJ-48), keyed by DB `slot_number` (1..10).
-# Ten trays need 40 GPIO lines if every motor is independent; with RFID, payment, hoppers, and
-# solenoids on the same header, native BCM is not enough for ten separate drivers. Odd slots
-# (1,3,5,7,9) share motor bank A; even slots (2,4,6,8,10) share motor bank B — typical when
-# each bank is one ULN2003 driving one physical lane until you add MCP23017 / second expanders.
-# Replace with unique BCM per slot when your wiring does.
-_STEPPER_BANK_A = {"in1": 17, "in2": 27, "in3": 22, "in4": 23}
-_STEPPER_BANK_B = {"in1": 4, "in2": 18, "in3": 15, "in4": 14}
-PRODUCT_STEPPER_PINS = {
-    slot: (_STEPPER_BANK_A if slot % 2 == 1 else _STEPPER_BANK_B).copy() for slot in range(1, 11)
-}
+# Primary mode uses three MCP23017 expanders so every slot can have its own 4 control lines.
+# Fallback mode keeps legacy native GPIO bank wiring for development or transition setups.
+_STEPPER_BANK_A = {"backend": "native_gpio", "in1": 17, "in2": 27, "in3": 22, "in4": 23}
+_STEPPER_BANK_B = {"backend": "native_gpio", "in1": 4, "in2": 18, "in3": 15, "in4": 14}
+
+
+def _build_native_stepper_map() -> dict[int, dict]:
+    return {
+        slot: (_STEPPER_BANK_A if slot % 2 == 1 else _STEPPER_BANK_B).copy() for slot in range(1, 11)
+    }
+
+STEPPER_BACKEND = os.getenv("STEPPER_BACKEND", "mcp23017" if ON_RPI else "native_gpio").strip().lower()
+STEPPER_I2C_BUS = int(os.getenv("STEPPER_I2C_BUS", "1"))
+MCP23017_ADDRESSES = [
+    int(part.strip(), 0)
+    for part in os.getenv("MCP23017_ADDRESSES", "0x20,0x21,0x22").split(",")
+    if part.strip()
+]
+
+
+def _build_mcp23017_stepper_map() -> dict[int, dict]:
+    mapping: dict[int, dict] = {}
+    slot = 1
+    for address in MCP23017_ADDRESSES:
+        for base_pin in (0, 4, 8, 12):
+            if slot > 10:
+                return mapping
+            mapping[slot] = {
+                "backend": "mcp23017",
+                "address": address,
+                "in1": base_pin,
+                "in2": base_pin + 1,
+                "in3": base_pin + 2,
+                "in4": base_pin + 3,
+            }
+            slot += 1
+    return mapping
+
+
+if STEPPER_BACKEND == "mcp23017":
+    PRODUCT_STEPPER_PINS = _build_mcp23017_stepper_map()
+else:
+    PRODUCT_STEPPER_PINS = _build_native_stepper_map()
 
 SOLENOID_PINS = {
     "restock": 16,          # Physical pin 36
@@ -212,18 +245,7 @@ SOLENOID_PINS = {
 }
 
 PAYMENT_INPUT_PINS = {
-    "bill_acceptor": 6,     # Physical pin 31
     "coin_acceptor": 19,    # Physical pin 35
-}
-
-COIN_HOPPER_PINS = {
-    1: 12,                    # 1-peso hopper motor control, physical pin 32
-    5: 21,                    # 5-peso hopper motor control, physical pin 40
-}
-
-HOPPER_FEEDBACK_PINS = {
-    1: 24,                    # 1-peso hopper pulse out, physical pin 18
-    5: 25,                    # 5-peso hopper pulse out, physical pin 22
 }
 
 IR_BREAK_BEAM_PIN = 26        # Physical pin 37
@@ -239,50 +261,29 @@ COINS_PER_SECOND = {
 }
 
 COIN_ACCEPTOR_PULSE_VALUE = 1.0
-BILL_ACCEPTOR_PULSE_VALUE = 20.0
 PAYMENT_PULSE_EDGE_DEFAULT = "falling"  # supported: falling, rising
 PAYMENT_PULSE_BOUNCETIME_MS = 50
-HOPPER_PULSE_BOUNCETIME_MS = 20
-HOPPER_DISPENSE_TIMEOUT_PER_COIN_S = 0.5
 
 _payment_pulse_counts = {
     "coin_acceptor": 0,
-    "bill_acceptor": 0,
-}
-
-_hopper_pulse_counts = {
-    1: 0,
-    5: 0,
 }
 
 
 def get_payment_pulse_counts() -> dict:
     return {
         "coin_acceptor": int(_payment_pulse_counts["coin_acceptor"]),
-        "bill_acceptor": int(_payment_pulse_counts["bill_acceptor"]),
     }
 
 
 def _payment_pulse_callback(channel: int):
     if channel == PAYMENT_INPUT_PINS["coin_acceptor"]:
         _payment_pulse_counts["coin_acceptor"] += 1
-    elif channel == PAYMENT_INPUT_PINS["bill_acceptor"]:
-        _payment_pulse_counts["bill_acceptor"] += 1
-
-
-def _hopper_pulse_callback(channel: int):
-    if channel == HOPPER_FEEDBACK_PINS[1]:
-        _hopper_pulse_counts[1] += 1
-    elif channel == HOPPER_FEEDBACK_PINS[5]:
-        _hopper_pulse_counts[5] += 1
 
 
 def consume_payment_pulse_amount() -> float:
     coin_pulses = _payment_pulse_counts["coin_acceptor"]
-    bill_pulses = _payment_pulse_counts["bill_acceptor"]
     _payment_pulse_counts["coin_acceptor"] = 0
-    _payment_pulse_counts["bill_acceptor"] = 0
-    return (coin_pulses * COIN_ACCEPTOR_PULSE_VALUE) + (bill_pulses * BILL_ACCEPTOR_PULSE_VALUE)
+    return coin_pulses * COIN_ACCEPTOR_PULSE_VALUE
 
 
 def _normalize_payment_edge_name(value) -> str:
@@ -310,7 +311,122 @@ def _solenoid_active_level():
 #  HARDWARE ABSTRACTION
 # ======================
 
+
+class NativeGPIOStepperBackend:
+    def setup(self, product_pins: dict[int, dict]) -> None:
+        for cfg in product_pins.values():
+            for key in ("in1", "in2", "in3", "in4"):
+                pin = cfg[key]
+                GPIO.setup(pin, GPIO.OUT)
+                GPIO.output(pin, GPIO.LOW)
+
+    def set_phase(self, pins: dict, phase: tuple[int, int, int, int]) -> None:
+        GPIO.output(pins["in1"], GPIO.HIGH if phase[0] else GPIO.LOW)
+        GPIO.output(pins["in2"], GPIO.HIGH if phase[1] else GPIO.LOW)
+        GPIO.output(pins["in3"], GPIO.HIGH if phase[2] else GPIO.LOW)
+        GPIO.output(pins["in4"], GPIO.HIGH if phase[3] else GPIO.LOW)
+
+    def cleanup(self) -> None:
+        pass
+
+
+class MCP23017StepperBackend:
+    IODIRA = 0x00
+    IODIRB = 0x01
+    OLATA = 0x14
+    OLATB = 0x15
+
+    def __init__(self, bus_id: int, addresses: list[int]):
+        self.bus_id = bus_id
+        self.addresses = addresses
+        self.bus = None
+        self.olat_cache = {addr: {"A": 0x00, "B": 0x00} for addr in addresses}
+
+    def _import_bus(self):
+        try:
+            from smbus2 import SMBus  # type: ignore
+
+            return SMBus
+        except Exception:
+            try:
+                from smbus import SMBus  # type: ignore
+
+                return SMBus
+            except Exception as exc:
+                raise RuntimeError("Install smbus2 (or smbus) for MCP23017 stepper mode.") from exc
+
+    def setup(self, _product_pins: dict[int, dict]) -> None:
+        SMBus = self._import_bus()
+        self.bus = SMBus(self.bus_id)
+        for addr in self.addresses:
+            self.bus.write_byte_data(addr, self.IODIRA, 0x00)
+            self.bus.write_byte_data(addr, self.IODIRB, 0x00)
+            self.bus.write_byte_data(addr, self.OLATA, 0x00)
+            self.bus.write_byte_data(addr, self.OLATB, 0x00)
+
+    def _set_pin_value(self, address: int, pin: int, value: int) -> None:
+        port = "A" if pin < 8 else "B"
+        bit = pin if pin < 8 else pin - 8
+        current = self.olat_cache[address][port]
+        if value:
+            current |= 1 << bit
+        else:
+            current &= ~(1 << bit)
+        self.olat_cache[address][port] = current & 0xFF
+
+    def set_phase(self, pins: dict, phase: tuple[int, int, int, int]) -> None:
+        if self.bus is None:
+            raise RuntimeError("MCP23017 backend is not initialized.")
+
+        address = int(pins["address"])
+        for key, value in zip(("in1", "in2", "in3", "in4"), phase):
+            self._set_pin_value(address, int(pins[key]), int(value))
+
+        self.bus.write_byte_data(address, self.OLATA, self.olat_cache[address]["A"])
+        self.bus.write_byte_data(address, self.OLATB, self.olat_cache[address]["B"])
+
+    def cleanup(self) -> None:
+        if self.bus is None:
+            return
+        try:
+            for addr in self.addresses:
+                self.bus.write_byte_data(addr, self.OLATA, 0x00)
+                self.bus.write_byte_data(addr, self.OLATB, 0x00)
+        except Exception:
+            pass
+        try:
+            self.bus.close()
+        except Exception:
+            pass
+        self.bus = None
+
+
+_stepper_backend = None
+
+
+def _create_stepper_backend():
+    if STEPPER_BACKEND == "mcp23017":
+        return MCP23017StepperBackend(STEPPER_I2C_BUS, MCP23017_ADDRESSES)
+    return NativeGPIOStepperBackend()
+
+
+def _describe_stepper_backend() -> str:
+    i2c_ready = Path("/dev/i2c-1").exists()
+    if STEPPER_BACKEND == "mcp23017":
+        return "MCP23017 preferred (I2C ready)" if i2c_ready else "MCP23017 preferred (I2C missing, native GPIO test mode)"
+    return "native GPIO stepper mode"
+
+
+def _switch_to_native_stepper_backend(reason: str) -> None:
+    global STEPPER_BACKEND, PRODUCT_STEPPER_PINS, _stepper_backend
+    STEPPER_BACKEND = "native_gpio"
+    PRODUCT_STEPPER_PINS = _build_native_stepper_map()
+    _stepper_backend = NativeGPIOStepperBackend()
+    print(f"[HW] {reason}")
+    print("[HW] Falling back to native GPIO stepper bank mode.")
+
 def gpio_init():
+    global _stepper_backend
     GPIO.setwarnings(False)
     GPIO.setmode(GPIO.BCM)
     payment_edge_name = _normalize_payment_edge_name(
@@ -318,11 +434,16 @@ def gpio_init():
     )
     payment_edge = _payment_pulse_edge_gpio_constant(payment_edge_name)
 
-    # Stepper pins (ULN2003 inputs)
-    for cfg in PRODUCT_STEPPER_PINS.values():
-        for pin in cfg.values():
-            GPIO.setup(pin, GPIO.OUT)
-            GPIO.output(pin, GPIO.LOW)
+    # Stepper outputs (native GPIO or MCP23017 via I2C)
+    _stepper_backend = _create_stepper_backend()
+    try:
+        _stepper_backend.setup(PRODUCT_STEPPER_PINS)
+    except Exception as exc:
+        if isinstance(_stepper_backend, MCP23017StepperBackend):
+            _switch_to_native_stepper_backend(f"MCP23017 stepper backend unavailable: {exc}")
+            _stepper_backend.setup(PRODUCT_STEPPER_PINS)
+        else:
+            raise
 
     # Solenoid outputs (through relay or MOSFET driver)
     for pin in SOLENOID_PINS.values():
@@ -333,12 +454,7 @@ def gpio_init():
     GPIO.setup(RFID_PINS["reader_rst"], GPIO.OUT)
     GPIO.output(RFID_PINS["reader_rst"], GPIO.HIGH)
 
-    # Coin hopper outputs
-    for pin in COIN_HOPPER_PINS.values():
-        GPIO.setup(pin, GPIO.OUT)
-        GPIO.output(pin, GPIO.LOW)
-
-    # Pulse inputs from bill/coin acceptors
+    # Pulse inputs from coin acceptor
     for pin in PAYMENT_INPUT_PINS.values():
         GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
         try:
@@ -347,19 +463,6 @@ def gpio_init():
                 payment_edge,
                 callback=_payment_pulse_callback,
                 bouncetime=PAYMENT_PULSE_BOUNCETIME_MS,
-            )
-        except Exception:
-            pass
-
-    # Hopper coin-out pulse feedback lines.
-    for pin in HOPPER_FEEDBACK_PINS.values():
-        GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-        try:
-            GPIO.add_event_detect(
-                pin,
-                GPIO.FALLING,
-                callback=_hopper_pulse_callback,
-                bouncetime=HOPPER_PULSE_BOUNCETIME_MS,
             )
         except Exception:
             pass
@@ -417,10 +520,11 @@ ULN2003_SEQUENCE = [
 
 
 def _set_stepper_phase(pins: dict, phase: tuple[int, int, int, int]):
-    GPIO.output(pins["in1"], GPIO.HIGH if phase[0] else GPIO.LOW)
-    GPIO.output(pins["in2"], GPIO.HIGH if phase[1] else GPIO.LOW)
-    GPIO.output(pins["in3"], GPIO.HIGH if phase[2] else GPIO.LOW)
-    GPIO.output(pins["in4"], GPIO.HIGH if phase[3] else GPIO.LOW)
+    if _stepper_backend is None:
+        if not ON_RPI:
+            return
+        raise RuntimeError("Stepper backend is not initialized.")
+    _stepper_backend.set_phase(pins, phase)
 
 def dispense_from_slot(slot_number: int, quantity: int = 1):
     pins = PRODUCT_STEPPER_PINS.get(slot_number)
@@ -433,6 +537,10 @@ def dispense_from_slot(slot_number: int, quantity: int = 1):
         return
 
     steps = STEPS_PER_PRODUCT * quantity
+    if _stepper_backend is None and not ON_RPI:
+        time.sleep(steps * STEP_DELAY)
+        return
+
     for i in range(steps):
         _set_stepper_phase(pins, ULN2003_SEQUENCE[i % len(ULN2003_SEQUENCE)])
         time.sleep(STEP_DELAY)
@@ -463,44 +571,6 @@ def unlock_access_door(door: str):
     GPIO.output(pin, _solenoid_active_level())
     time.sleep(SOLENOID_UNLOCK_SECONDS)
     GPIO.output(pin, _solenoid_idle_level())
-
-def dispense_change(amount: float):
-    amount = int(round(amount))
-    if amount <= 0:
-        return
-
-    five_count = amount // 5
-    one_count = amount % 5
-
-    def dispense_with_feedback(coin_value: int, target_count: int):
-        if target_count <= 0:
-            return
-
-        ctrl_pin = COIN_HOPPER_PINS[coin_value]
-        print(f"[HW] Dispensing {target_count} x ₱{coin_value} coins")
-
-        # Development fallback when running off Pi.
-        if not ON_RPI:
-            rate = max(1, COINS_PER_SECOND.get(coin_value, 5))
-            time.sleep(target_count / rate)
-            return
-
-        _hopper_pulse_counts[coin_value] = 0
-        deadline = time.time() + max(2.0, target_count * HOPPER_DISPENSE_TIMEOUT_PER_COIN_S)
-        GPIO.output(ctrl_pin, GPIO.HIGH)
-        try:
-            while _hopper_pulse_counts[coin_value] < target_count and time.time() < deadline:
-                time.sleep(0.005)
-        finally:
-            GPIO.output(ctrl_pin, GPIO.LOW)
-
-        emitted = _hopper_pulse_counts[coin_value]
-        if emitted < target_count:
-            print(f"[HW] WARNING: Hopper ₱{coin_value} emitted {emitted}/{target_count} pulses")
-
-    # Use higher denomination first to minimize total coins dispensed.
-    dispense_with_feedback(5, five_count)
-    dispense_with_feedback(1, one_count)
 
 
 # ======================
@@ -584,16 +654,11 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         self.cash_session = cash_session
         self._cash_poll_after_id = None
         self.coin_pulse_value = COIN_ACCEPTOR_PULSE_VALUE
-        self.bill_pulse_value = BILL_ACCEPTOR_PULSE_VALUE
 
         try:
             self.coin_pulse_value = float(self.get_hardware_setting_data("coin_pulse_value", str(COIN_ACCEPTOR_PULSE_VALUE)))
         except Exception:
             self.coin_pulse_value = COIN_ACCEPTOR_PULSE_VALUE
-        try:
-            self.bill_pulse_value = float(self.get_hardware_setting_data("bill_pulse_value", str(BILL_ACCEPTOR_PULSE_VALUE)))
-        except Exception:
-            self.bill_pulse_value = BILL_ACCEPTOR_PULSE_VALUE
 
         # Icon images (loaded lazily if files exist)
         self.staff_icon = None
@@ -887,10 +952,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
     def format_payment_pulse_debug_text(self) -> str:
         counts = self.get_payment_pulse_counts_data()
         edge = self.get_payment_pulse_edge_data()
-        return (
-            f"Pulse debug  coin(GPIO19): {counts['coin_acceptor']}  "
-            f"bill(GPIO6): {counts['bill_acceptor']}  edge: {edge}"
-        )
+        return f"Pulse debug  coin(GPIO19): {counts['coin_acceptor']}  edge: {edge}"
 
     def _create_mfrc522_reader(self):
         if MFRC522 is None:
@@ -1048,7 +1110,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         def tick():
             if not self.winfo_exists():
                 return
-            delta = self.consume_payment_pulse_amount_with_values(self.coin_pulse_value, self.bill_pulse_value)
+            delta = self.consume_payment_pulse_amount_with_values(self.coin_pulse_value)
             if delta > 0:
                 self.cash_session.add(delta)
                 current = self.cash_session.get_amount()
@@ -1065,12 +1127,10 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
 
         self._cash_poll_after_id = self.after(120, tick)
 
-    def consume_payment_pulse_amount_with_values(self, coin_value: float, bill_value: float) -> float:
+    def consume_payment_pulse_amount_with_values(self, coin_value: float) -> float:
         coin_pulses = _payment_pulse_counts["coin_acceptor"]
-        bill_pulses = _payment_pulse_counts["bill_acceptor"]
         _payment_pulse_counts["coin_acceptor"] = 0
-        _payment_pulse_counts["bill_acceptor"] = 0
-        return (coin_pulses * float(coin_value)) + (bill_pulses * float(bill_value))
+        return coin_pulses * float(coin_value)
 
     def is_user_authorized_for_door(self, user, door: str) -> bool:
         role = (user["role"] or "").strip().lower() if "role" in user.keys() else ""
@@ -2340,7 +2400,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         self.add_theme_toggle_footer()
 
     def _build_cash_payment_content(self, parent, total_amount: float):
-        """Cash payment screen with simulated coin/bill buttons."""
+        """Cash payment screen with coin-only pulse/simulation support."""
         checkout_ui.build_cash_payment_content(self, parent, total_amount)
 
     def complete_purchase_cash(self, total_amount: float, inserted: float):
@@ -2363,11 +2423,15 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                 if not wait_for_vend_confirmation(timeout_s=3.0):
                     print(f"[HW] WARNING: No IR vend confirmation for slot {p['slot_number']}")
                 record_transaction(p["id"], q, line_total, "cash")
+            change_note = ""
             if change > 0:
-                dispense_change(change)
+                change_note = (
+                    f"\n\nInserted above total: Php{change:.2f}. "
+                    "Automatic coin change hopper is disabled in this build."
+                )
             self.show_success_screen(
                 "Thank you!",
-                f"Please take your products.\n\nChange: ₱{change:.2f}",
+                f"Please take your products.{change_note}",
                 on_ok=lambda: (self._reset_checkout_state(), self.build_main_menu()),
             )
         except Exception as e:
@@ -2483,7 +2547,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         ctk.CTkLabel(inner, text="Buy a New RFID Card", font=(UI_FONT, 18, "bold"), text_color=theme["fg"]).pack(pady=(0, 10))
         ctk.CTkLabel(
             inner,
-            text=f"Please pay ₱{card_price:.2f} using the cash buttons below.",
+            text=f"Please pay ₱{card_price:.2f} using the coin buttons below.",
             font=UI_FONT_BODY,
             text_color=theme["muted"],
             wraplength=360,
@@ -2684,7 +2748,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         for text, value in [("+₱1", 1), ("+₱5", 5), ("+₱10", 10), ("+₱20", 20)]:
             ctk.CTkButton(btn_frame, text=text, width=70, font=UI_FONT_BODY, command=lambda v=value: add_money(v), fg_color=theme["accent"], hover_color=theme["accent_hover"], text_color=theme.get("on_accent", "#ffffff"), corner_radius=8).pack(side=tk.LEFT, padx=5)
 
-        # Monitor cash pulses from bill/coin acceptors while this screen is open.
+        # Monitor coin-acceptor pulses while this screen is open.
         self.start_cash_pulse_monitor(amount_var, tk.DoubleVar(value=0.0), 0.0, on_update=_refresh_pulse_debug)
 
         def confirm_reload():
@@ -2814,6 +2878,7 @@ def main():
         print(f"[HW] GPIO backend version: {getattr(GPIO, 'VERSION', 'unknown')}")
     else:
         print("[HW] GPIO backend: simulation (RPi.GPIO import unavailable)")
+    print(f"[HW] Stepper backend: {_describe_stepper_backend()}")
     try:
         gpio_init()
         print("[HW] GPIO mode: live (RPi.GPIO)")
@@ -2821,7 +2886,12 @@ def main():
         # GPIO init can fail on unsupported backends or when the chip is not available.
         # Fall back to simulation mode so the app still runs.
         print(f"[HW] GPIO init failed: {e}")
-        if "busy" in str(e).lower() or "not allocated" in str(e).lower():
+        error_text = str(e).lower()
+        if STEPPER_BACKEND == "mcp23017" and (
+            "/dev/i2c-1" in error_text or "i2c" in error_text or "smbus" in error_text
+        ):
+            print("[HW] MCP23017 stepper backend unavailable; switching to native GPIO stepper bank mode.")
+        if "busy" in error_text or "not allocated" in error_text:
             owner_details = _describe_gpio_owners()
             print("[HW] GPIO pins appear to be in use by another process.")
             if owner_details:
@@ -2831,6 +2901,7 @@ def main():
         ON_RPI = False
         GPIO = MockGPIO()
         print("[HW] GPIO mode: simulation")
+        print(f"[HW] Stepper backend: {_describe_stepper_backend()}")
 
     app = MainApp()
     try:
@@ -2838,6 +2909,11 @@ def main():
     except KeyboardInterrupt:
         print("\nStopped by user (Ctrl+C).")
     finally:
+        try:
+            if _stepper_backend is not None:
+                _stepper_backend.cleanup()
+        except Exception:
+            pass
         try:
             GPIO.cleanup()
         except Exception:
