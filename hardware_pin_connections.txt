@@ -67,9 +67,30 @@ Notes:
 ========================================
 3) Solenoid Locks (12V Solenoid Model 102)
 ========================================
-Through relay/MOSFET driver board:
-- Restock door unlock control        -> GPIO16 (Physical pin 36)
-- Troubleshooting door unlock control -> GPIO20 (Physical pin 38)
+Songle dual-channel 5V relay module (JD-VCC + VCC type):
+- Keep JD-VCC <-> VCC jumper installed for simple single-supply mode.
+- Relay VCC/JD-VCC -> Pi 5V (Physical pin 2 or 4)
+- Relay GND -> Pi GND (Physical pin 6)
+- IN1 -> GPIO16 (Physical pin 36)  [restock lock]
+- IN2 -> GPIO20 (Physical pin 38)  [troubleshoot lock]
+
+About the two GND pins and two VCC pins:
+- With jumper installed, the two power domains are tied; one GND connection is enough.
+- If convenient, both GND pins can be tied to the same ground rail.
+- Remove jumper only for split/isolated supply experiments.
+
+Relay contact wiring for each 12V solenoid lock:
+- External PSU +12V -> COM (relay channel)
+- NO (relay channel) -> Solenoid +
+- Solenoid - -> External PSU GND
+- Tie external PSU GND to Pi GND (common reference)
+
+Protection and behavior notes:
+- Add flyback diode across each solenoid coil:
+	stripe/cathode -> solenoid +, anode -> solenoid -
+- Most Songle relay modules are active-low:
+	IN=LOW energizes relay, IN=HIGH releases relay.
+- Keep unlock pulse short (for example 1-3 seconds); many lock solenoids are not meant for long continuous hold.
 
 ========================================
 4) Cash Input (coin-only)
