@@ -1,0 +1,29 @@
+source venv/bin/activate
+export DISPLAY=:0
+export PYTHONNOUSERSITE=1
+
+# NOTE: Run one command at a time (do not paste all commands at once).
+# Current setup: only MCP #1 (0x20) is connected.
+
+# Show slot to MCP pin mapping
+venv/bin/python mcp_led_test.py --list-slots
+
+# Open manual UI (ON/OFF, blink, pulse)
+venv/bin/python mcp_led_test.py --ui --address 0x20
+
+# Blink slot 1 LEDs/wires
+venv/bin/python mcp_led_test.py --blink --slots 1 --iterations 6 --interval 0.2
+
+# Turn slot 1 ON, then OFF
+venv/bin/python mcp_led_test.py --on --slots 1
+venv/bin/python mcp_led_test.py --off --slots 1
+
+# Chase test across several slots
+venv/bin/python mcp_led_test.py --chase --slots 1 2 5 --iterations 4 --interval 0.12
+
+# Safety reset: force all MCP outputs OFF
+venv/bin/python mcp_led_test.py --all-off --address 0x20
+
+# Optional later (after MCP #2 and #3 are connected and detected)
+# venv/bin/python mcp_led_test.py --ui --addresses 0x20 0x21 0x22
+# venv/bin/python mcp_led_test.py --all-off --addresses 0x20 0x21 0x22

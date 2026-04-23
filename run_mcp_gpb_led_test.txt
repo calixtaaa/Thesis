@@ -1,0 +1,18 @@
+source venv/bin/activate
+export PYTHONNOUSERSITE=1
+
+# Run one command at a time.
+# Current setup assumes MCP #1 at 0x20.
+
+# 1) Direct GPB0 test (logical pin 8)
+venv/bin/python mcp_gpb_led_test.py --address 0x20 --pin 8 --on --keep-state
+venv/bin/python mcp_gpb_led_test.py --address 0x20 --pin 8 --off
+
+# 2) Blink GPB0
+venv/bin/python mcp_gpb_led_test.py --address 0x20 --pin 8 --blink --count 8 --interval 0.25
+
+# 3) Walk test across GPB0..GPB7 (pins 8..15)
+venv/bin/python mcp_gpb_led_test.py --address 0x20 --walk --count 3 --interval 0.2
+
+# 4) Safety reset
+venv/bin/python mcp_gpb_led_test.py --address 0x20 --all-off

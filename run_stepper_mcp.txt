@@ -2,4 +2,4 @@ source venv/bin/activate
 export DISPLAY=:0
 export PYTHONNOUSERSITE=1
 export MCP23017_ADDRESSES=0x20
-venv/bin/python main.py
+python stepper_mcp.py

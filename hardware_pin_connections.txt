@@ -40,7 +40,7 @@ MCP23017 bus wiring:
 - Pi GPIO3  (Physical pin 5)  -> SCL
 - 3.3V -> VDD
 - GND  -> VSS
-- RESET -> 3.3V (pull-up)
+- RESET -> 3.3V through a pull-up resistor (recommended: 10k ohm; acceptable range: 4.7k to 10k)
 - A0/A1/A2 set per chip address
 
 Configured expander addresses in software:

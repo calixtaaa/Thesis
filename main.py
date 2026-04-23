@@ -355,14 +355,52 @@ class MCP23017StepperBackend:
             except Exception as exc:
                 raise RuntimeError("Install smbus2 (or smbus) for MCP23017 stepper mode.") from exc
 
-    def setup(self, _product_pins: dict[int, dict]) -> None:
+    def setup(self, product_pins: dict[int, dict]) -> None:
         SMBus = self._import_bus()
         self.bus = SMBus(self.bus_id)
+
+        detected: list[int] = []
+        missing: list[int] = []
+        for addr in self.addresses:
+            try:
+                _ = self.bus.read_byte_data(addr, self.IODIRA)
+                detected.append(addr)
+            except Exception:
+                missing.append(addr)
+
+        if not detected:
+            raise RuntimeError(
+                "No configured MCP23017 addresses responded on I2C bus "
+                f"{self.bus_id}: {', '.join(f'0x{x:02X}' for x in self.addresses)}"
+            )
+
+        if missing:
+            print(
+                "[HW] MCP23017 addresses not detected: "
+                + ", ".join(f"0x{x:02X}" for x in missing)
+            )
+
+        self.addresses = detected
+        self.olat_cache = {addr: {"A": 0x00, "B": 0x00} for addr in detected}
+
         for addr in self.addresses:
             self.bus.write_byte_data(addr, self.IODIRA, 0x00)
             self.bus.write_byte_data(addr, self.IODIRB, 0x00)
             self.bus.write_byte_data(addr, self.OLATA, 0x00)
             self.bus.write_byte_data(addr, self.OLATB, 0x00)
+
+        disabled_slots: list[int] = []
+        for slot, cfg in list(product_pins.items()):
+            if cfg.get("backend") != "mcp23017":
+                continue
+            if int(cfg.get("address", -1)) not in self.addresses:
+                disabled_slots.append(slot)
+                product_pins.pop(slot, None)
+        if disabled_slots:
+            print(
+                "[HW] Disabled MCP slots due to missing expanders: "
+                + ", ".join(str(slot) for slot in sorted(disabled_slots))
+            )
 
     def _set_pin_value(self, address: int, pin: int, value: int) -> None:
         port = "A" if pin < 8 else "B"
