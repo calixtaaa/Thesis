@@ -3,7 +3,6 @@ import sys
 import re
 import subprocess
 import time
-import uuid
 import json
 import math
 import datetime
@@ -2552,107 +2551,13 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
     # ---------- RFID Card Purchase ----------
 
     def buy_card_flow(self):
-        """Customer buys a new RFID card for a fixed price (e.g. ₱50)."""
-        self._current_screen_builder = self.buy_card_flow
-        CARD_PRICE = 50.0
-        theme = self.current_theme
-        if self.sidebar_holder is not None and self.sidebar_holder.winfo_exists():
-            self.sidebar_holder.destroy()
-            self.sidebar_holder = None
-        self.clear_screen()
-        cash_session.reset()
-
-        self.content_holder.configure(fg_color=theme["bg"])
-        frame = ctk.CTkFrame(self.content_holder, fg_color=theme["bg"])
-        frame.pack(expand=True, fill=tk.BOTH)
-
-        self._build_buy_card_content(frame, CARD_PRICE, theme)
-        self.add_theme_toggle_footer()
-
-    def _build_buy_card_content(self, parent, card_price: float, theme):
-        """RFID card purchase UI and actions."""
-        panel = ctk.CTkFrame(
-            parent,
-            fg_color=theme["card_bg"],
-            corner_radius=16,
-            border_width=1,
-            border_color=theme["card_border"],
+        """Card dispensing is unavailable in this build."""
+        messagebox.showinfo(
+            "Card Purchase Unavailable",
+            "This machine cannot dispense RFID cards right now.\n"
+            "Please buy a card at the office.",
         )
-        panel.place(relx=0.5, rely=0.5, anchor="center")
-        inner = ctk.CTkFrame(panel, fg_color=theme["card_bg"])
-        inner.pack(padx=40, pady=28)
-
-        ctk.CTkLabel(inner, text="Buy a New RFID Card", font=(UI_FONT, 18, "bold"), text_color=theme["fg"]).pack(pady=(0, 10))
-        ctk.CTkLabel(
-            inner,
-            text=f"Please pay ₱{card_price:.2f} using the coin buttons below.",
-            font=UI_FONT_BODY,
-            text_color=theme["muted"],
-            wraplength=360,
-            justify="left",
-        ).pack(pady=(0, 10))
-
-        amount_var = tk.DoubleVar(value=0.0)
-        remaining_var = tk.DoubleVar(value=card_price)
-        ctk.CTkLabel(inner, text="Amount Inserted:", font=UI_FONT_BODY, text_color=theme["muted"]).pack(pady=4)
-        tk.Label(inner, textvariable=amount_var, font=(UI_FONT, 20, "bold"), bg=theme["card_bg"], fg=theme["fg"]).pack()
-        ctk.CTkLabel(inner, text="Remaining:", font=UI_FONT_BODY, text_color=theme["muted"]).pack(pady=4)
-        tk.Label(inner, textvariable=remaining_var, font=(UI_FONT, 20, "bold"), bg=theme["card_bg"], fg=theme["fg"]).pack()
-        pulse_debug_var = tk.StringVar(value=self.format_payment_pulse_debug_text())
-        tk.Label(
-            inner,
-            textvariable=pulse_debug_var,
-            font=UI_FONT_SMALL,
-            bg=theme["card_bg"],
-            fg=theme.get("muted", theme["fg"]),
-            wraplength=360,
-            justify="left",
-        ).pack(pady=(6, 0), anchor="w")
-
-        def add_money(value):
-            cash_session.add(value)
-            current = cash_session.get_amount()
-            amount_var.set(current)
-            remaining_var.set(max(0.0, card_price - current))
-
-        def _refresh_pulse_debug():
-            pulse_debug_var.set(self.format_payment_pulse_debug_text())
-
-        btn_frame = ctk.CTkFrame(inner, fg_color=theme["card_bg"])
-        btn_frame.pack(pady=12)
-        for text, value in [("+₱1", 1), ("+₱5", 5), ("+₱10", 10), ("+₱20", 20)]:
-            ctk.CTkButton(
-                btn_frame,
-                text=text,
-                width=80,
-                font=UI_FONT_BODY,
-                command=lambda v=value: add_money(v),
-                fg_color=theme["accent"],
-                hover_color=theme["accent_hover"],
-                text_color=theme.get("on_accent", "#ffffff"),
-                corner_radius=8,
-            ).pack(side=tk.LEFT, padx=10)
-
-            self.start_cash_pulse_monitor(amount_var, remaining_var, card_price, on_update=_refresh_pulse_debug)
-
-        def confirm_purchase():
-            inserted = cash_session.get_amount()
-            if inserted < card_price:
-                messagebox.showwarning("Not enough", "Please insert full card price.")
-                return
-            uid = uuid.uuid4().hex[:8].upper()
-            user_id = create_user(uid, name=None, is_staff=0, initial_balance=card_price)
-            record_transaction(product_id=None, quantity=None, total_amount=card_price, payment_method="card_purchase", rfid_user_id=user_id)
-            self.show_success_screen(
-                "Card Issued",
-                f"New RFID card created.\nCard ID (simulate UID): {uid}\nStarting balance: ₱{card_price:.2f}",
-                on_ok=self.build_main_menu,
-            )
-
-        action_frame = ctk.CTkFrame(inner, fg_color=theme["card_bg"])
-        action_frame.pack(pady=(8, 0), fill=tk.X)
-        ctk.CTkButton(action_frame, text="Confirm and issue card", font=UI_FONT_BUTTON, command=confirm_purchase, fg_color=theme["accent"], hover_color=theme["accent_hover"], text_color=theme.get("on_accent", "#ffffff"), corner_radius=8, height=40).pack(side=tk.LEFT, padx=(0, 10))
-        ctk.CTkButton(action_frame, text="Cancel and go back", font=UI_FONT_BODY, command=self.build_main_menu, fg_color=theme["button_bg"], hover_color=theme["card_border"], text_color=theme["button_fg"], corner_radius=8, height=36).pack(side=tk.LEFT)
+        self.build_main_menu()
 
     # ---------- RFID Reload ----------
 
@@ -2685,19 +2590,38 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         inner = ctk.CTkFrame(panel, fg_color=theme["card_bg"])
         inner.pack(padx=40, pady=28)
         ctk.CTkLabel(inner, text="Reload RFID Card", font=(UI_FONT, 18, "bold"), text_color=theme["fg"]).pack(pady=(0, 10))
-        ctk.CTkLabel(inner, text="Enter RFID Card ID (simulate tap):", font=UI_FONT_SMALL, text_color=theme["muted"]).pack(anchor="w", pady=(0, 6))
+        ctk.CTkLabel(
+            inner,
+            text="Tap RFID card now. Reader is always listening (or type card ID manually):",
+            font=UI_FONT_SMALL,
+            text_color=theme["muted"],
+        ).pack(anchor="w", pady=(0, 6))
+
+        scan_hint = ctk.CTkLabel(
+            inner,
+            text="Waiting for RFID tap...",
+            font=(UI_FONT, 12, "bold"),
+            text_color=theme.get("accent", "#22c55e"),
+        )
+        scan_hint.pack(anchor="w", pady=(0, 8))
 
         uid_entry = ctk.CTkEntry(inner, font=UI_FONT_BODY, width=280, fg_color=theme["search_bg"], text_color=theme["fg"], border_color=theme["search_border"], corner_radius=8, height=40)
         uid_entry.pack(pady=(0, 8))
+
+        last_uid = {"value": None}
+        lookup_in_progress = {"value": False}
 
         def read_from_reader():
             uid = self.read_rfid_uid("payment")
             if not uid:
                 error_lbl.configure(text="No RFID tap detected. You can type card ID manually.")
+                scan_hint.configure(text="Waiting for RFID tap...")
                 return
             uid_entry.delete(0, tk.END)
-            uid_entry.insert(0, uid)
+            uid_entry.insert(0, uid.strip().upper())
+            scan_hint.configure(text=f"RFID {uid.strip().upper()} detected.")
             error_lbl.configure(text="")
+            proceed_to_amount(uid)
 
         ctk.CTkButton(
             inner,
@@ -2715,22 +2639,58 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         error_lbl = ctk.CTkLabel(inner, text="", font=UI_FONT_SMALL, text_color=theme.get("status_error", "#b91c1c"))
         error_lbl.pack(pady=(0, 4))
 
-        def proceed_to_amount():
-            uid = uid_entry.get().strip()
-            if not uid:
-                error_lbl.configure(text="Please enter a card ID.")
+        def proceed_to_amount(uid_override: str | None = None):
+            if lookup_in_progress["value"]:
                 return
+
+            uid = (uid_override or uid_entry.get()).strip().upper()
+            if not uid:
+                error_lbl.configure(text="Please enter or tap a card ID.")
+                scan_hint.configure(text="Waiting for RFID tap...")
+                return
+
+            lookup_in_progress["value"] = True
             user = get_user_by_uid(uid)
             if not user:
-                error_lbl.configure(text="Card not found. Please buy a new card first.")
+                error_lbl.configure(text="Card not found. Please buy a new card at the office.")
+                scan_hint.configure(text="Waiting for RFID tap...")
+                lookup_in_progress["value"] = False
                 return
+
+            scan_hint.configure(text=f"RFID {uid} detected. Opening reload amount...")
             self._reload_amount_screen(uid, user)
+
+        def poll_rfid():
+            if not inner.winfo_exists() or lookup_in_progress["value"]:
+                return
+
+            try:
+                uid = self.read_rfid_uid("payment")
+            except Exception:
+                uid = None
+
+            if uid:
+                uid = uid.strip().upper()
+                if uid != last_uid["value"]:
+                    last_uid["value"] = uid
+                    uid_entry.delete(0, tk.END)
+                    uid_entry.insert(0, uid)
+                    scan_hint.configure(text=f"RFID {uid} detected. Verifying card...")
+                    error_lbl.configure(text="")
+                    proceed_to_amount(uid)
+            else:
+                last_uid["value"] = None
+
+            if inner.winfo_exists() and not lookup_in_progress["value"] and self._current_screen_builder == self.reload_card_flow:
+                self.after(250, poll_rfid)
 
         btn_row = ctk.CTkFrame(inner, fg_color=theme["card_bg"])
         btn_row.pack(fill=tk.X, pady=(8, 0))
-        ctk.CTkButton(btn_row, text="OK", font=(UI_FONT, 11, "bold"), command=proceed_to_amount, fg_color=theme["accent"], hover_color=theme["accent_hover"], text_color=theme.get("on_accent", "#ffffff"), corner_radius=8, height=38).pack(side=tk.LEFT, padx=(0, 10))
+        ctk.CTkButton(btn_row, text="OK", font=(UI_FONT, 11, "bold"), command=lambda: proceed_to_amount(None), fg_color=theme["accent"], hover_color=theme["accent_hover"], text_color=theme.get("on_accent", "#ffffff"), corner_radius=8, height=38).pack(side=tk.LEFT, padx=(0, 10))
         ctk.CTkButton(btn_row, text="Cancel", font=(UI_FONT, 11, "bold"), command=self.build_main_menu, fg_color=theme["button_bg"], hover_color=theme["card_border"], text_color=theme["button_fg"], corner_radius=8, height=38).pack(side=tk.LEFT)
-        uid_entry.bind("<Return>", lambda _e: proceed_to_amount())
+        uid_entry.bind("<Return>", lambda _e: proceed_to_amount(None))
+
+        self.after(250, poll_rfid)
 
     def _reload_amount_screen(self, uid, user):
         """Second step for reload – choose amount, still in-app."""
@@ -2821,7 +2781,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         self.add_theme_toggle_footer()
 
     def _build_rfid_payment_content(self, parent, total_amount: float, theme):
-        """RFID payment entry and validation screen."""
+        """RFID payment entry and validation screen with live RFID listening."""
         panel = ctk.CTkFrame(
             parent,
             fg_color=theme["card_bg"],
@@ -2834,19 +2794,74 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         inner.pack(padx=40, pady=28)
         ctk.CTkLabel(inner, text="RFID Payment", font=(UI_FONT, 18, "bold"), text_color=theme["fg"]).pack(pady=(0, 6))
         ctk.CTkLabel(inner, text=f"Total: ₱{total_amount:.2f}", font=(UI_FONT, 16), text_color=theme["muted"]).pack(pady=(0, 10))
-        ctk.CTkLabel(inner, text="Enter RFID Card ID (simulate tap):", font=UI_FONT_SMALL, text_color=theme["muted"]).pack(anchor="w", pady=(0, 6))
+        ctk.CTkLabel(
+            inner,
+            text="Tap RFID card now. Reader is always listening (or type card ID manually):",
+            font=UI_FONT_SMALL,
+            text_color=theme["muted"],
+        ).pack(anchor="w", pady=(0, 6))
+
+        scan_hint = ctk.CTkLabel(
+            inner,
+            text="Waiting for RFID tap...",
+            font=(UI_FONT, 12, "bold"),
+            text_color=theme.get("accent", "#22c55e"),
+        )
+        scan_hint.pack(anchor="w", pady=(0, 8))
 
         uid_entry = ctk.CTkEntry(inner, font=UI_FONT_BODY, width=280, fg_color=theme["search_bg"], text_color=theme["fg"], border_color=theme["search_border"], corner_radius=8, height=40)
         uid_entry.pack(pady=(0, 8))
+
+        last_uid = {"value": None}
+        payment_in_progress = {"value": False}
+
+        error_lbl = ctk.CTkLabel(inner, text="", font=UI_FONT_SMALL, text_color=theme.get("status_error", "#b91c1c"))
+        error_lbl.pack(pady=(0, 4))
+
+        def process_rfid(uid_override: str | None = None):
+            if payment_in_progress["value"]:
+                return
+
+            uid = (uid_override or uid_entry.get()).strip().upper()
+            if not uid:
+                error_lbl.configure(text="Please enter or tap a card ID.")
+                scan_hint.configure(text="Waiting for RFID tap...")
+                return
+
+            user = get_user_by_uid(uid)
+            if not user:
+                error_lbl.configure(text=f"RFID {uid}: card not found.")
+                scan_hint.configure(text="Waiting for RFID tap...")
+                return
+            if user["balance"] < total_amount:
+                error_lbl.configure(text=f"RFID {uid}: insufficient card balance.")
+                scan_hint.configure(text="Waiting for RFID tap...")
+                return
+
+            payment_in_progress["value"] = True
+            scan_hint.configure(text=f"RFID {uid} accepted. Processing payment...")
+            error_lbl.configure(text="")
+
+            new_balance = user["balance"] - total_amount
+            update_user_balance(user["id"], new_balance)
+            items = self._get_checkout_items()
+            if not items:
+                self.build_main_menu()
+                return
+            self._show_dispensing_screen()
+            self.after(50, lambda i=items, uid=user["id"], nb=new_balance: self._do_dispense_rfid(i, uid, nb))
 
         def read_from_reader():
             uid = self.read_rfid_uid("payment")
             if not uid:
                 error_lbl.configure(text="No RFID tap detected. You can type card ID manually.")
+                scan_hint.configure(text="Waiting for RFID tap...")
                 return
             uid_entry.delete(0, tk.END)
-            uid_entry.insert(0, uid)
+            uid_entry.insert(0, uid.strip().upper())
+            scan_hint.configure(text=f"RFID {uid.strip().upper()} detected.")
             error_lbl.configure(text="")
+            process_rfid(uid)
 
         ctk.CTkButton(
             inner,
@@ -2860,35 +2875,38 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             height=32,
             width=180,
         ).pack(anchor="w", pady=(0, 8))
-        error_lbl = ctk.CTkLabel(inner, text="", font=UI_FONT_SMALL, text_color=theme.get("status_error", "#b91c1c"))
-        error_lbl.pack(pady=(0, 4))
 
-        def process_rfid():
-            uid = uid_entry.get().strip()
-            if not uid:
-                error_lbl.configure(text="Please enter a card ID.")
+        def poll_rfid():
+            if not inner.winfo_exists() or payment_in_progress["value"]:
                 return
-            user = get_user_by_uid(uid)
-            if not user:
-                error_lbl.configure(text="Card not found.")
-                return
-            if user["balance"] < total_amount:
-                error_lbl.configure(text="Insufficient card balance.")
-                return
-            new_balance = user["balance"] - total_amount
-            update_user_balance(user["id"], new_balance)
-            items = self._get_checkout_items()
-            if not items:
-                self.build_main_menu()
-                return
-            self._show_dispensing_screen()
-            self.after(50, lambda i=items, uid=user["id"], nb=new_balance: self._do_dispense_rfid(i, uid, nb))
+
+            try:
+                uid = self.read_rfid_uid("payment")
+            except Exception:
+                uid = None
+
+            if uid:
+                uid = uid.strip().upper()
+                if uid != last_uid["value"]:
+                    last_uid["value"] = uid
+                    uid_entry.delete(0, tk.END)
+                    uid_entry.insert(0, uid)
+                    scan_hint.configure(text=f"RFID {uid} detected. Verifying...")
+                    error_lbl.configure(text="")
+                    process_rfid(uid)
+            else:
+                last_uid["value"] = None
+
+            if inner.winfo_exists() and not payment_in_progress["value"]:
+                self.after(250, poll_rfid)
 
         btn_row = ctk.CTkFrame(inner, fg_color=theme["card_bg"])
         btn_row.pack(fill=tk.X, pady=(8, 0))
-        ctk.CTkButton(btn_row, text="Pay Now", font=(UI_FONT, 11, "bold"), command=process_rfid, fg_color=theme["accent"], hover_color=theme["accent_hover"], text_color=theme.get("on_accent", "#ffffff"), corner_radius=8, height=38).pack(side=tk.LEFT, padx=(0, 10))
+        ctk.CTkButton(btn_row, text="Pay Now", font=(UI_FONT, 11, "bold"), command=lambda: process_rfid(None), fg_color=theme["accent"], hover_color=theme["accent_hover"], text_color=theme.get("on_accent", "#ffffff"), corner_radius=8, height=38).pack(side=tk.LEFT, padx=(0, 10))
         ctk.CTkButton(btn_row, text="Cancel", font=(UI_FONT, 11, "bold"), command=self.show_payment_method_screen, fg_color=theme["button_bg"], hover_color=theme["card_border"], text_color=theme["button_fg"], corner_radius=8, height=38).pack(side=tk.LEFT)
-        uid_entry.bind("<Return>", lambda _e: process_rfid())
+        uid_entry.bind("<Return>", lambda _e: process_rfid(None))
+
+        self.after(250, poll_rfid)
 
     # ---------- Sales Report Export ----------
 

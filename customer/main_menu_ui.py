@@ -674,8 +674,6 @@ def build_main_menu_footer(app, *, version, hover_scale_btn):
     nav_bg = app.current_theme.get("nav_bg", "#8E4585")
     nav_fg = app.current_theme.get("nav_fg", "#ffffff")
     nav_hover = app.current_theme.get("nav_hover", "#723670")
-    accent = app.current_theme.get("accent", "#50C878")
-    accent_hover = app.current_theme.get("accent_hover", "#3DA863")
     ctk.CTkButton(
         actions_row,
         text="Reload (RFID)",
@@ -687,17 +685,6 @@ def build_main_menu_footer(app, *, version, hover_scale_btn):
         corner_radius=980,
         height=36,
     ).pack(side=tk.LEFT, padx=(12, 6))
-    ctk.CTkButton(
-        actions_row,
-        text="Buy RFID Card",
-        command=app.buy_card_flow,
-        font=app._ui_font_button,
-        fg_color=accent,
-        hover_color=accent_hover,
-        text_color="#ffffff",
-        corner_radius=980,
-        height=36,
-    ).pack(side=tk.LEFT, padx=6)
     ctk.CTkButton(
         actions_row,
         text="Report",

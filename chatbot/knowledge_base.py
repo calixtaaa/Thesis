@@ -109,8 +109,8 @@ TROUBLESHOOTING = {
         "enter your card ID, and insert cash into the bill/coin slot."
     ),
     "buy card": (
-        "To buy a new RFID card, tap 'Buy RFID Card' on the main menu, "
-        "then follow the on-screen instructions to pay."
+        "This machine cannot dispense new RFID cards right now. "
+        "Please buy a new card at the office."
     ),
     "how to use": (
         "1) Select the product you want. 2) Set the quantity. "

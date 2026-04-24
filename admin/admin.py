@@ -393,7 +393,7 @@ class AdminMixin:
         return chart_card
 
     def enter_admin_dashboard(self):
-        """Show in-app Admin Login (mint panel, username + password)."""
+        """Show in-app Admin Login with credential and RFID options."""
         self._current_screen_builder = self.enter_admin_dashboard
         if hasattr(self, "_apply_lcd_fit"):
             try:
@@ -455,17 +455,112 @@ class AdminMixin:
         )
         status_lbl.pack(fill=tk.X, pady=(0, 8))
 
+        def log_admin_login(method: str, status: str, details: dict):
+            if not hasattr(self, "_debug_log"):
+                return
+            try:
+                self._debug_log(
+                    "A1",
+                    "admin.py:enter_admin_dashboard",
+                    "admin login event",
+                    {
+                        "method": method,
+                        "status": status,
+                        **details,
+                    },
+                )
+            except Exception:
+                pass
+
         def submit():
             username = un_entry.get().strip()
             password = pw_entry.get()
             if not username or not password:
                 status_lbl.configure(text="Please enter both username and password.")
+                log_admin_login("password", "failed", {"reason": "missing_fields", "username": username})
                 return
             if username != stored_username or not _verify_password(password, stored_hash):
                 status_lbl.configure(text="Invalid admin credentials.")
+                log_admin_login("password", "failed", {"reason": "invalid_credentials", "username": username})
                 return
             status_lbl.configure(text="")
-            self.show_admin_dashboard({"name": username, "rfid_uid": ""})
+            log_admin_login("password", "success", {"username": username})
+            self.show_admin_dashboard({"name": username, "rfid_uid": "", "login_method": "password"})
+
+        ctk.CTkLabel(
+            inner,
+            text="or",
+            font=UI_FONT_SMALL,
+            text_color=theme.get("muted", "#8e8e93"),
+        ).pack(pady=(2, 4))
+
+        ctk.CTkLabel(
+            inner,
+            text="Tap admin RFID card. Reader is always listening:",
+            font=UI_FONT_SMALL,
+            text_color=theme.get("muted", "#8e8e93"),
+        ).pack(anchor="w", pady=(0, 6))
+
+        scan_hint = ctk.CTkLabel(
+            inner,
+            text="Waiting for RFID tap...",
+            font=(UI_FONT, 11, "bold"),
+            text_color=theme.get("accent", "#22c55e"),
+        )
+        scan_hint.pack(anchor="w", pady=(0, 6))
+
+        rfid_status_var = tk.StringVar(value="Last accepted: none")
+        rfid_status_lbl = ctk.CTkLabel(
+            inner,
+            textvariable=rfid_status_var,
+            font=UI_FONT_SMALL,
+            text_color=theme.get("muted", "#8e8e93"),
+        )
+        rfid_status_lbl.pack(anchor="w", pady=(0, 8))
+
+        last_uid = {"value": None}
+
+        def handle_admin_rfid(uid: str):
+            user = self.get_user_by_uid_data(uid)
+            if not user:
+                status_lbl.configure(text=f"RFID {uid}: card not found.")
+                scan_hint.configure(text="Waiting for RFID tap...")
+                log_admin_login("rfid", "failed", {"reason": "card_not_found", "uid": uid})
+                return
+
+            role = str(user["role"] if "role" in user.keys() else "").strip().lower()
+            if role != "admin":
+                status_lbl.configure(text=f"RFID {uid}: not authorized for admin login.")
+                scan_hint.configure(text="Waiting for RFID tap...")
+                log_admin_login("rfid", "failed", {"reason": "role_not_admin", "uid": uid, "role": role})
+                return
+
+            admin_name = str(user["name"] if "name" in user.keys() else "").strip() or stored_username
+            status_lbl.configure(text="")
+            rfid_status_var.set(f"Last accepted: UID {uid} | role admin")
+            scan_hint.configure(text=f"RFID {uid} accepted. Opening admin dashboard...")
+            log_admin_login("rfid", "success", {"uid": uid, "name": admin_name})
+            self.show_admin_dashboard({"name": admin_name, "rfid_uid": uid, "login_method": "rfid"})
+
+        def poll_admin_rfid():
+            if not inner.winfo_exists():
+                return
+
+            try:
+                uid = self.read_rfid_uid("door")
+            except Exception:
+                uid = None
+
+            if uid:
+                uid = uid.strip().upper()
+                if uid != last_uid["value"]:
+                    last_uid["value"] = uid
+                    handle_admin_rfid(uid)
+            else:
+                last_uid["value"] = None
+
+            if inner.winfo_exists() and self._current_screen_builder == self.enter_admin_dashboard:
+                self.after(250, poll_admin_rfid)
 
         btn_frame = ctk.CTkFrame(inner, fg_color=theme["card_bg"])
         btn_frame.pack(fill=tk.X)
@@ -476,6 +571,7 @@ class AdminMixin:
             submit()
         un_entry.bind("<Return>", lambda e: pw_entry.focus())
         pw_entry.bind("<Return>", on_return)
+        self.after(250, poll_admin_rfid)
         self.add_theme_toggle_footer()
 
     def _slide_in(self, frame, steps=12, step_ms=20):
@@ -559,9 +655,17 @@ class AdminMixin:
             font=(UI_FONT, 20, "bold"),
             text_color=self.current_theme["fg"],
         ).pack(side=tk.LEFT)
+
+        if isinstance(staff_user, dict):
+            method_value = str(staff_user.get("login_method", "")).strip().lower()
+            if method_value not in {"password", "rfid"}:
+                method_value = "rfid" if staff_user.get("rfid_uid") else "password"
+        else:
+            method_value = "password"
+        login_method = "RFID" if method_value == "rfid" else "Password"
         ctk.CTkLabel(
             header,
-            text=f"Admin: {staff_user['name'] or staff_user['rfid_uid']}",
+            text=f"Admin: {staff_user['name'] or staff_user['rfid_uid']} | Login: {login_method}",
             font=UI_FONT_SMALL,
             text_color=self.current_theme.get("muted", self.current_theme["fg"]),
         ).pack(side=tk.RIGHT)
