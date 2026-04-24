@@ -209,9 +209,6 @@ def build_cash_payment_content(app, parent, total_amount: float):
     content = ctk.CTkFrame(parent, fg_color=app.current_theme["bg"], corner_radius=0)
     content.pack(expand=True, fill=tk.BOTH)
 
-    coin_bar = ctk.CTkFrame(content, fg_color=app.current_theme["bg"], corner_radius=0)
-    coin_bar.pack(side=tk.BOTTOM, fill=tk.X, pady=(0, 4))
-
     action_bar = ctk.CTkFrame(content, fg_color=app.current_theme["bg"], corner_radius=0)
     action_bar.pack(side=tk.BOTTOM, fill=tk.X, pady=(0, 4))
 
@@ -254,34 +251,18 @@ def build_cash_payment_content(app, parent, total_amount: float):
         )
 
     _sync_cash_display()
-    ctk.CTkLabel(card, text="Amount Inserted:", font=app._ui_font_body, text_color=app.current_theme["button_fg"]).pack(pady=4, padx=20)
+    ctk.CTkLabel(card, text="Coins Inserted:", font=app._ui_font_body, text_color=app.current_theme["button_fg"]).pack(pady=4, padx=20)
     tk.Label(card, textvariable=amount_display_var, font=(app._ui_font_name, 22, "bold"), bg=app.current_theme["button_bg"], fg=app.current_theme["button_fg"]).pack()
     ctk.CTkLabel(card, text="Remaining:", font=app._ui_font_body, text_color=app.current_theme["button_fg"]).pack(pady=(10, 4), padx=20)
     tk.Label(card, textvariable=remaining_display_var, font=(app._ui_font_name, 22, "bold"), bg=app.current_theme["button_bg"], fg=app.current_theme["button_fg"]).pack()
     ctk.CTkLabel(card, text="Overpay amount:", font=app._ui_font_body, text_color=app.current_theme["button_fg"]).pack(pady=(10, 4), padx=20)
     tk.Label(card, textvariable=change_display_var, font=(app._ui_font_name, 22, "bold"), bg=app.current_theme["button_bg"], fg=app.current_theme.get("accent", app.current_theme["button_fg"])).pack()
 
-    ctk.CTkLabel(content, text="Quick Insert:", font=app._ui_font_small, text_color=app.current_theme.get("muted", app.current_theme["fg"])).pack(side=tk.BOTTOM, anchor="w", padx=24, pady=(0, 2))
-
-    btn_frame = ctk.CTkFrame(coin_bar, fg_color=app.current_theme["bg"], corner_radius=0)
-    btn_frame.pack(fill=tk.X, padx=24)
-
-    def add_money(value):
-        app.cash_session.add(value)
-        current = app.cash_session.get_amount()
-        amount_var.set(current)
-        remaining_var.set(max(0.0, total_amount - current))
-        change_var.set(max(0.0, current - total_amount))
-        _sync_cash_display()
-
-    for text, value in [("+₱1", 1), ("+₱5", 5), ("+₱10", 10), ("+₱20", 20)]:
-        ctk.CTkButton(btn_frame, text=text, font=app._ui_font_body, fg_color=app.current_theme.get("accent", "#1A948E"), hover_color=app.current_theme.get("accent_hover", "#15857B"), text_color=app.current_theme.get("on_accent", "#ffffff"), corner_radius=8, width=70, height=34, command=lambda v=value: add_money(v)).pack(side=tk.LEFT, padx=4, expand=True, fill=tk.X)
-
     def finish_if_enough():
         current = app.cash_session.get_amount()
         if current < total_amount:
             from tkinter import messagebox
-            messagebox.showwarning("Not enough", "Please insert more cash.")
+            messagebox.showwarning("Not enough", "Please insert more coins.")
             return
         app.complete_purchase_cash(total_amount, current)
 

@@ -322,6 +322,41 @@ def update_rfid_user_role(user_id: int, role: str):
     conn.close()
 
 
+def update_rfid_user(user_id: int, rfid_uid: str, name: str | None, balance: float, role: str):
+    clean_role = (role or "customer").strip().lower()
+    is_staff = 1 if clean_role in {"staff", "restocker", "admin"} else 0
+    clean_uid = (rfid_uid or "").strip().upper()
+    clean_name = (name or None)
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        UPDATE rfid_users
+        SET rfid_uid = ?, name = ?, balance = ?, role = ?, is_staff = ?
+        WHERE id = ?
+        """,
+        (clean_uid, clean_name, float(balance), clean_role, is_staff, user_id),
+    )
+    if cur.rowcount == 0:
+        conn.rollback()
+        conn.close()
+        raise ValueError("RFID user not found")
+    conn.commit()
+    conn.close()
+
+
+def delete_rfid_user(user_id: int):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM rfid_users WHERE id = ?", (user_id,))
+    if cur.rowcount == 0:
+        conn.rollback()
+        conn.close()
+        raise ValueError("RFID user not found")
+    conn.commit()
+    conn.close()
+
+
 def get_hardware_setting(key: str, default: str | None = None):
     conn = get_connection()
     cur = conn.cursor()

@@ -638,7 +638,7 @@ class AdminMixin:
 
         nav_btn("Overview", lambda: self.show_admin_dashboard(staff_user))
         nav_btn("Card Enrollment", self.show_card_enrollment_screen)
-        nav_btn("RFID Roles", self.show_rfid_roles_screen)
+        nav_btn("RFID Cards", self.show_rfid_cards_crud_screen)
         nav_btn("Cash Pulse Settings", self.show_cash_pulse_settings_screen)
         nav_btn("Hardware Diagnostics", self.show_hardware_diagnostics_screen)
         nav_btn("Sales Reports", self.show_sales_reports_screen)
@@ -847,6 +847,402 @@ class AdminMixin:
         ).pack(anchor="nw", pady=(12, 0))
 
         self._slide_in(container)
+        self.add_theme_toggle_footer()
+
+    def show_rfid_cards_crud_screen(self):
+        """Create, edit, delete, and role-manage registered RFID cards."""
+        self._current_screen_builder = self.show_rfid_cards_crud_screen
+        self.clear_screen()
+
+        frame = ctk.CTkFrame(self.content_holder, fg_color=self.current_theme["bg"])
+        frame.pack(expand=True, fill=tk.BOTH, padx=20, pady=16)
+
+        header = ctk.CTkFrame(frame, fg_color=self.current_theme["bg"])
+        header.pack(fill=tk.X, pady=(0, 8))
+
+        title_block = ctk.CTkFrame(header, fg_color=self.current_theme["bg"])
+        title_block.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+        ctk.CTkLabel(
+            title_block,
+            text="RFID Card Management",
+            font=(UI_FONT, 20, "bold"),
+            text_color=self.current_theme["fg"],
+        ).pack(anchor="w")
+
+        ctk.CTkLabel(
+            title_block,
+            text="Create, update, role-manage, and delete registered cards from one screen.",
+            font=UI_FONT_SMALL,
+            text_color=self.current_theme.get("muted", self.current_theme["fg"]),
+            wraplength=540,
+            justify="left",
+        ).pack(anchor="w", pady=(2, 0))
+
+        ctk.CTkButton(
+            header,
+            text="Back",
+            font=UI_FONT_BODY,
+            command=lambda: self.show_admin_dashboard(getattr(self, "_current_admin_user", {"name": "admin", "rfid_uid": ""})),
+            fg_color=self.current_theme["button_bg"],
+            hover_color=self.current_theme.get("accent", "#10b981"),
+            text_color=self.current_theme["button_fg"],
+            corner_radius=8,
+            height=34,
+            width=90,
+        ).pack(side=tk.RIGHT)
+
+        ctk.CTkLabel(
+            frame,
+            text="Use the create form below to add a card, then edit or delete any registered card in the list.",
+            font=UI_FONT_SMALL,
+            text_color=self.current_theme.get("muted", self.current_theme["fg"]),
+            wraplength=760,
+            justify="left",
+        ).pack(pady=(0, 10), anchor="w")
+
+        scroll = ctk.CTkScrollableFrame(frame, fg_color=self.current_theme["bg"])
+        scroll.pack(expand=True, fill=tk.BOTH)
+
+        create_card = ctk.CTkFrame(
+            scroll,
+            fg_color=self.current_theme.get("card_bg", self.current_theme["button_bg"]),
+            border_width=1,
+            border_color=self.current_theme.get("card_border", "#e2e8f0"),
+            corner_radius=10,
+        )
+        create_card.pack(fill=tk.X, padx=8, pady=(0, 8))
+
+        create_inner = ctk.CTkFrame(create_card, fg_color=self.current_theme.get("card_bg", self.current_theme["button_bg"]))
+        create_inner.pack(fill=tk.X, padx=14, pady=12)
+
+        uid_var = tk.StringVar(value="")
+        name_var = tk.StringVar(value="")
+        role_var = tk.StringVar(value="customer")
+        balance_var = tk.StringVar(value="50.00")
+        status_var = tk.StringVar(value="")
+
+        ctk.CTkLabel(create_inner, text="New RFID UID:", font=UI_FONT_BODY, text_color=self.current_theme["fg"]).pack(anchor="w")
+        uid_entry = ctk.CTkEntry(
+            create_inner,
+            textvariable=uid_var,
+            width=320,
+            fg_color=self.current_theme.get("search_bg", "#f2f2f7"),
+            text_color=self.current_theme["fg"],
+            border_color=self.current_theme.get("search_border", "#d1d1d6"),
+        )
+        uid_entry.pack(anchor="w", pady=(4, 8))
+
+        ctk.CTkLabel(create_inner, text="Display Name:", font=UI_FONT_BODY, text_color=self.current_theme["fg"]).pack(anchor="w")
+        ctk.CTkEntry(
+            create_inner,
+            textvariable=name_var,
+            width=320,
+            fg_color=self.current_theme.get("search_bg", "#f2f2f7"),
+            text_color=self.current_theme["fg"],
+            border_color=self.current_theme.get("search_border", "#d1d1d6"),
+        ).pack(anchor="w", pady=(4, 8))
+
+        ctk.CTkLabel(create_inner, text="Role:", font=UI_FONT_BODY, text_color=self.current_theme["fg"]).pack(anchor="w")
+
+        def _default_balance_for_role(role: str) -> str:
+            return "50.00" if role == "customer" else "0.00"
+
+        def on_role_change(selected: str):
+            role_value = (selected or "customer").strip().lower()
+            role_var.set(role_value)
+            balance_var.set(_default_balance_for_role(role_value))
+
+        ctk.CTkOptionMenu(
+            create_inner,
+            variable=role_var,
+            values=["customer", "restocker", "troubleshooter", "researcher", "admin"],
+            command=on_role_change,
+            width=240,
+            fg_color=self.current_theme.get("accent", "#10b981"),
+            button_color=self.current_theme.get("accent_hover", "#059669"),
+            button_hover_color=self.current_theme.get("accent_hover", "#059669"),
+            text_color="#ffffff",
+        ).pack(anchor="w", pady=(4, 8))
+
+        ctk.CTkLabel(create_inner, text="Initial Balance (PHP):", font=UI_FONT_BODY, text_color=self.current_theme["fg"]).pack(anchor="w")
+        ctk.CTkEntry(
+            create_inner,
+            textvariable=balance_var,
+            width=220,
+            fg_color=self.current_theme.get("search_bg", "#f2f2f7"),
+            text_color=self.current_theme["fg"],
+            border_color=self.current_theme.get("search_border", "#d1d1d6"),
+        ).pack(anchor="w", pady=(4, 8))
+
+        ctk.CTkLabel(
+            create_inner,
+            textvariable=status_var,
+            font=UI_FONT_SMALL,
+            text_color=self.current_theme.get("muted", self.current_theme["fg"]),
+            wraplength=620,
+            justify="left",
+        ).pack(anchor="w", pady=(2, 8))
+
+        def enroll_card():
+            uid = uid_var.get().strip().upper()
+            if not uid:
+                status_var.set("RFID UID is required.")
+                return
+
+            role = role_var.get().strip().lower() or "customer"
+            name = name_var.get().strip() or None
+
+            try:
+                initial_balance = float(balance_var.get().strip())
+            except Exception:
+                status_var.set("Initial balance must be a valid number.")
+                return
+
+            if initial_balance < 0:
+                status_var.set("Initial balance cannot be negative.")
+                return
+
+            existing = self.get_user_by_uid_data(uid)
+            if existing:
+                status_var.set(f"UID already registered (role={existing['role']}, balance=₱{float(existing['balance']):.2f}).")
+                return
+
+            is_staff = 1 if role in {"restocker", "admin", "staff"} else 0
+            try:
+                self.create_rfid_user_data(
+                    uid,
+                    name=name,
+                    is_staff=is_staff,
+                    initial_balance=initial_balance,
+                    role=role,
+                )
+            except Exception as exc:
+                status_var.set(f"Enrollment failed: {exc}")
+                return
+
+            status_var.set(f"Card created: UID={uid}, role={role}, balance=₱{initial_balance:.2f}")
+            uid_var.set("")
+            name_var.set("")
+            on_role_change("customer")
+            uid_entry.focus_set()
+            refresh_table()
+
+        ctk.CTkButton(
+            create_inner,
+            text="Create RFID Card",
+            font=(UI_FONT, 11, "bold"),
+            command=enroll_card,
+            fg_color=self.current_theme.get("accent", "#10b981"),
+            hover_color=self.current_theme.get("accent_hover", "#059669"),
+            text_color="#ffffff",
+            corner_radius=8,
+            height=36,
+        ).pack(anchor="w", pady=(0, 4))
+
+        list_header = ctk.CTkFrame(scroll, fg_color=self.current_theme["bg"])
+        list_header.pack(fill=tk.X, padx=8, pady=(6, 4))
+        card_count_var = tk.StringVar(value="Cards: 0")
+        ctk.CTkLabel(
+            list_header,
+            text="Registered Cards",
+            font=(UI_FONT, 13, "bold"),
+            text_color=self.current_theme["fg"],
+        ).pack(side=tk.LEFT)
+        ctk.CTkLabel(
+            list_header,
+            textvariable=card_count_var,
+            font=UI_FONT_SMALL,
+            text_color=self.current_theme.get("muted", self.current_theme["fg"]),
+        ).pack(side=tk.RIGHT)
+
+        table = ctk.CTkFrame(scroll, fg_color=self.current_theme["bg"])
+        table.pack(fill=tk.BOTH, expand=True, padx=0, pady=(0, 8))
+
+        users = []
+
+        def refresh_table():
+            for child in table.winfo_children():
+                child.destroy()
+
+            nonlocal users
+            users = list(self.get_all_rfid_users_data())
+            card_count_var.set(f"Cards: {len(users)}")
+
+            if not users:
+                ctk.CTkLabel(
+                    table,
+                    text="No RFID cards registered yet.",
+                    font=UI_FONT_BODY,
+                    text_color=self.current_theme.get("muted", self.current_theme["fg"]),
+                ).pack(pady=16)
+                return
+
+            header = ctk.CTkFrame(table, fg_color=self.current_theme["bg"])
+            header.pack(fill=tk.X, pady=(0, 4))
+            for text in ["UID", "Name", "Balance", "Role", "Actions"]:
+                ctk.CTkLabel(
+                    header,
+                    text=text,
+                    font=(UI_FONT, 10, "bold"),
+                    text_color=self.current_theme["fg"],
+                    anchor="w",
+                ).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=4)
+
+            role_values = ["customer", "restocker", "researcher", "troubleshooter", "admin"]
+
+            for user in users:
+                row = ctk.CTkFrame(
+                    table,
+                    fg_color=self.current_theme.get("card_bg", self.current_theme["button_bg"]),
+                    border_width=1,
+                    border_color=self.current_theme.get("card_border", "#e2e8f0"),
+                    corner_radius=8,
+                )
+                row.pack(fill=tk.X, pady=4)
+
+                uid_edit = tk.StringVar(value=str(user["rfid_uid"]))
+                name_edit = tk.StringVar(value=str(user["name"] or ""))
+                balance_edit = tk.StringVar(value=f"{float(user['balance']):.2f}")
+                role_edit = tk.StringVar(value=str(user["role"] or "customer"))
+
+                row_grid = ctk.CTkFrame(row, fg_color=self.current_theme.get("card_bg", self.current_theme["button_bg"]))
+                row_grid.pack(fill=tk.X, padx=10, pady=(8, 10))
+
+                summary_line = ctk.CTkFrame(row_grid, fg_color="transparent")
+                summary_line.pack(fill=tk.X, pady=(0, 6))
+
+                summary_left = ctk.CTkFrame(summary_line, fg_color="transparent")
+                summary_left.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+                ctk.CTkLabel(
+                    summary_left,
+                    text=f"UID {user['rfid_uid']}",
+                    font=(UI_FONT, 12, "bold"),
+                    text_color=self.current_theme["fg"],
+                    anchor="w",
+                ).pack(anchor="w")
+
+                ctk.CTkLabel(
+                    summary_left,
+                    text=f"{(user['name'] or '(no name)')}  ·  ₱{float(user['balance']):.2f}  ·  {user['role'] or 'customer'}",
+                    font=UI_FONT_SMALL,
+                    text_color=self.current_theme.get("muted", self.current_theme["fg"]),
+                    anchor="w",
+                ).pack(anchor="w", pady=(1, 0))
+
+                summary_right = ctk.CTkLabel(
+                    summary_line,
+                    text="Edit below",
+                    font=UI_FONT_SMALL,
+                    text_color=self.current_theme.get("muted", self.current_theme["fg"]),
+                )
+                summary_right.pack(side=tk.RIGHT, padx=(8, 0))
+
+                fields = ctk.CTkFrame(row_grid, fg_color=self.current_theme.get("card_bg", self.current_theme["button_bg"]))
+                fields.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+                def make_field(parent, label, var, width=160):
+                    box = ctk.CTkFrame(parent, fg_color="transparent")
+                    box.pack(side=tk.LEFT, padx=3, fill=tk.X, expand=True)
+                    ctk.CTkLabel(box, text=label, font=UI_FONT_SMALL, text_color=self.current_theme.get("muted", self.current_theme["fg"])).pack(anchor="w")
+                    ctk.CTkEntry(
+                        box,
+                        textvariable=var,
+                        width=width,
+                        fg_color=self.current_theme.get("search_bg", "#f2f2f7"),
+                        text_color=self.current_theme["fg"],
+                        border_color=self.current_theme.get("search_border", "#d1d1d6"),
+                    ).pack(anchor="w", pady=(2, 0), fill=tk.X)
+
+                make_field(fields, "UID", uid_edit, 120)
+                make_field(fields, "Name", name_edit, 140)
+                make_field(fields, "Balance", balance_edit, 100)
+
+                role_box = ctk.CTkFrame(fields, fg_color="transparent")
+                role_box.pack(side=tk.LEFT, padx=3, fill=tk.X, expand=True)
+                ctk.CTkLabel(role_box, text="Role", font=UI_FONT_SMALL, text_color=self.current_theme.get("muted", self.current_theme["fg"])).pack(anchor="w")
+                ctk.CTkOptionMenu(
+                    role_box,
+                    variable=role_edit,
+                    values=role_values,
+                    width=130,
+                    fg_color=self.current_theme.get("accent", "#10b981"),
+                    button_color=self.current_theme.get("accent_hover", "#059669"),
+                    button_hover_color=self.current_theme.get("accent_hover", "#059669"),
+                    text_color="#ffffff",
+                ).pack(anchor="w", pady=(2, 0))
+
+                action_box = ctk.CTkFrame(row_grid, fg_color="transparent")
+                action_box.pack(side=tk.RIGHT, padx=(6, 0), pady=(24, 0))
+
+                def make_save_cmd(uid=user["id"], uid_var=uid_edit, name_var=name_edit, balance_var=balance_edit, role_var=role_edit):
+                    def _save():
+                        try:
+                            balance_value = float(balance_var.get().strip())
+                        except Exception:
+                            messagebox.showerror("Invalid Balance", "Balance must be a valid number.")
+                            return
+                        try:
+                            self.update_rfid_user_data(uid, uid_var.get(), name_var.get().strip() or None, balance_value, role_var.get())
+                        except Exception as exc:
+                            messagebox.showerror("Save Failed", str(exc))
+                            return
+                        messagebox.showinfo("Saved", "RFID card updated successfully.")
+                        refresh_table()
+                    return _save
+
+                def make_delete_cmd(uid=user["id"], card_uid=user["rfid_uid"]):
+                    def _delete():
+                        if not messagebox.askyesno("Delete RFID Card", f"Delete RFID card {card_uid}? This cannot be undone."):
+                            return
+                        try:
+                            self.delete_rfid_user_data(uid)
+                        except Exception as exc:
+                            messagebox.showerror("Delete Failed", str(exc))
+                            return
+                        messagebox.showinfo("Deleted", "RFID card deleted successfully.")
+                        refresh_table()
+                    return _delete
+
+                ctk.CTkButton(
+                    action_box,
+                    text="Save",
+                    font=(UI_FONT, 11, "bold"),
+                    command=make_save_cmd(),
+                    fg_color=self.current_theme.get("accent", "#10b981"),
+                    hover_color=self.current_theme.get("accent_hover", "#059669"),
+                    text_color="#ffffff",
+                    corner_radius=8,
+                    width=62,
+                ).pack(side=tk.LEFT, padx=(0, 6), pady=0)
+
+                ctk.CTkButton(
+                    action_box,
+                    text="Delete",
+                    font=(UI_FONT, 11, "bold"),
+                    command=make_delete_cmd(),
+                    fg_color="#dc2626",
+                    hover_color="#b91c1c",
+                    text_color="#ffffff",
+                    corner_radius=8,
+                    width=66,
+                ).pack(side=tk.LEFT, pady=0)
+
+        refresh_table()
+
+        ctk.CTkButton(
+            scroll,
+            text="Back to Admin Dashboard",
+            font=UI_FONT_BODY,
+            command=lambda: self.show_admin_dashboard(getattr(self, "_current_admin_user", {"name": "admin", "rfid_uid": ""})),
+            fg_color=self.current_theme["button_bg"],
+            hover_color=self.current_theme.get("accent", "#10b981"),
+            text_color=self.current_theme["button_fg"],
+            corner_radius=8,
+            height=38,
+        ).pack(pady=(4, 0))
+
         self.add_theme_toggle_footer()
 
     def show_sales_reports_screen(self):
@@ -1107,9 +1503,9 @@ class AdminMixin:
 
         ctk.CTkButton(
             btn_row,
-            text="Open RFID Roles",
+            text="Open RFID Management",
             font=(UI_FONT, 11, "bold"),
-            command=self.show_rfid_roles_screen,
+            command=self.show_rfid_cards_crud_screen,
             fg_color=self.current_theme.get("button_bg", "#ffffff"),
             hover_color=self.current_theme.get("card_border", "#d1d1d6"),
             text_color=self.current_theme.get("button_fg", "#1c1c1e"),
@@ -1118,101 +1514,6 @@ class AdminMixin:
             border_color=self.current_theme.get("card_border", "#d1d1d6"),
             height=36,
         ).pack(side=tk.LEFT)
-
-        ctk.CTkButton(
-            frame,
-            text="Back to Admin Dashboard",
-            font=UI_FONT_BODY,
-            command=lambda: self.show_admin_dashboard(getattr(self, "_current_admin_user", {"name": "admin", "rfid_uid": ""})),
-            fg_color=self.current_theme["button_bg"],
-            hover_color=self.current_theme.get("accent", "#10b981"),
-            text_color=self.current_theme["button_fg"],
-            corner_radius=8,
-            height=38,
-        ).pack(pady=12)
-
-        self.add_theme_toggle_footer()
-
-    def show_rfid_roles_screen(self):
-        """Manage RFID user roles for door access control."""
-        self._current_screen_builder = self.show_rfid_roles_screen
-        self.clear_screen()
-
-        frame = ctk.CTkFrame(self.content_holder, fg_color=self.current_theme["bg"])
-        frame.pack(expand=True, fill=tk.BOTH, padx=20, pady=16)
-
-        ctk.CTkLabel(
-            frame,
-            text="RFID Role Management",
-            font=(UI_FONT, 20, "bold"),
-            text_color=self.current_theme["fg"],
-        ).pack(pady=(0, 6))
-
-        ctk.CTkLabel(
-            frame,
-            text="Roles: customer, restocker, researcher, troubleshooter, admin",
-            font=UI_FONT_SMALL,
-            text_color=self.current_theme.get("muted", self.current_theme["fg"]),
-        ).pack(pady=(0, 10))
-
-        table = ctk.CTkScrollableFrame(frame, fg_color=self.current_theme["bg"])
-        table.pack(expand=True, fill=tk.BOTH)
-
-        users = self.get_all_rfid_users_data()
-        role_values = ["customer", "restocker", "researcher", "troubleshooter", "admin"]
-
-        for user in users:
-            row = ctk.CTkFrame(
-                table,
-                fg_color=self.current_theme.get("card_bg", self.current_theme["button_bg"]),
-                border_width=1,
-                border_color=self.current_theme.get("card_border", "#e2e8f0"),
-                corner_radius=8,
-            )
-            row.pack(fill=tk.X, pady=6)
-
-            name_text = user["name"] or "(no name)"
-            ctk.CTkLabel(
-                row,
-                text=f"UID: {user['rfid_uid']}  |  {name_text}  |  Bal: ₱{float(user['balance']):.2f}",
-                font=UI_FONT_BODY,
-                text_color=self.current_theme["button_fg"],
-                anchor="w",
-            ).pack(side=tk.LEFT, padx=10, pady=10, expand=True, fill=tk.X)
-
-            role_var = tk.StringVar(value=(user["role"] or "customer"))
-            picker = ctk.CTkOptionMenu(
-                row,
-                variable=role_var,
-                values=role_values,
-                width=150,
-                fg_color=self.current_theme.get("accent", "#10b981"),
-                button_color=self.current_theme.get("accent_hover", "#059669"),
-                button_hover_color=self.current_theme.get("accent_hover", "#059669"),
-                text_color="#ffffff",
-            )
-            picker.pack(side=tk.LEFT, padx=(0, 8), pady=8)
-
-            def make_save(uid=user["id"], rvar=role_var):
-                def _save():
-                    try:
-                        self.update_rfid_user_role_data(uid, rvar.get())
-                        messagebox.showinfo("Saved", "RFID role updated successfully.")
-                    except Exception as exc:
-                        messagebox.showerror("Error", str(exc))
-                return _save
-
-            ctk.CTkButton(
-                row,
-                text="Save",
-                font=(UI_FONT, 11, "bold"),
-                command=make_save(),
-                fg_color=self.current_theme.get("accent", "#10b981"),
-                hover_color=self.current_theme.get("accent_hover", "#059669"),
-                text_color="#ffffff",
-                corner_radius=8,
-                width=72,
-            ).pack(side=tk.LEFT, padx=(0, 10), pady=8)
 
         ctk.CTkButton(
             frame,

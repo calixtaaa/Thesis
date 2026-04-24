@@ -33,6 +33,8 @@ from database import (
     update_user_balance,
     adjust_user_balance,
     get_all_rfid_users,
+    update_rfid_user,
+    delete_rfid_user,
     update_rfid_user_role,
     get_hardware_setting,
     set_hardware_setting,
@@ -971,6 +973,12 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
 
     def update_rfid_user_role_data(self, user_id: int, role: str):
         return update_rfid_user_role(user_id, role)
+
+    def update_rfid_user_data(self, user_id: int, rfid_uid: str, name: str | None, balance: float, role: str):
+        return update_rfid_user(user_id, rfid_uid, name, balance, role)
+
+    def delete_rfid_user_data(self, user_id: int):
+        return delete_rfid_user(user_id)
 
     def get_hardware_setting_data(self, key: str, default: str | None = None):
         return get_hardware_setting(key, default)
@@ -2619,7 +2627,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                 return
             uid_entry.delete(0, tk.END)
             uid_entry.insert(0, uid.strip().upper())
-            scan_hint.configure(text=f"RFID {uid.strip().upper()} detected.")
+            scan_hint.configure(text=f"RFID {uid.strip().upper()} detected. Verifying card...")
             error_lbl.configure(text="")
             proceed_to_amount(uid)
 
@@ -2657,7 +2665,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                 lookup_in_progress["value"] = False
                 return
 
-            scan_hint.configure(text=f"RFID {uid} detected. Opening reload amount...")
+            scan_hint.configure(text=f"RFID {uid} accepted. Opening reload amount...")
             self._reload_amount_screen(uid, user)
 
         def poll_rfid():
@@ -2733,18 +2741,17 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             justify="left",
         ).pack(pady=(8, 0), anchor="w")
 
-        btn_frame = ctk.CTkFrame(card_inner, fg_color=theme["button_bg"])
-        btn_frame.pack(pady=15)
-
-        def add_money(value):
-            cash_session.add(value)
-            amount_var.set(cash_session.get_amount())
+        ctk.CTkLabel(
+            card_inner,
+            text="Insert coins into the coin acceptor to add balance.",
+            font=UI_FONT_SMALL,
+            text_color=theme.get("muted", theme["button_fg"]),
+            justify="left",
+            wraplength=380,
+        ).pack(pady=(10, 8), anchor="w")
 
         def _refresh_pulse_debug():
             pulse_debug_var.set(self.format_payment_pulse_debug_text())
-
-        for text, value in [("+₱1", 1), ("+₱5", 5), ("+₱10", 10), ("+₱20", 20)]:
-            ctk.CTkButton(btn_frame, text=text, width=70, font=UI_FONT_BODY, command=lambda v=value: add_money(v), fg_color=theme["accent"], hover_color=theme["accent_hover"], text_color=theme.get("on_accent", "#ffffff"), corner_radius=8).pack(side=tk.LEFT, padx=5)
 
         # Monitor coin-acceptor pulses while this screen is open.
         self.start_cash_pulse_monitor(amount_var, tk.DoubleVar(value=0.0), 0.0, on_update=_refresh_pulse_debug)
@@ -2830,11 +2837,11 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
 
             user = get_user_by_uid(uid)
             if not user:
-                error_lbl.configure(text=f"RFID {uid}: card not found.")
+                error_lbl.configure(text="Card not found. Please buy a new card at the office.")
                 scan_hint.configure(text="Waiting for RFID tap...")
                 return
             if user["balance"] < total_amount:
-                error_lbl.configure(text=f"RFID {uid}: insufficient card balance.")
+                error_lbl.configure(text="Insufficient card balance.")
                 scan_hint.configure(text="Waiting for RFID tap...")
                 return
 
@@ -2859,7 +2866,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                 return
             uid_entry.delete(0, tk.END)
             uid_entry.insert(0, uid.strip().upper())
-            scan_hint.configure(text=f"RFID {uid.strip().upper()} detected.")
+            scan_hint.configure(text=f"RFID {uid.strip().upper()} detected. Verifying card...")
             error_lbl.configure(text="")
             process_rfid(uid)
 
