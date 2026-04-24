@@ -391,6 +391,19 @@ class StepperMCPTestApp(ctk.CTk):
             corner_radius=10,
         ).pack(side=tk.LEFT, fill=tk.X, expand=True)
 
+        run_all_row = ctk.CTkFrame(control_card, fg_color="transparent")
+        run_all_row.pack(fill=tk.X, padx=18, pady=(0, 10))
+        ctk.CTkButton(
+            run_all_row,
+            text="Run all slots (1 rev each)",
+            command=self.run_all_slots,
+            fg_color="#0ea5e9",
+            hover_color="#0284c7",
+            text_color="#ffffff",
+            height=40,
+            corner_radius=10,
+        ).pack(side=tk.LEFT, fill=tk.X, expand=True)
+
         stop_row = ctk.CTkFrame(control_card, fg_color="transparent")
         stop_row.pack(fill=tk.X, padx=18, pady=(0, 16))
         ctk.CTkButton(
@@ -736,6 +749,95 @@ class StepperMCPTestApp(ctk.CTk):
             self._rotate(steps)
         except Exception as exc:
             messagebox.showerror("Stepper error", str(exc))
+
+    def run_all_slots(self):
+        if self.running:
+            return
+        if self.ctrl is None:
+            messagebox.showerror("MCP error", "MCP backend is not ready.")
+            return
+        slots = sorted(self.slot_map.keys())
+        if not slots:
+            messagebox.showerror("No slot mapping", "No detected MCP slot mapping is available.")
+            return
+
+        try:
+            step_delay = max(0.0005, float(self.step_delay_ms.get()) / 1000.0)
+            steps_per_slot = max(1, int(self.steps_per_rev.get()))
+        except Exception as exc:
+            messagebox.showerror("Invalid input", str(exc))
+            return
+
+        sequence = (
+            ULN2003_SEQUENCE
+            if self.direction.get() == "forward"
+            else list(reversed(ULN2003_SEQUENCE))
+        )
+
+        def worker():
+            self.running = True
+            self.stop_requested = False
+            try:
+                total = len(slots)
+                for index, slot in enumerate(slots, start=1):
+                    if self.stop_requested:
+                        break
+                    cfg = self._slot_config(slot)
+                    address = int(cfg["address"])
+                    pins = cfg["pins"]
+
+                    self.after(
+                        0,
+                        lambda s=slot, i=index, t=total: self.progress_label.configure(
+                            text=f"Running slot {s} ({i}/{t})",
+                            text_color=self.current_theme["status_warn"],
+                        ),
+                    )
+
+                    for step_index in range(steps_per_slot):
+                        if self.stop_requested:
+                            break
+                        phase = sequence[step_index % len(sequence)]
+                        self.ctrl.write_phase(address, pins, phase)
+                        time.sleep(step_delay)
+
+                    self.ctrl.write_phase(address, pins, (0, 0, 0, 0))
+                    time.sleep(0.05)
+
+                self.ctrl.all_off()
+                if self.stop_requested:
+                    self.after(
+                        0,
+                        lambda: self.progress_label.configure(
+                            text="Run all stopped",
+                            text_color=self.current_theme["status_warn"],
+                        ),
+                    )
+                else:
+                    self.after(
+                        0,
+                        lambda: self.progress_label.configure(
+                            text=f"Completed all {len(slots)} slots",
+                            text_color=self.current_theme["status_ok"],
+                        ),
+                    )
+            except Exception as exc:
+                self.after(0, lambda: messagebox.showerror("Run all slots error", str(exc)))
+                self.after(
+                    0,
+                    lambda: self.progress_label.configure(
+                        text="Run all error",
+                        text_color=self.current_theme["status_error"],
+                    ),
+                )
+            finally:
+                try:
+                    self.ctrl.all_off()
+                except Exception:
+                    pass
+                self.running = False
+
+        threading.Thread(target=worker, daemon=True).start()
 
     def stop_motor(self):
         self.stop_requested = True

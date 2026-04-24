@@ -63,6 +63,10 @@ Slot to expander pin mapping (main.py default):
 Notes:
 - Runtime selects MCP mode by default on Raspberry Pi.
 - To force old direct GPIO stepper mode, set STEPPER_BACKEND=native_gpio before launching.
+- MCP logical pin map in tools/tests:
+	- GPA0..GPA7 = pins 0..7
+	- GPB0..GPB7 = pins 8..15
+	- GPB0 specifically equals logical pin 8
 
 ========================================
 3) Solenoid Locks (12V Solenoid Model 102)

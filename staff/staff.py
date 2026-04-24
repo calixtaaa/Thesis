@@ -65,7 +65,7 @@ class StaffMixin:
 
         ctk.CTkLabel(
             inner,
-            text="Select door and tap staff/research RFID card:",
+            text="Tap staff/research RFID card. Reader is always listening:",
             font=UI_FONT_SMALL,
             text_color=theme.get("muted", theme["fg"]),
         ).pack(anchor="w", pady=(0, 6))
@@ -74,56 +74,22 @@ class StaffMixin:
         nav_fg = theme.get("nav_fg", "#ffffff")
         nav_hover = theme.get("nav_hover", "#333333")
 
-        door_var = tk.StringVar(value="restock")
-        ctk.CTkOptionMenu(
+        scan_hint = ctk.CTkLabel(
             inner,
-            variable=door_var,
-            values=["restock", "troubleshoot"],
-            width=280,
-            fg_color=nav_bg,
-            button_color=nav_hover,
-            button_hover_color=theme.get("accent", "#22c55e"),
-            text_color=nav_fg,
-            dropdown_fg_color=theme["card_bg"],
-            dropdown_text_color=theme["fg"],
-            dropdown_hover_color=theme.get("search_bg", "#f2f2f7"),
-        ).pack(pady=(0, 12))
-
-        entry = ctk.CTkEntry(
-            inner,
-            font=UI_FONT_BODY,
-            width=280,
-            fg_color=theme.get("search_bg", "#ffffff"),
-            text_color=theme["fg"],
-            border_color=theme.get("search_border", "#d1d1d6"),
-            corner_radius=12,
-            height=42,
+            text="Waiting for RFID tap...",
+            font=(UI_FONT, 12, "bold"),
+            text_color=theme.get("accent", "#22c55e"),
         )
-        entry.pack(pady=(0, 20))
-        entry.focus_set()
+        scan_hint.pack(anchor="w", pady=(0, 12))
 
-        def read_from_door_reader():
-            uid = self.read_rfid_uid("door")
-            if not uid:
-                error_lbl.configure(text="No RFID tap detected. You can type card ID manually.")
-                return
-            entry.delete(0, tk.END)
-            entry.insert(0, uid)
-            error_lbl.configure(text="")
-
-        ctk.CTkButton(
+        auth_status_var = tk.StringVar(value="Last accepted: none")
+        auth_status_lbl = ctk.CTkLabel(
             inner,
-            text="Read from Shared RFID Reader",
-            font=(UI_FONT, 11, "bold"),
-            command=read_from_door_reader,
-            fg_color=theme.get("button_bg", "#ffffff"),
-            hover_color=theme.get("card_border", "#d1d1d6"),
-            text_color=theme.get("button_fg", "#1c1c1e"),
-            corner_radius=980,
-            height=34,
-            border_width=1,
-            border_color=theme.get("card_border", "#d1d1d6"),
-        ).pack(anchor="w", pady=(0, 12))
+            textvariable=auth_status_var,
+            font=UI_FONT_SMALL,
+            text_color=theme.get("muted", theme["fg"]),
+        )
+        auth_status_lbl.pack(anchor="w", pady=(0, 8))
 
         error_lbl = ctk.CTkLabel(
             inner,
@@ -136,44 +102,74 @@ class StaffMixin:
         btn_frame = ctk.CTkFrame(inner, fg_color=theme["card_bg"])
         btn_frame.pack(fill=tk.X, pady=(4, 0))
 
-        def submit():
-            uid = entry.get().strip()
-            if not uid:
-                error_lbl.configure(text="Please enter a staff RFID card ID.")
-                return
+        last_uid = {"value": None}
 
-            selected_door = door_var.get().strip().lower()
+        def user_value(user, key, default=None):
+            try:
+                value = user[key]
+            except Exception:
+                value = default
+            return default if value is None else value
+
+        def resolve_door_from_user(user):
+            role = str(user_value(user, "role", "")).strip().lower()
+            is_staff = bool(user_value(user, "is_staff", 0))
+
+            if role in {"researcher", "troubleshooter", "technician"}:
+                return "troubleshoot"
+            if role == "admin":
+                return "restock"
+            if is_staff or role in {"restocker", "staff"}:
+                return "restock"
+            return None
+
+        def handle_uid(uid: str):
             user = self.get_user_by_uid_data(uid)
             if not user:
-                error_lbl.configure(text="RFID card not found.")
-                return
-            if not self.is_user_authorized_for_door(user, selected_door):
-                error_lbl.configure(text=f"Card role is not allowed to open {selected_door} door.")
+                error_lbl.configure(text=f"RFID {uid}: card not found")
                 return
 
+            selected_door = resolve_door_from_user(user)
+            if not selected_door:
+                error_lbl.configure(text=f"RFID {uid}: role has no door access")
+                return
+            if not self.is_user_authorized_for_door(user, selected_door):
+                error_lbl.configure(text=f"RFID {uid}: not authorized for {selected_door} door")
+                return
+
+            role = str(user_value(user, "role", "")).strip().lower() or "unknown"
+            auth_status_var.set(f"Last accepted: UID {uid} | role {role} | door {selected_door}")
+            scan_hint.configure(text=f"RFID {uid} accepted. Unlocking {selected_door} door...")
+            error_lbl.configure(text="")
             try:
                 self.unlock_access_door(selected_door)
             except Exception as exc:
-                error_lbl.configure(text=f"Failed to unlock door: {exc}")
+                error_lbl.configure(text=f"Failed to unlock {selected_door} door: {exc}")
+                scan_hint.configure(text="Waiting for RFID tap...")
                 return
 
-            error_lbl.configure(text="")
             if selected_door == "restock":
                 self.show_restock_screen(user)
             else:
                 self.show_troubleshooting_screen(user)
 
-        ctk.CTkButton(
-            btn_frame,
-            text="Unlock",
-            font=(UI_FONT, 12, "bold"),
-            command=submit,
-            fg_color=nav_bg,
-            hover_color=nav_hover,
-            text_color=nav_fg,
-            corner_radius=980,
-            height=40,
-        ).pack(side=tk.LEFT, padx=(0, 10))
+        def poll_rfid():
+            if not inner.winfo_exists():
+                return
+
+            try:
+                uid = self.read_rfid_uid("door")
+            except Exception:
+                uid = None
+
+            if uid:
+                uid = uid.strip().upper()
+                if uid != last_uid["value"]:
+                    last_uid["value"] = uid
+                    handle_uid(uid)
+
+            if inner.winfo_exists() and self._current_screen_builder == self.enter_restock_mode:
+                self.after(250, poll_rfid)
 
         ctk.CTkButton(
             btn_frame,
@@ -189,7 +185,7 @@ class StaffMixin:
             border_color=theme.get("card_border", "#d1d1d6"),
         ).pack(side=tk.LEFT)
 
-        entry.bind("<Return>", lambda _: submit())
+        self.after(250, poll_rfid)
         self.add_theme_toggle_footer()
 
     def _slide_in(self, frame, steps=12, step_ms=20):

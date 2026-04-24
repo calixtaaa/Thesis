@@ -1,5 +1,7 @@
 source venv/bin/activate
 export DISPLAY=:0
 export PYTHONNOUSERSITE=1
-export MCP23017_ADDRESSES=0x20
+# Use all expected expanders for slots 1..10.
+# If your third chip currently appears as 0x26 in i2cdetect, use 0x20,0x21,0x26 temporarily.
+export MCP23017_ADDRESSES=0x20,0x21,0x22
 venv/bin/python main.py
