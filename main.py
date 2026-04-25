@@ -1114,7 +1114,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             GPIO.output(rst_pin, GPIO.LOW)
             time.sleep(0.01)
             GPIO.output(rst_pin, GPIO.HIGH)
-            time.sleep(0.01)
+            time.sleep(0.1)  # MFRC522 needs ~100ms to stabilize after reset
         except Exception:
             pass
 
@@ -1124,6 +1124,22 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             return None
 
         try:
+            # Initialize firmware and set antenna gain if available
+            for init_method in ("PCD_Init", "InitRC522", "init"):
+                if hasattr(reader, init_method):
+                    try:
+                        getattr(reader, init_method)()
+                        break
+                    except Exception:
+                        pass
+            
+            # Ensure antenna is enabled if method exists
+            if hasattr(reader, "PCD_SetAntennaGain"):
+                try:
+                    reader.PCD_SetAntennaGain(0x07)  # Max gain
+                except Exception:
+                    pass
+            
             # Common MFRC522 low-level API used by several Python wrappers.
             if hasattr(reader, "MFRC522_Request") and hasattr(reader, "MFRC522_Anticoll"):
                 req_cmd = getattr(reader, "PICC_REQIDL", 0x26)

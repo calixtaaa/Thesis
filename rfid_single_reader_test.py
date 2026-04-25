@@ -173,7 +173,7 @@ def _read_uid_low_level() -> str | None:
         GPIO.output(RFID_RST_PIN, GPIO.LOW)
         time.sleep(0.01)
         GPIO.output(RFID_RST_PIN, GPIO.HIGH)
-        time.sleep(0.01)
+        time.sleep(0.1)  # MFRC522 needs ~100ms to stabilize after reset
     except Exception:
         pass
 
@@ -183,6 +183,22 @@ def _read_uid_low_level() -> str | None:
         return None
 
     try:
+        # Initialize firmware and set antenna gain if available
+        for init_method in ("PCD_Init", "InitRC522", "init"):
+            if hasattr(reader, init_method):
+                try:
+                    getattr(reader, init_method)()
+                    break
+                except Exception:
+                    pass
+        
+        # Ensure antenna is enabled if method exists
+        if hasattr(reader, "PCD_SetAntennaGain"):
+            try:
+                reader.PCD_SetAntennaGain(0x07)  # Max gain
+            except Exception:
+                pass
+        
         if hasattr(reader, "MFRC522_Request") and hasattr(reader, "MFRC522_Anticoll"):
             req_cmd = getattr(reader, "PICC_REQIDL", 0x26)
             mi_ok = getattr(reader, "MI_OK", 0)
