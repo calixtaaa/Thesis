@@ -2061,7 +2061,9 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             except Exception:
                 pass
         self.clear_screen()
-        all_products = get_all_products()
+        # UI ordering should match physical tray layout:
+        # show highest slot at the top so the bottom-most/heaviest (slot 1) appears last.
+        all_products = sorted(get_all_products(), key=lambda p: int(p["slot_number"]), reverse=True)
 
         # Destroy any existing sidebar
         if self.sidebar_holder is not None and self.sidebar_holder.winfo_exists():

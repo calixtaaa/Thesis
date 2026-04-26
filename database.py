@@ -51,6 +51,7 @@ def init_db():
     CREATE TABLE IF NOT EXISTS products (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
+        details TEXT,
         price REAL NOT NULL,
         slot_number INTEGER NOT NULL UNIQUE,
         capacity INTEGER NOT NULL,
@@ -80,6 +81,12 @@ def init_db():
     conn.commit()
 
     # Ensure new column exists if upgrading from older schema
+    cur.execute("PRAGMA table_info(products)")
+    product_cols = [row["name"] for row in cur.fetchall()]
+    if "details" not in product_cols:
+        cur.execute("ALTER TABLE products ADD COLUMN details TEXT")
+        conn.commit()
+
     cur.execute("PRAGMA table_info(transactions)")
     cols = [row["name"] for row in cur.fetchall()]
     if "rfid_user_id" not in cols:
@@ -134,21 +141,22 @@ def init_db():
     cur.execute("SELECT COUNT(*) AS c FROM products")
     if cur.fetchone()["c"] == 0:
         sample_products = [
-            ("All Night Pads",          12.0, 1, 10, 5),
-            ("Panty Liners",            8.0,  2, 10, 5),
-            ("Regular W/ Wings Pads",   10.0, 3, 10, 5),
-            ("Non-Wing Pads",           9.0,  4, 10, 5),
-            ("Alcohol",                 25.0, 5, 10, 5),
-            ("Mouthwash",               35.0, 6, 10, 5),
-            ("Tissues",                 15.0, 7, 10, 5),
-            ("Wet Wipes",               25.0, 8, 10, 5),
-            ("Deodorant",               50.0, 9, 10, 5),
-            ("Soap",                    30.0, 10, 10, 5),
+            # Slot → Product (per latest physical tray layout)
+            ("Alcohol", "Green Cross Isopropyl Alcohol 70% Solution, 60mL", 25.00, 1, 10, 5),
+            ("Soap", "Soap, 10grams", 5.00, 2, 10, 5),
+            ("Deodorant", "Rexona Shower Clean, 3ml*12packs", 10.00, 3, 10, 5),
+            ("Mouthwash", "Scoban Mint Flavor, 10ml*10 packs", 8.00, 4, 10, 5),
+            ("Tissues", "Sanicare Hankies, 6 packs", 8.00, 5, 10, 5),
+            ("Wet Wipes", "Sanicare Mini Wipes, 6 packs x 8 sheets", 18.00, 6, 10, 5),
+            ("Panty Liners", "Charmee Breathable, 20 liners", 5.00, 7, 10, 5),
+            ("All Night Pads", "Charmee All Night Plus, 4 pads", 10.00, 8, 10, 5),
+            ("Regular W/ Wings Pads", "Charmee Dry Net with wings, 8 pads", 7.00, 9, 10, 5),
+            ("Non-Wing Pads", "Charmee Cottony without wings, 8 pads", 7.00, 10, 10, 5),
         ]
         cur.executemany(
             """
-            INSERT INTO products (name, price, slot_number, capacity, current_stock)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO products (name, details, price, slot_number, capacity, current_stock)
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
             sample_products,
         )

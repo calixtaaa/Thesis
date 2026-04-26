@@ -8,6 +8,13 @@ __pycache__/
 
 supabase.env
 
+# Environment / API keys
+.env
+.env.*
+*.env
+*.env.*
+WebSite/.env.local
+
 vending.db
 
 # Debug logs

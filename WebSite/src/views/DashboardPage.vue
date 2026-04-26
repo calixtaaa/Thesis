@@ -383,12 +383,14 @@
 import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
+import { useRealtimeMachineData } from '../composables/useRealtimeMachineData'
 import { Chart, registerables } from 'chart.js'
 
 Chart.register(...registerables)
 
 const router = useRouter()
 const { currentUser, isAdmin, logout, createUser, getUsers, deleteUser } = useAuth()
+const machine = useRealtimeMachineData()
 
 const activeSection = ref('overview')
 const sidebarOpen = ref(false)
@@ -426,30 +428,16 @@ function handleProfileUpload(e) {
   }
 }
 
-// === DATA (demo data matching machine format - replace with API) ===
+// === LIVE DATA (Supabase Realtime) ===
+const overviewStats = computed(() => ([
+  { label: 'Total Sales', value: `₱${Number(machine.overview.value.totalSales || 0).toFixed(2)}`, color: 'text-emerald-400' },
+  { label: 'Orders', value: String(machine.overview.value.orders || 0), color: 'text-blue-400' },
+  { label: 'Active Customers', value: String(machine.overview.value.activeCustomers || 0), color: 'text-purple-400' },
+  { label: 'Low-stock Products', value: String(machine.overview.value.lowStock || 0), color: 'text-amber-400' },
+]))
 
-const overviewStats = ref([
-  { label: 'Total Sales', value: '₱2,090.00', color: 'text-emerald-400' },
-  { label: 'Orders', value: '79', color: 'text-blue-400' },
-  { label: 'Active Customers', value: '6', color: 'text-purple-400' },
-  { label: 'Low-stock Products', value: '2', color: 'text-amber-400' },
-])
-
-const lowStockItems = ref([
-  { name: 'Hand Sanitizer', stock: 3, capacity: 10 },
-  { name: 'Face Mask', stock: 2, capacity: 10 },
-  { name: 'Wet Wipes', stock: 7, capacity: 10 },
-  { name: 'Tissue Pack', stock: 5, capacity: 10 },
-  { name: 'Alcohol Spray', stock: 8, capacity: 10 },
-])
-
-const recentTransactions = ref([
-  { item: 'Hand Sanitizer — Slot A1', time: '2 min ago', amount: '25.00' },
-  { item: 'Face Mask (3-pack) — Slot B2', time: '15 min ago', amount: '45.00' },
-  { item: 'Wet Wipes — Slot C1', time: '1 hour ago', amount: '20.00' },
-  { item: 'Alcohol Spray — Slot A3', time: '3 hours ago', amount: '35.00' },
-  { item: 'Tissue Pack — Slot B1', time: '5 hours ago', amount: '15.00' },
-])
+const lowStockItems = computed(() => machine.lowStockItems.value)
+const recentTransactions = computed(() => machine.recentTransactions.value)
 
 // === CHARTS ===
 const salesTrendChart = ref(null)

@@ -7,7 +7,7 @@ from datetime import datetime
 
 
 # App version (bump when releasing; shown in title, footers, and patch notes)
-VERSION = "v1.0.0"
+VERSION = "v1.0.1"
 
 
 # ---------------------------------------------------------------------------
@@ -140,8 +140,33 @@ PATCH_v1_0_0 = {
     ],
 }
 
+# v1.0.1 – Product layout + pricing + Supabase realtime sync
+PATCH_v1_0_1 = {
+    "version": "v1.0.1",
+    "added": [
+        "Supabase realtime sync foundation: website now reads inventory/transactions from Supabase and subscribes to Realtime updates.",
+        "Machine-to-cloud bridge script (sync/machine_supabase_bridge.py) that upserts products + posts new transactions to Supabase without changing hardware logic.",
+        "Supabase SQL schema helper (supabase/schema_machine_sync.sql) for products + transactions tables (realtime-ready).",
+        "Product metadata support: new products.details column for brand/size/net weight display.",
+    ],
+    "improved": [
+        "Updated physical tray placement (slot_number → product) to match the latest machine layout.",
+        "Updated product prices to match the latest 'Selling Price' list.",
+        "Customer product grid ordering now matches physical tray stacking (heaviest at bottom shown last).",
+        "Product detail modal now shows brand/size/net weight when available.",
+    ],
+    "bugs_fixed": [
+        "Corrected pad naming alignment (Regular w/ wings, Regular w/o wings) so UI/DB naming matches the final product list.",
+        "Resolved inconsistent pricing between earlier drafts and the final selling-price sheet.",
+    ],
+    "future": [
+        "Optional: bi-directional sync (cloud → machine) for remote restock/price changes if needed.",
+        "Optional: secure machine identity + RLS policies for multi-machine deployments.",
+    ],
+}
+
 # All versions in order (oldest first)
-PATCH_HISTORY = [PATCH_v0_01, PATCH_v0_02, PATCH_v0_03, PATCH_v1_0_0]
+PATCH_HISTORY = [PATCH_v0_01, PATCH_v0_02, PATCH_v0_03, PATCH_v1_0_0, PATCH_v1_0_1]
 
 
 def get_patch_notes_text() -> str:

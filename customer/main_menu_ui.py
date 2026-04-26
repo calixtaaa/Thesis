@@ -25,7 +25,13 @@ PRODUCT_IMAGE_MAP = {
     "panty liners":         "Panty_Liners.png",
     "regular w/ wings pads": "Regular_W_Wings_Pads.png",
     "regular w wings pads": "Regular_W_Wings_Pads.png",
+    "napkin w/ wings":      "Regular_W_Wings_Pads.png",
+    "napkin w wings":       "Regular_W_Wings_Pads.png",
+    "napkin with wings":    "Regular_W_Wings_Pads.png",
     "non-wing pads":        "Non_Wing_Pads.png",
+    "napkin w/o wings":     "Non_Wing_Pads.png",
+    "napkin w o wings":     "Non_Wing_Pads.png",
+    "napkin without wings": "Non_Wing_Pads.png",
     "mouthwash":            "Mouthwash.png",
     "tissues":              "Tissue.png",
     "wet wipes":            "Wet_Wipes.png",
@@ -49,7 +55,15 @@ PRODUCT_DESCRIPTIONS = {
         "Wings wrap around your underwear for a secure, no-shift fit during daily activities. "
         "Offers reliable absorbency and comfort for regular flow days."
     ),
+    "napkin w/ wings": (
+        "Wings wrap around your underwear for a secure, no-shift fit during daily activities. "
+        "Offers reliable absorbency and comfort for regular flow days."
+    ),
     "non-wing pads": (
+        "A simple, comfortable pad for light to regular flow. Easy to use and discreet, "
+        "perfect for everyday protection when you need it most."
+    ),
+    "napkin w/o wings": (
         "A simple, comfortable pad for light to regular flow. Easy to use and discreet, "
         "perfect for everyday protection when you need it most."
     ),
@@ -384,6 +398,17 @@ def _show_product_detail_modal(app, product):
         font=(app._ui_font_name, 20, "bold"),
         text_color=app.current_theme.get("price_color", "#8E4585"),
     ).pack(pady=(0, 6))
+
+    details_text = (product.get("details") or "").strip() if hasattr(product, "get") else ""
+    if details_text:
+        ctk.CTkLabel(
+            scroll_body,
+            text=details_text,
+            font=(app._ui_font_name, 12),
+            text_color=app.current_theme.get("muted", "#7A7491"),
+            wraplength=520,
+            justify="center",
+        ).pack(pady=(0, 10))
 
     stock_text = f"In Stock: {product['current_stock']}" if product["current_stock"] > 0 else "Out of Stock"
     stock_color = app.current_theme.get("accent", "#50C878") if product["current_stock"] > 0 else app.current_theme.get("status_error", "#E74C3C")
