@@ -17,7 +17,7 @@ RFID Modules
 - 1x MFRC522 13.56 MHz RFID reader (shared)
   - Shared for card payment/reload and both door authentication/unlock flows:
     - Restock door
-    - Troubleshooting/wiring door
+    - Troubleshooting/wiring door (admin only)
 
 Door Access Hardware
 - 2x 12V solenoid locks (Model 102)
@@ -37,7 +37,7 @@ Vend Confirmation
 Software/Database Context Added
 - RFID users now support role-based door access via rfid_users.role:
   - customer
-  - restocker/staff
-  - researcher/troubleshooter
+  - restocker
   - admin
-- Staff screen now lets operator choose door (restock or troubleshoot) and unlock via RFID role validation.
+- Restocker cards can unlock restock door only.
+- Admin cards can unlock both restock and troubleshooting doors.

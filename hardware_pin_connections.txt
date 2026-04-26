@@ -23,7 +23,7 @@ RFID flow usage:
 - Payment tap
 - Card reload tap
 - Restock door unlock authorization tap
-- Troubleshoot door unlock authorization tap
+- Troubleshoot door unlock authorization tap (admin role only)
 
 ========================================
 2) Stepper Expansion (28BYJ-48 + ULN2003 + MCP23017-E/SP)

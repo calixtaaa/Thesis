@@ -105,14 +105,15 @@ What is implemented
 - Two solenoid output pins are defined and initialized.
 - Unlock pulse timing is implemented.
 - Role-based authorization logic is implemented before unlock.
-- Staff UI supports selecting door (restock/troubleshoot) and tapping/typing RFID ID.
+- Restocker role unlocks restock door only.
+- Admin role can unlock both restock and troubleshoot doors via RFID.
 
 Evidence
 - main.py: SOLENOID_PINS, unlock_access_door(), is_user_authorized_for_door()
 - staff/staff.py: enter_restock_mode() door unlock workflow
 
 Progress notes
-- Door security is software-enforced by role and staff flags.
+- Door security is software-enforced by RFID role (customer/restocker/admin).
 
 Remaining gap
 - No explicit hardware feedback sensor for door-open/door-closed state is currently integrated.

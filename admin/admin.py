@@ -956,7 +956,7 @@ class AdminMixin:
         ctk.CTkOptionMenu(
             create_inner,
             variable=role_var,
-            values=["customer", "restocker", "troubleshooter", "researcher", "admin"],
+            values=["customer", "restocker", "admin"],
             command=on_role_change,
             width=240,
             fg_color=self.current_theme.get("accent", "#10b981"),
@@ -1008,7 +1008,7 @@ class AdminMixin:
                 status_var.set(f"UID already registered (role={existing['role']}, balance=₱{float(existing['balance']):.2f}).")
                 return
 
-            is_staff = 1 if role in {"restocker", "admin", "staff"} else 0
+            is_staff = 1 if role in {"restocker", "admin"} else 0
             try:
                 self.create_rfid_user_data(
                     uid,
@@ -1089,7 +1089,7 @@ class AdminMixin:
                     anchor="w",
                 ).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=4)
 
-            role_values = ["customer", "restocker", "researcher", "troubleshooter", "admin"]
+            role_values = ["customer", "restocker", "admin"]
 
             for user in users:
                 row = ctk.CTkFrame(
@@ -1319,7 +1319,7 @@ class AdminMixin:
         self.add_theme_toggle_footer()
 
     def show_card_enrollment_screen(self):
-        """Register a new RFID card for customer/restocker/troubleshooter roles."""
+        """Register a new RFID card for customer/restocker/admin roles."""
         self._current_screen_builder = self.show_card_enrollment_screen
         self.clear_screen()
 
@@ -1335,7 +1335,7 @@ class AdminMixin:
 
         ctk.CTkLabel(
             frame,
-            text="Register RFID cards for customer, restocker, or troubleshooter access.",
+            text="Register RFID cards for customer, restocker, or admin access.",
             font=UI_FONT_SMALL,
             text_color=self.current_theme.get("muted", self.current_theme["fg"]),
         ).pack(pady=(0, 12))
@@ -1413,7 +1413,7 @@ class AdminMixin:
         ctk.CTkOptionMenu(
             inner,
             variable=role_var,
-            values=["customer", "restocker", "troubleshooter"],
+            values=["customer", "restocker", "admin"],
             command=on_role_change,
             width=220,
             fg_color=self.current_theme.get("accent", "#10b981"),
@@ -1467,7 +1467,7 @@ class AdminMixin:
                 )
                 return
 
-            is_staff = 1 if role in {"restocker", "admin", "staff"} else 0
+            is_staff = 1 if role in {"restocker", "admin"} else 0
             try:
                 self.create_rfid_user_data(
                     uid,

@@ -93,12 +93,41 @@ def init_db():
         cur.execute("ALTER TABLE rfid_users ADD COLUMN role TEXT NOT NULL DEFAULT 'customer'")
         conn.commit()
 
-    # Backfill legacy staff cards to a restock-access role.
+    # Backfill legacy cards to supported role model.
+    # Supported roles: customer, restocker, admin.
     cur.execute("""
         UPDATE rfid_users
         SET role = 'restocker'
-        WHERE is_staff = 1 AND (role IS NULL OR role = '' OR role = 'customer')
+        WHERE is_staff = 1 AND (role IS NULL OR role = '' OR role = 'customer' OR role = 'staff')
     """)
+    conn.commit()
+
+    # Normalize deprecated maintenance roles to restocker.
+    cur.execute(
+        """
+        UPDATE rfid_users
+        SET role = 'restocker'
+        WHERE lower(trim(role)) IN ('researcher', 'troubleshooter', 'technician')
+        """
+    )
+    conn.commit()
+
+    # Keep role and is_staff in sync with the supported role model.
+    cur.execute(
+        """
+        UPDATE rfid_users
+        SET
+            role = CASE
+                WHEN lower(trim(role)) = 'admin' THEN 'admin'
+                WHEN lower(trim(role)) = 'restocker' THEN 'restocker'
+                ELSE 'customer'
+            END,
+            is_staff = CASE
+                WHEN lower(trim(role)) IN ('admin', 'restocker') THEN 1
+                ELSE 0
+            END
+        """
+    )
     conn.commit()
 
     # Seed sample data if empty
@@ -266,12 +295,17 @@ def create_user(
     initial_balance: float = 0.0,
     role: str = "customer",
 ):
+    clean_role = (role or "customer").strip().lower()
+    if clean_role not in {"customer", "restocker", "admin"}:
+        clean_role = "customer"
+    clean_is_staff = 1 if clean_role in {"restocker", "admin"} else 0
+
     conn = get_connection()
     cur = conn.cursor()
     cur.execute("""
         INSERT INTO rfid_users (rfid_uid, name, balance, is_staff, role)
         VALUES (?, ?, ?, ?, ?)
-    """, (rfid_uid, name, initial_balance, is_staff, role))
+    """, (rfid_uid, name, initial_balance, clean_is_staff, clean_role))
     conn.commit()
     user_id = cur.lastrowid
     conn.close()
@@ -311,7 +345,9 @@ def get_all_rfid_users():
 
 def update_rfid_user_role(user_id: int, role: str):
     clean_role = (role or "customer").strip().lower()
-    is_staff = 1 if clean_role in {"staff", "restocker", "admin"} else 0
+    if clean_role not in {"customer", "restocker", "admin"}:
+        clean_role = "customer"
+    is_staff = 1 if clean_role in {"restocker", "admin"} else 0
     conn = get_connection()
     cur = conn.cursor()
     cur.execute(
@@ -324,7 +360,9 @@ def update_rfid_user_role(user_id: int, role: str):
 
 def update_rfid_user(user_id: int, rfid_uid: str, name: str | None, balance: float, role: str):
     clean_role = (role or "customer").strip().lower()
-    is_staff = 1 if clean_role in {"staff", "restocker", "admin"} else 0
+    if clean_role not in {"customer", "restocker", "admin"}:
+        clean_role = "customer"
+    is_staff = 1 if clean_role in {"restocker", "admin"} else 0
     clean_uid = (rfid_uid or "").strip().upper()
     clean_name = (name or None)
     conn = get_connection()

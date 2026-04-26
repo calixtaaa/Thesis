@@ -1195,14 +1195,13 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
 
     def is_user_authorized_for_door(self, user, door: str) -> bool:
         role = (user["role"] or "").strip().lower() if "role" in user.keys() else ""
-        is_staff = bool(user["is_staff"]) if "is_staff" in user.keys() else False
 
         if role == "admin":
             return True
         if door == "restock":
-            return is_staff or role in {"restocker", "staff"}
+            return role == "restocker"
         if door == "troubleshoot":
-            return role in {"researcher", "troubleshooter", "technician", "admin"}
+            return False
         return False
 
     def unlock_access_door(self, door: str):

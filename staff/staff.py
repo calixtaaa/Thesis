@@ -65,7 +65,7 @@ class StaffMixin:
 
         ctk.CTkLabel(
             inner,
-            text="Tap staff/research RFID card. Reader is always listening:",
+            text="Tap restocker/admin RFID card. Reader is always listening:",
             font=UI_FONT_SMALL,
             text_color=theme.get("muted", theme["fg"]),
         ).pack(anchor="w", pady=(0, 6))
@@ -113,13 +113,14 @@ class StaffMixin:
 
         def resolve_door_from_user(user):
             role = str(user_value(user, "role", "")).strip().lower()
-            is_staff = bool(user_value(user, "is_staff", 0))
 
-            if role in {"researcher", "troubleshooter", "technician"}:
-                return "troubleshoot"
             if role == "admin":
-                return "restock"
-            if is_staff or role in {"restocker", "staff"}:
+                choose_troubleshoot = messagebox.askyesno(
+                    "Admin Door Selection",
+                    "Open troubleshoot door?\n\nChoose 'No' to open restock door.",
+                )
+                return "troubleshoot" if choose_troubleshoot else "restock"
+            if role == "restocker":
                 return "restock"
             return None
 
