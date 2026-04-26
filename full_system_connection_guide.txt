@@ -1,0 +1,237 @@
+FULL SYSTEM CONNECTION GUIDE
+Project: Personal Hygiene Vending Machine (Raspberry Pi 5)
+Date: 26 April 2026
+
+Purpose
+- Single reference for complete hardware wiring and system-level connections.
+- Covers all active components in the current build.
+
+============================================================
+A) ACTIVE COMPONENTS (CURRENT BUILD)
+============================================================
+Controller
+- Raspberry Pi 5
+
+RFID
+- 1x MFRC522 RFID reader (single shared reader)
+
+Dispense Drive
+- 10x 28BYJ-48 stepper motors (12V variant)
+- 10x ULN2003 driver boards (one per motor lane/slot)
+- 3x MCP23017-E/SP I2C GPIO expanders
+
+Door Access
+- 2x 12V Solenoid locks (Model 102)
+- 1x 2-channel Songle 5V relay module (JD-VCC + VCC type)
+
+Payment Input
+- 1x Coin acceptor (pulse output)
+
+Vend Confirmation
+- 1x IR break-beam sensor
+
+Removed / not active
+- Bill acceptor
+- Coin hopper and hopper pulse feedback
+
+============================================================
+B) POWER ARCHITECTURE (MUST FOLLOW)
+============================================================
+1) Raspberry Pi power
+- Use stable Pi-rated 5V supply.
+
+2) Motor + solenoid power
+- Use separate external 12V PSU for:
+  - ULN2003 motor power rails
+  - Solenoid lock coils
+
+3) Common ground rule (critical)
+- Tie all grounds together:
+  - Pi GND
+  - 12V PSU GND
+  - ULN2003 GND
+  - Relay GND
+  - Sensor grounds
+- Do NOT drive motors or solenoids directly from Pi GPIO.
+
+============================================================
+C) RASPBERRY PI PIN CONNECTIONS (BCM + PHYSICAL)
+============================================================
+I2C bus for MCP23017
+- GPIO2  (Pin 3)  -> SDA (all MCP23017 chips)
+- GPIO3  (Pin 5)  -> SCL (all MCP23017 chips)
+
+RFID (MFRC522, SPI shared reader)
+- GPIO11 (Pin 23) -> SCK
+- GPIO10 (Pin 19) -> MOSI
+- GPIO9  (Pin 21) -> MISO
+- GPIO8  (Pin 24) -> SDA/SS (CE0)
+- GPIO5  (Pin 29) -> RST
+- 3.3V            -> VCC
+- GND             -> GND
+
+Door relay inputs
+- GPIO16 (Pin 36) -> Relay IN1 (restock lock channel)
+- GPIO20 (Pin 38) -> Relay IN2 (troubleshoot lock channel)
+
+Cash pulse input
+- GPIO19 (Pin 35) -> Coin acceptor pulse output
+
+Vend confirmation input
+- GPIO26 (Pin 37) -> IR break-beam digital OUT
+
+============================================================
+D) MCP23017 WIRING + ADDRESSING
+============================================================
+Power + control per MCP23017
+- VDD   -> 3.3V
+- VSS   -> GND
+- SDA   -> Pi GPIO2 (Pin 3)
+- SCL   -> Pi GPIO3 (Pin 5)
+- RESET -> 3.3V via pull-up resistor (recommended 10k)
+
+I2C addresses used in software
+- MCP #1 = 0x20
+- MCP #2 = 0x21
+- MCP #3 = 0x22
+
+Address pin strapping (example)
+- 0x20: A2=0, A1=0, A0=0
+- 0x21: A2=0, A1=0, A0=1
+- 0x22: A2=0, A1=1, A0=0
+
+============================================================
+E) SLOT-TO-STEPPER CONTROL MAPPING
+============================================================
+Each slot uses 4 MCP outputs connected to ULN2003 IN1..IN4.
+
+- Slot 1  -> 0x20 GP0..GP3
+- Slot 2  -> 0x20 GP4..GP7
+- Slot 3  -> 0x20 GP8..GP11
+- Slot 4  -> 0x20 GP12..GP15
+- Slot 5  -> 0x21 GP0..GP3
+- Slot 6  -> 0x21 GP4..GP7
+- Slot 7  -> 0x21 GP8..GP11
+- Slot 8  -> 0x21 GP12..GP15
+- Slot 9  -> 0x22 GP0..GP3
+- Slot 10 -> 0x22 GP4..GP7
+
+ULN2003 board connection per slot
+- ULN2003 IN1 <- mapped pin 1
+- ULN2003 IN2 <- mapped pin 2
+- ULN2003 IN3 <- mapped pin 3
+- ULN2003 IN4 <- mapped pin 4
+- ULN2003 V+  -> +12V PSU
+- ULN2003 GND -> PSU GND (shared with Pi GND)
+- Motor plug  -> ULN2003 motor socket
+
+============================================================
+F) SOLENOID LOCK WIRING (2 DOORS)
+============================================================
+Relay module logic side (5V)
+- Relay VCC/JD-VCC -> Pi 5V
+- Relay GND        -> Pi GND
+- Relay IN1        -> GPIO16
+- Relay IN2        -> GPIO20
+
+Relay contact side (12V lock power)
+For each lock channel:
+- PSU +12V -> Relay COM
+- Relay NO -> Solenoid +
+- Solenoid - -> PSU GND
+
+Protection
+- Add flyback diode across each solenoid coil:
+  - diode stripe/cathode -> solenoid +
+  - diode anode -> solenoid -
+
+============================================================
+G) SENSOR + INPUT WIRING
+============================================================
+Coin acceptor
+- Pulse OUT -> GPIO19
+- If pulse output exceeds 3.3V, use a level shifter/divider.
+
+IR break-beam
+- OUT -> GPIO26
+- VCC -> per module spec (3.3V-compatible module preferred)
+- GND -> GND
+- Software expects active-low trigger (beam broken = LOW).
+
+============================================================
+H) FULL SIGNAL FLOW (SYSTEM CONNECTION VIEW)
+============================================================
+1) Product purchase path
+- User selects product -> software resolves slot number.
+- Pi sends step sequence to MCP23017 over I2C.
+- MCP23017 output pins drive ULN2003 IN1..IN4.
+- ULN2003 drives 12V stepper coils.
+- Product dispenses.
+- IR break-beam on GPIO26 confirms drop event.
+
+2) RFID authorization path
+- MFRC522 reads card UID over SPI CE0.
+- App validates UID/role in database.
+- If authorized door requested:
+  - Pi toggles relay input GPIO16 or GPIO20.
+  - Relay switches 12V to matching solenoid lock.
+
+3) Coin payment path
+- Coin acceptor pulses GPIO19.
+- App counts pulses and converts to value.
+- On sufficient payment, dispense flow runs.
+
+============================================================
+I) RESERVED / ACTIVE GPIO SUMMARY
+============================================================
+Active GPIO lines used by current runtime:
+- 2, 3, 5, 8, 9, 10, 11, 16, 19, 20, 26
+
+============================================================
+J) COMMISSIONING CHECKLIST (END-TO-END)
+============================================================
+1) Electrical pre-check
+- Confirm no 12V line is connected directly to any Pi GPIO.
+- Confirm all grounds are common.
+- Confirm polarity on solenoids and diode orientation.
+
+2) I2C check
+- Verify MCP chips visible (0x20, 0x21, 0x22).
+- If third chip appears as different address, fix A0/A1/A2 straps.
+
+3) RFID check
+- SPI link probe should pass.
+- Tag tap should return UID.
+
+4) Stepper check
+- Test one slot at a time.
+- Verify each slot drives only intended motor.
+
+5) Solenoid check
+- Trigger restock and troubleshoot channels separately.
+- Ensure lock pulses only during intended unlock window.
+
+6) Sensor/input check
+- Block/unblock IR beam and verify state changes.
+- Insert coins and verify pulse counting increments.
+
+============================================================
+K) QUICK TROUBLE SYMPTOMS
+============================================================
+No MCP response
+- Check SDA/SCL wiring, 3.3V power, RESET pull-up, and address straps.
+
+RFID SPI probe pass but no UID
+- Check tag type/frequency (13.56 MHz ISO14443A).
+- Verify reader reset/init timing and antenna distance.
+- Verify CE0 and RST pins match software.
+
+Motor not moving or weak
+- Check 12V supply under load, wiring to IN1..IN4, and common ground.
+
+Solenoid chatters or fails
+- Check PSU current capacity and relay contact wiring.
+- Confirm flyback diode installed correctly.
+
+============================================================
+End of full system guide.

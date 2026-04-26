@@ -1,0 +1,327 @@
+VENDING MACHINE WIRING DIAGRAM - COMPONENT PINOUT REFERENCE
+==========================================================
+Generated: 2026-04-26
+Format: Extended Pegasus Diagram (Text-based schematic)
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ POWER DOMAINS                                                                   │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│ 12V PSU GND ────────┬─→ All motor/solenoid returns                              │
+│                    └─→ Common ground with Pi GND (critical!)                    │
+│                                                                                  │
+│ Pi 5V Rail ────────→ Relay module (VCC/JD-VCC)                                 │
+│                   → IR break-beam sensor (if 5V variant)                        │
+│                                                                                  │
+│ Pi 3.3V Rail ──────→ MFRC522 RFID VDD                                          │
+│                   → MCP23017 #1 VDD (0x20)                                      │
+│                   → MCP23017 #2 VDD (0x21)                                      │
+│                   → MCP23017 #3 VDD (0x22)                                      │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ RASPBERRY PI 5 GPIO ALLOCATION (11 active pins)                                │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                  │
+│  I2C BUS (GPIO2, GPIO3)                                                         │
+│  ├─ GPIO2 (Pin 3)  → SDA (I2C Data) → All MCPs + SCL common                    │
+│  └─ GPIO3 (Pin 5)  → SCL (I2C Clock) → All MCPs + SDA common                   │
+│                                                                                  │
+│  SPI0 BUS (GPIO8-11) - RFID READER                                             │
+│  ├─ GPIO11 (Pin 23) → SCLK (Serial Clock)      → MFRC522 SCK                   │
+│  ├─ GPIO10 (Pin 19) → MOSI (Master Out Slave In) → MFRC522 MOSI                │
+│  ├─ GPIO9  (Pin 21) → MISO (Master In Slave Out) → MFRC522 MISO                │
+│  └─ GPIO8  (Pin 24) → CE0 (Chip Enable 0)     → MFRC522 SDA/SS                 │
+│                                                                                  │
+│  RFID RESET & CONTROL                                                           │
+│  └─ GPIO5  (Pin 29) → RFID RST (Reset pulse, 100ms stabilization)              │
+│                                                                                  │
+│  RELAY CONTROL (GPIO16, GPIO20)                                                │
+│  ├─ GPIO16 (Pin 36) → Relay IN1 (Restock door solenoid control)                │
+│  └─ GPIO20 (Pin 38) → Relay IN2 (Troubleshoot door solenoid control)           │
+│                                                                                  │
+│  SENSOR INPUTS                                                                  │
+│  ├─ GPIO19 (Pin 35) → Coin pulse input (WEIYU acceptor)                        │
+│  └─ GPIO26 (Pin 37) → IR break-beam sensor (active-low)                        │
+│                                                                                  │
+│  POWER                                                                          │
+│  ├─ 5V (Pin 2)  → Relay VCC, IR sensor VCC (if 5V)                             │
+│  ├─ 3.3V (Pin 1) → RFID VDD, MCP VDD, Level conversion                         │
+│  └─ GND (Multiple) → All grounds tied together                                  │
+│                                                                                  │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ I2C BUS DEVICE CHAIN (Address assignments)                                      │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                  │
+│ Single I2C bus (GPIO2/SDA, GPIO3/SCL) connects to all three MCPs               │
+│                                                                                  │
+│  MCP23017 #1 (Slots 1-4)                                                        │
+│  ├─ I2C Address: 0x20                                                           │
+│  ├─ A0, A1, A2 = GND (0x20 = 0010_0000)                                        │
+│  ├─ SDA → GPIO2, SCL → GPIO3                                                    │
+│  ├─ VDD → Pi 3.3V, GND → Pi GND, RESET → 3.3V (pull-up)                        │
+│  └─ GPIO Output Mapping:                                                        │
+│      ├─ GPB0-3 → ULN2003 IN1-4 (Slot 1 stepper driver)                         │
+│      ├─ GPB4-7 → ULN2003 IN1-4 (Slot 2 stepper driver)                         │
+│      ├─ GPB8-11 → ULN2003 IN1-4 (Slot 3 stepper driver)                        │
+│      └─ GPB12-15 → ULN2003 IN1-4 (Slot 4 stepper driver)                       │
+│                                                                                  │
+│  MCP23017 #2 (Slots 5-8)                                                        │
+│  ├─ I2C Address: 0x21                                                           │
+│  ├─ A0=VDD, A1=GND, A2=GND (0x21 = 0010_0001)                                  │
+│  ├─ SDA → GPIO2, SCL → GPIO3                                                    │
+│  ├─ VDD → Pi 3.3V, GND → Pi GND                                                 │
+│  └─ GPIO Output Mapping:                                                        │
+│      ├─ GPB0-3 → ULN2003 IN1-4 (Slot 5 stepper driver)                         │
+│      ├─ GPB4-7 → ULN2003 IN1-4 (Slot 6 stepper driver)                         │
+│      ├─ GPB8-11 → ULN2003 IN1-4 (Slot 7 stepper driver)                        │
+│      └─ GPB12-15 → ULN2003 IN1-4 (Slot 8 stepper driver)                       │
+│                                                                                  │
+│  MCP23017 #3 (Slots 9-10)                                                       │
+│  ├─ I2C Address: 0x22                                                           │
+│  ├─ A0=GND, A1=VDD, A2=GND (0x22 = 0010_0010)                                  │
+│  ├─ SDA → GPIO2, SCL → GPIO3                                                    │
+│  ├─ VDD → Pi 3.3V, GND → Pi GND                                                 │
+│  └─ GPIO Output Mapping:                                                        │
+│      ├─ GPB0-3 → ULN2003 IN1-4 (Slot 9 stepper driver)                         │
+│      └─ GPB4-7 → ULN2003 IN1-4 (Slot 10 stepper driver)                        │
+│                                                                                  │
+│ ** All MCP23017 RESET pins tied HIGH through 10k pull-up to 3.3V               │
+│                                                                                  │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ RFID READER (MFRC522) - SPI CONNECTION                                         │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                  │
+│ Pin Configuration (13.56 MHz ISO/IEC14443A Type A)                             │
+│ ┌────────────┬─────────────────────────────────────────────────────────┐       │
+│ │ MFRC522 Pin│ Raspberry Pi Connection      │ Signal Name              │       │
+│ ├────────────┼─────────────────────────────────────────────────────────┤       │
+│ │ 1 (SDA)    │ GPIO8 (SPI0 CE0, Pin 24)   │ Chip Select              │       │
+│ │ 2 (SCK)    │ GPIO11 (SPI0 CLK, Pin 23)  │ SPI Clock (max ~25 MHz)  │       │
+│ │ 3 (MOSI)   │ GPIO10 (SPI0 MOSI, Pin 19) │ Data In (Master→Slave)   │       │
+│ │ 4 (MISO)   │ GPIO9 (SPI0 MISO, Pin 21)  │ Data Out (Slave→Master)  │       │
+│ │ 5 (GND)    │ Any GND (Pin 6, 9, 14, 20) │ Ground                   │       │
+│ │ 6 (RST)    │ GPIO5 (Pin 29)             │ Reset (100ms pulse)      │       │
+│ │ 7 (3.3V)   │ Pi 3.3V (Pin 1 or 17)      │ Power supply             │       │
+│ └────────────┴─────────────────────────────────────────────────────────┘       │
+│                                                                                  │
+│ Reset Procedure (critical for initialization):                                 │
+│  1. Drive GPIO5 (RST) LOW for ~10-20ms (discharge)                             │
+│  2. Release GPIO5 (RST) HIGH, wait ~100ms (MFRC522 initializes)                │
+│  3. Execute firmware init: PCD_Init() or mfrc522.init()                        │
+│  4. Set antenna gain: PCD_SetAntennaGain(0x07) [max gain]                      │
+│  5. Ready for card detection                                                    │
+│                                                                                  │
+│ Shared Usage:                                                                   │
+│  → Customer payment/reload: Card tap on reader                                  │
+│  → Restock door unlock: RFID card + GPIO16 relay trigger                       │
+│  → Troubleshoot door unlock: RFID card + GPIO20 relay trigger                  │
+│                                                                                  │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ STEPPER MOTOR CONTROL (10x 28BYJ-48 via ULN2003 drivers)                       │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                  │
+│ Slot → MCP Assignment → GPIO Pins → ULN2003 Driver → 28BYJ-48 Stepper          │
+│                                                                                  │
+│ Slot 1:  MCP23017(0x20) → GPB0-3 → ULN2003 IN1-4 → Motor coil A,B,C,D          │
+│ Slot 2:  MCP23017(0x20) → GPB4-7 → ULN2003 IN1-4 → Motor coil A,B,C,D          │
+│ Slot 3:  MCP23017(0x20) → GPB8-11 → ULN2003 IN1-4 → Motor coil A,B,C,D         │
+│ Slot 4:  MCP23017(0x20) → GPB12-15 → ULN2003 IN1-4 → Motor coil A,B,C,D        │
+│ Slot 5:  MCP23017(0x21) → GPB0-3 → ULN2003 IN1-4 → Motor coil A,B,C,D          │
+│ Slot 6:  MCP23017(0x21) → GPB4-7 → ULN2003 IN1-4 → Motor coil A,B,C,D          │
+│ Slot 7:  MCP23017(0x21) → GPB8-11 → ULN2003 IN1-4 → Motor coil A,B,C,D         │
+│ Slot 8:  MCP23017(0x21) → GPB12-15 → ULN2003 IN1-4 → Motor coil A,B,C,D        │
+│ Slot 9:  MCP23017(0x22) → GPB0-3 → ULN2003 IN1-4 → Motor coil A,B,C,D          │
+│ Slot 10: MCP23017(0x22) → GPB4-7 → ULN2003 IN1-4 → Motor coil A,B,C,D          │
+│                                                                                  │
+│ ULN2003 Power Connections (per driver board):                                  │
+│  • GND → Pi GND                                                                  │
+│  • 12V (motor supply) → 12V PSU output                                          │
+│  • IN1-4 signals → MCP23017 GPIO pins (logic 3.3V)                             │
+│  • OUT1-4 (to motor coils) → 28BYJ-48 phase coils (A, B, C, D)                 │
+│                                                                                  │
+│ Motor Speed & Timing:                                                           │
+│  • Step delay: ~20-50ms per pulse cycle (adjustable via code)                  │
+│  • Full rotation: 2048 steps (for 28BYJ-48)                                     │
+│  • Torque available: ~300mN·m at 12V (sufficient for dispense)                 │
+│                                                                                  │
+│ Sequence (Half-step drive, common in vending):                                 │
+│  Step 1: IN1=1, IN2=0, IN3=0, IN4=0 → Coil A energized                         │
+│  Step 2: IN1=1, IN2=1, IN3=0, IN4=0 → Coils A+B energized                      │
+│  Step 3: IN1=0, IN2=1, IN3=0, IN4=0 → Coil B energized                         │
+│  Step 4: IN1=0, IN2=1, IN3=1, IN4=0 → Coils B+C energized                      │
+│  ... repeats with forward/reverse patterns                                      │
+│                                                                                  │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ SOLENOID LOCK CONTROL (2x 12V locks via relay module)                          │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                  │
+│ Relay Module (Songle 2-Channel)                                                │
+│ ┌─────────────────────────────────────────────────────────────────┐             │
+│ │ Logic Side (5V TTL)  │ Contact Side (12V switching)            │             │
+│ ├──────────────────────┼─────────────────────────────────────────┤             │
+│ │ JD-VCC → Pi 5V       │ COM → +12V from PSU                     │             │
+│ │ GND → Pi GND         │ NO1 → Restock solenoid + pin            │             │
+│ │ IN1 ← GPIO16         │ NO2 → Troubleshoot solenoid + pin       │             │
+│ │ IN2 ← GPIO20         │ All returns → 12V PSU GND (common w/ Pi)│             │
+│ └──────────────────────┴─────────────────────────────────────────┘             │
+│                                                                                  │
+│ Channel 1 (Restock Door Solenoid)                                              │
+│  GPIO16 HIGH (GPIO.output(16, GPIO.HIGH)) → IN1=HIGH → Relay CH1 energizes    │
+│  Relay contact closure: 12V PSU(+) → NO1 → Solenoid + → Solenoid - → PSU GND  │
+│  Lock unlocks for restock access (spring-loaded return)                        │
+│                                                                                  │
+│ Channel 2 (Troubleshoot Door Solenoid)                                         │
+│  GPIO20 HIGH (GPIO.output(20, GPIO.HIGH)) → IN2=HIGH → Relay CH2 energizes    │
+│  Relay contact closure: 12V PSU(+) → NO2 → Solenoid + → Solenoid - → PSU GND  │
+│  Lock unlocks for troubleshooting/wiring access (spring-loaded return)         │
+│                                                                                  │
+│ Solenoid Coil Protection (CRITICAL):                                           │
+│  • 1N4007 flyback diode across coil terminals (cathode to +12V, anode to GND) │
+│  • Prevents voltage spike (back-emf) when relay contact opens                  │
+│  • Protects relay contacts and MCP23017 if wired incorrectly                   │
+│                                                                                  │
+│ Activation Timing:                                                              │
+│  • Relay response: ~10ms after GPIO signal change                              │
+│  • Solenoid action: ~50-100ms to full unlock                                   │
+│  • Relay hold current: ~85mA per channel (safe from GPIO)                      │
+│                                                                                  │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ COIN ACCEPTOR (WEIYU Universal 1239/1239A)                                     │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                  │
+│ Connections:                                                                    │
+│  • Power IN: 12V from PSU → Blue wire to acceptor motor (internal)             │
+│  • GND: PSU GND → Black wire (common with Pi GND)                              │
+│  • Pulse OUT: To GPIO19 (Pi receives digital pulse on coin acceptance)         │
+│  • Pulse type: LOW→HIGH pulse, ~50ms duration per coin                         │
+│  • Logic level: Output typically 5V or 12V (check module variant)              │
+│                                                                                  │
+│ Level Conversion (if 5V or 12V output):                                        │
+│  • Pi GPIO19 maximum safe input: 3.3V                                          │
+│  • If coin acceptor outputs 5V: Use 1k→2k voltage divider or level shifter    │
+│    ├─ Pulse from acceptor (5V) → 1k resistor → GPIO19                         │
+│    └─ GPIO19 → 2k resistor to GND (creates ~3.3V at GPIO19 from 5V pulse)     │
+│  • If coin acceptor outputs 12V: MUST use level shifter (risk of GPIO damage) │
+│                                                                                  │
+│ Detection Logic (in main.py):                                                  │
+│  • GPIO19 set as INPUT with pull-up                                            │
+│  • Rising edge triggers coin count increment                                    │
+│  • Each pulse = 1 coin (machine dependent, usually 1 coin per pulse)            │
+│  • Pulse duration monitored to debounce noise                                   │
+│                                                                                  │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ IR BREAK-BEAM SENSOR (Vend confirmation)                                       │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                  │
+│ Connections:                                                                    │
+│  • VCC: 5V or 3.3V (module dependent) → Usually Pi 5V rail                     │
+│  • GND: Pi GND (common ground)                                                  │
+│  • Signal OUT: GPIO26 (Pi receives beam state)                                  │
+│  • Signal type: Active-LOW (beam blocked = LOW, beam clear = HIGH)             │
+│                                                                                  │
+│ Placement:                                                                      │
+│  • Mounted in product drop path below stepper motor discharge                  │
+│  • Transmitter and receiver aligned horizontally                                │
+│  • Detection range: ~5-10cm (typical for this sensor type)                     │
+│                                                                                  │
+│ Detection Logic (in main.py - wait_for_vend_confirmation()):                  │
+│  1. GPIO26 set as INPUT with pull-up                                           │
+│  2. Monitor GPIO26 = HIGH (beam clear) initially                                │
+│  3. When motor starts rotating, monitor for GPIO26 → LOW (product breaks beam) │
+│  4. Product passes under beam, returns to HIGH (beam restored)                  │
+│  5. Time LOW pulse duration (typically 200-500ms for product passage)           │
+│  6. Confirm vend successful if LOW→HIGH transition detected                    │
+│                                                                                  │
+│ Failure Detection:                                                              │
+│  • If GPIO26 stays HIGH throughout motor cycle: Product stuck/jam detected     │
+│  • If GPIO26 stays LOW (no return to HIGH): Beam misalignment or sensor error  │
+│                                                                                  │
+│ Testing:                                                                        │
+│  • Run: python3 ir_break_beam_test.py --duration 30                            │
+│  • Manually block/unblock beam to verify state changes                         │
+│                                                                                  │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ GROUND & POWER DISTRIBUTION (CRITICAL)                                         │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                  │
+│ Ground Reference (Common GND required):                                         │
+│  • 12V PSU GND → Pi GND (tied together with short wire)                        │
+│  • All logic circuits reference this common GND                                 │
+│  • Prevents floating reference and signal integrity issues                      │
+│                                                                                  │
+│ Pi 5V Distribution:                                                             │
+│  • Pi 5V pin → Relay module VCC/JD-VCC                                         │
+│  • Pi 5V pin → IR sensor VCC (if 5V variant)                                    │
+│  • Typical draw: ~500mA for relay + sensors (safe from Pi USB supply)          │
+│                                                                                  │
+│ Pi 3.3V Distribution (Logic power):                                            │
+│  • Pi 3.3V pin → MFRC522 VDD via 10µF bypass cap                               │
+│  • Pi 3.3V pin → MCP23017 #1 VDD (0x20)                                        │
+│  • Pi 3.3V pin → MCP23017 #2 VDD (0x21)                                        │
+│  • Pi 3.3V pin → MCP23017 #3 VDD (0x22)                                        │
+│  • Each MCP with 10µF bypass cap to GND near VDD pin                           │
+│  • Typical draw: ~50mA for all MCPs + RFID (safe from Pi supply)               │
+│                                                                                  │
+│ 12V Supply (Motor + Solenoid power):                                           │
+│  • 12V PSU + terminal → All ULN2003 module 12V pins (parallel)                 │
+│  • 12V PSU + terminal → Relay NO contacts (12V switching)                      │
+│  • 12V PSU + terminal → Solenoid lock coils (through relay)                    │
+│  • All motors + solenoids return to PSU GND (common)                           │
+│  • Typical peak draw: ~5A (10 motors @ 500mA each)                             │
+│                                                                                  │
+│ Bypass Capacitors (noise suppression):                                         │
+│  • 10µF ceramic across 3.3V and GND near each MCP23017 VDD pin                 │
+│  • 10µF ceramic across MFRC522 VDD and GND                                     │
+│  • 100µF electrolytic across 12V PSU output (local to PSU)                     │
+│                                                                                  │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+TESTING CHECKLIST
+=================
+
+ □ Electrical continuity: Use multimeter to verify:
+   - Pi 3.3V rail connected to RFID, all MCPs
+   - Pi 5V rail connected to relay module
+   - 12V PSU connected to all motor drivers
+   - All GND connections form common reference
+   - No shorts between power rails
+
+ □ I2C Bus detection:
+   - Command: i2cdetect -y 1
+   - Expected: 0x20, 0x21, 0x22 listed (three MCPs)
+
+ □ RFID reader:
+   - Command: python3 rfid_single_reader_test.py
+   - Expected: "SPI probe PASS", then "UID: ..." when card tapped
+
+ □ Stepper motors:
+   - Command: python3 stepper.py
+   - Expected: Motors rotate smoothly, slots 1-10 controllable
+
+ □ Coin acceptor:
+   - Command: python3 -c "import RPi.GPIO as GPIO; GPIO.setmode(GPIO.BCM); GPIO.setup(19, GPIO.IN); print(GPIO.input(19))"
+   - Expected: Insert coin, detect LOW→HIGH pulse on GPIO19
+
+ □ IR break-beam sensor:
+   - Command: python3 ir_break_beam_test.py --duration 30
+   - Expected: "CLEAR" when unblocked, "BROKEN" when blocked
+
+ □ Relay actuation:
+   - Command: python3 -c "import RPi.GPIO as GPIO; GPIO.setmode(GPIO.BCM); GPIO.setup(16, GPIO.OUT); GPIO.output(16, GPIO.HIGH); import time; time.sleep(1); print('Relay should click')"
+   - Expected: Audible relay click, solenoid lock engages
+
+END OF DIAGRAM
