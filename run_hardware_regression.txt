@@ -2,8 +2,18 @@ source venv/bin/activate
 export DISPLAY=:0
 export PYTHONNOUSERSITE=1
 
+# Recommended pre-checks before regression run
+sudo raspi-config nonint do_i2c 0
+sudo raspi-config nonint do_spi 0
+ls /dev/i2c-1
+ls /dev/spidev0.0
+ls /dev/spidev0.1
+
 # Basic regression run (RFID probe + stepper pulse test)
 venv/bin/python hardware_regression_checklist.py
+
+# Save latest report path for quick review
+ls -1t debug_logs/hardware_regression_*.txt | head -n 1
 
 # Include loopback checks only when output->input jumper pairs are connected:
 # venv/bin/python hardware_regression_checklist.py --enable-loopback --loopback-pairs 17:6
@@ -13,3 +23,7 @@ venv/bin/python hardware_regression_checklist.py
 
 # Force native GPIO stepper mode if MCP23017 is not wired yet:
 # STEPPER_BACKEND=native_gpio venv/bin/python hardware_regression_checklist.py --slots 2
+
+# Current known blockers from latest report (2026-04-23 00:59:29)
+# - RFID SPI probe: VersionReg=0x00
+# - MCP stepper test: /dev/i2c-1 missing

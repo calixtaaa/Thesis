@@ -1,5 +1,5 @@
 Software to Hardware Integration Progress (Raspberry Pi 5)
-Date: 23 April 2026
+Date: 26 April 2026
 Project: Personal Hygiene Vending Machine
 
 Scope
@@ -12,6 +12,15 @@ Overall Status Summary
 - Multiple hardware diagnostics tools exist (gpio_test_tool.py, stepper.py, rfid_single_reader_test.py).
 - Main app supports simulation fallback when GPIO/RFID stack is unavailable.
 - Integration is functional for prototype use, with coin-only cash handling and no active hopper subsystem.
+
+Current bring-up checkpoint (latest regression evidence)
+- Latest report reviewed: debug_logs/hardware_regression_20260423_005929.txt
+- Summary from latest run: PASS=3 WARN=0 FAIL=2 SKIP=1
+- Verified available: runtime environment, SPI device nodes, GPIO backend import
+- Current blockers on test bench:
+  - RFID SPI probe returned VersionReg=0x00 (reader link not healthy yet)
+  - MCP stepper test failed because /dev/i2c-1 is missing
+- Conclusion: software integration is largely complete, but physical bus bring-up (SPI wiring/reader path and I2C enablement) must be resolved before declaring hardware acceptance.
 
 ----------------------------------------------------------------
 1) RFID Reader (MFRC522, single shared reader)
@@ -183,7 +192,7 @@ Action needed
 ----------------------------------------------------------------
 9) Raspberry Pi 5 Compatibility Readiness
 ----------------------------------------------------------------
-Current readiness level: PROTOTYPE READY / PRE-PRODUCTION
+Current readiness level: PROTOTYPE SOFTWARE READY / HARDWARE BRING-UP IN PROGRESS
 
 What is ready now
 - Main app can initialize GPIO and run hardware routines directly.
@@ -197,6 +206,9 @@ What still needs completion for production confidence
   - pulse scaling (coin)
   - vend confirmation timing
   - stepper step count per product lane using MCP23017 outputs
+ - Clear current hardware blockers from regression checklist:
+   - restore valid MFRC522 SPI response (non-zero VersionReg)
+   - enable I2C bus so MCP23017 is reachable on /dev/i2c-1
 
 ----------------------------------------------------------------
 10) Suggested Next Milestone (Implementation Order)
@@ -206,5 +218,6 @@ What still needs completion for production confidence
 3. Change buy-card flow to require real RFID tap and register actual UID.
 4. Execute hardware_regression_checklist.py on Pi 5 before each deployment candidate and archive report artifacts.
 5. Update README hardware integration section after pin-map normalization and production-mode gating are complete.
+6. Do not mark machine as field-ready until regression checks show PASS for both RFID SPI probe and stepper pulse test.
 
 End of document.

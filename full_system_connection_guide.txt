@@ -6,6 +6,12 @@ Purpose
 - Single reference for complete hardware wiring and system-level connections.
 - Covers all active components in the current build.
 
+Current validation status (as of latest logged regression)
+- Last reviewed report: debug_logs/hardware_regression_20260423_005929.txt
+- Verified: runtime environment, SPI device nodes, GPIO backend availability.
+- Pending hardware bring-up: RFID SPI probe still failing and MCP stepper path requires /dev/i2c-1.
+- Use run_hardware_regression.txt and run_stepper_mcp.txt for updated bring-up sequence.
+
 ============================================================
 A) ACTIVE COMPONENTS (CURRENT BUILD)
 ============================================================
