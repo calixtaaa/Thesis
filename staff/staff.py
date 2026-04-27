@@ -115,11 +115,7 @@ class StaffMixin:
             role = str(user_value(user, "role", "")).strip().lower()
 
             if role == "admin":
-                choose_troubleshoot = messagebox.askyesno(
-                    "Admin Door Selection",
-                    "Open troubleshoot door?\n\nChoose 'No' to open restock door.",
-                )
-                return "troubleshoot" if choose_troubleshoot else "restock"
+                return "both"
             if role == "restocker":
                 return "restock"
             return None
@@ -139,20 +135,42 @@ class StaffMixin:
                 return
 
             role = str(user_value(user, "role", "")).strip().lower() or "unknown"
-            auth_status_var.set(f"Last accepted: UID {uid} | role {role} | door {selected_door}")
-            scan_hint.configure(text=f"RFID {uid} accepted. Unlocking {selected_door} door...")
-            error_lbl.configure(text="")
-            try:
-                self.unlock_access_door(selected_door)
-            except Exception as exc:
-                error_lbl.configure(text=f"Failed to unlock {selected_door} door: {exc}")
-                scan_hint.configure(text="Waiting for RFID tap...")
-                return
-
-            if selected_door == "restock":
-                self.show_restock_screen(user)
+            if selected_door == "both":
+                auth_status_var.set(f"Last accepted: UID {uid} | role {role} | doors restock + troubleshoot")
+                scan_hint.configure(text=f"RFID {uid} accepted. Unlocking both staff doors...")
             else:
-                self.show_troubleshooting_screen(user)
+                auth_status_var.set(f"Last accepted: UID {uid} | role {role} | door {selected_door}")
+                scan_hint.configure(text=f"RFID {uid} accepted. Unlocking {selected_door} door...")
+            error_lbl.configure(text="")
+            doors = ["restock", "troubleshoot"] if selected_door == "both" else [selected_door]
+            self.show_unlocking_screen(user, doors)
+
+            def finish_unlock():
+                try:
+                    if selected_door == "both":
+                        self.unlock_access_door("restock")
+                        self.unlock_access_door("troubleshoot")
+                    else:
+                        self.unlock_access_door(selected_door)
+                except Exception as exc:
+                    target = "both doors" if selected_door == "both" else f"{selected_door} door"
+                    error_lbl.configure(text=f"Failed to unlock {target}: {exc}")
+                    scan_hint.configure(text="Waiting for RFID tap...")
+                    return
+
+                # Store current door for unlock-again functionality
+                self._current_staff_door = selected_door
+                self._current_staff_user_for_unlock = user
+
+                if selected_door == "both":
+                    self.show_admin_maintenance_screen(user)
+                elif selected_door == "restock":
+                    self.show_restock_screen(user)
+                else:
+                    self.show_troubleshooting_screen(user)
+
+            self.after(150, finish_unlock)
+            return
 
         def poll_rfid():
             if not inner.winfo_exists():
@@ -228,11 +246,25 @@ class StaffMixin:
         action_bar = ctk.CTkFrame(inner, fg_color=theme["bg"], corner_radius=0)
         # Keep this above the global footer/theme bar on compact displays.
         action_bar.pack(side=tk.BOTTOM, fill=tk.X, pady=(8, 52))
+        
+        unlock_again_btn = ctk.CTkButton(
+            action_bar,
+            text="Unlock Restock Door Again",
+            font=(UI_FONT, 11, "bold"),
+            command=lambda: self.unlock_access_door("restock"),
+            fg_color=theme.get("accent", "#22c55e"),
+            hover_color=theme.get("accent_hover", "#16a34a"),
+            text_color=theme.get("on_accent", "#ffffff"),
+            corner_radius=980,
+            height=40,
+        )
+        unlock_again_btn.pack(side=tk.LEFT, padx=(8, 10))
+        
         ctk.CTkButton(
             action_bar,
             text="Exit Restock Mode",
             font=(UI_FONT, 13, "bold"),
-            command=self.build_main_menu,
+            command=self.enter_restock_mode,
             fg_color=theme.get("button_bg", "#ffffff"),
             hover_color=theme.get("card_border", "#d1d1d6"),
             text_color=theme.get("button_fg", "#1c1c1e"),
@@ -354,6 +386,19 @@ class StaffMixin:
         action_bar = ctk.CTkFrame(inner, fg_color=theme["bg"], corner_radius=0)
         action_bar.pack(side=tk.BOTTOM, fill=tk.X, pady=(8, 52))
 
+        unlock_again_btn = ctk.CTkButton(
+            action_bar,
+            text="Unlock Troubleshoot Door Again",
+            font=(UI_FONT, 11, "bold"),
+            command=lambda: self.unlock_access_door("troubleshoot"),
+            fg_color=theme.get("accent", "#22c55e"),
+            hover_color=theme.get("accent_hover", "#16a34a"),
+            text_color=theme.get("on_accent", "#ffffff"),
+            corner_radius=980,
+            height=40,
+        )
+        unlock_again_btn.pack(side=tk.LEFT, padx=(8, 10))
+
         ctk.CTkButton(
             action_bar,
             text="Back To Staff Login",
@@ -367,6 +412,189 @@ class StaffMixin:
             border_width=1,
             border_color=theme.get("card_border", "#d1d1d6"),
         ).pack(side=tk.LEFT, padx=(8, 10))
+
+        ctk.CTkButton(
+            action_bar,
+            text="Exit To Main Menu",
+            font=(UI_FONT, 12, "bold"),
+            command=self.build_main_menu,
+            fg_color=theme.get("nav_bg", "#1c1c1e"),
+            hover_color=theme.get("nav_hover", "#333333"),
+            text_color=theme.get("nav_fg", "#ffffff"),
+            corner_radius=980,
+            height=40,
+        ).pack(side=tk.LEFT)
+
+        self._slide_in(frame)
+        self.add_theme_toggle_footer()
+
+    def show_unlocking_screen(self, staff_user, doors):
+        self._current_screen_builder = lambda: self.show_unlocking_screen(staff_user, doors)
+        self.clear_screen()
+        self._current_staff_user = staff_user
+        theme = self.current_theme
+
+        frame = ctk.CTkFrame(self.content_holder, fg_color=theme["bg"])
+        frame.place(relx=0, rely=0, relwidth=1, relheight=1, anchor="nw")
+
+        inner = ctk.CTkFrame(frame, fg_color=theme["bg"])
+        inner.pack(expand=True, fill=tk.BOTH, padx=20, pady=16)
+
+        ctk.CTkLabel(
+            inner,
+            text="Unlocking Door...",
+            font=(UI_FONT, 20, "bold"),
+            text_color=theme["fg"],
+        ).pack(pady=(0, 10))
+
+        doors_text = ", ".join(doors) if isinstance(doors, (list, tuple)) else str(doors)
+
+        status_card = ctk.CTkFrame(
+            inner,
+            fg_color=theme.get("card_bg", theme["button_bg"]),
+            corner_radius=14,
+            border_width=1,
+            border_color=theme.get("card_border", "#d1d1d6"),
+        )
+        status_card.pack(fill=tk.X, pady=(0, 10))
+
+        ctk.CTkLabel(
+            status_card,
+            text=f"Opening: {doors_text}",
+            font=(UI_FONT, 14, "bold"),
+            text_color=theme.get("accent", "#22c55e"),
+            anchor="w",
+        ).pack(fill=tk.X, padx=14, pady=(12, 2))
+
+        ctk.CTkLabel(
+            status_card,
+            text="Please wait while the relay activates and the lock releases.",
+            font=UI_FONT_SMALL,
+            text_color=theme.get("muted", theme["fg"]),
+            anchor="w",
+            justify="left",
+        ).pack(fill=tk.X, padx=14, pady=(0, 12))
+
+        ctk.CTkLabel(
+            inner,
+            text="Do not pull the screen away. The door unlock is in progress.",
+            font=UI_FONT_BODY,
+            text_color=theme.get("button_fg", theme["fg"]),
+        ).pack(pady=(10, 0))
+
+        self.add_theme_toggle_footer()
+
+    def show_admin_maintenance_screen(self, staff_user):
+        self._current_screen_builder = lambda: self.show_admin_maintenance_screen(staff_user)
+        self.clear_screen()
+        self._current_staff_user = staff_user
+        self._current_staff_door = "both"
+        theme = self.current_theme
+
+        frame = ctk.CTkFrame(self.content_holder, fg_color=theme["bg"])
+        frame.place(relx=0, rely=0, relwidth=1, relheight=1, anchor="nw")
+
+        inner = ctk.CTkFrame(frame, fg_color=theme["bg"])
+        inner.pack(expand=True, fill=tk.BOTH, padx=20, pady=16)
+
+        ctk.CTkLabel(
+            inner,
+            text=f"Admin Maintenance — {staff_user['name'] or staff_user['rfid_uid']}",
+            font=(UI_FONT, 20, "bold"),
+            text_color=theme["fg"],
+        ).pack(pady=(0, 10))
+
+        status_card = ctk.CTkFrame(
+            inner,
+            fg_color=theme.get("card_bg", theme["button_bg"]),
+            corner_radius=14,
+            border_width=1,
+            border_color=theme.get("card_border", "#d1d1d6"),
+        )
+        status_card.pack(fill=tk.X, pady=(0, 10))
+
+        ctk.CTkLabel(
+            status_card,
+            text="Both restock and troubleshoot doors are unlocked.",
+            font=(UI_FONT, 14, "bold"),
+            text_color=theme.get("accent", "#22c55e"),
+            anchor="w",
+        ).pack(fill=tk.X, padx=14, pady=(12, 2))
+
+        ctk.CTkLabel(
+            status_card,
+            text="Use the buttons below to re-open either door or jump straight into the related maintenance screen.",
+            font=UI_FONT_SMALL,
+            text_color=theme.get("muted", theme["fg"]),
+            anchor="w",
+            justify="left",
+        ).pack(fill=tk.X, padx=14, pady=(0, 12))
+
+        checklist_card = ctk.CTkFrame(
+            inner,
+            fg_color=theme.get("card_bg", theme["button_bg"]),
+            corner_radius=14,
+            border_width=1,
+            border_color=theme.get("card_border", "#d1d1d6"),
+        )
+        checklist_card.pack(fill=tk.BOTH, expand=True)
+
+        checklist_lines = [
+            "1. Use Unlock Restock Door Again if the restock door bounced shut.",
+            "2. Use Unlock Troubleshoot Door Again if the troubleshooting door bounced shut.",
+            "3. Jump to Restock Mode to restock inventory.",
+            "4. Jump to Troubleshooting Mode for hardware checks.",
+            "5. Exit to the main menu when finished.",
+        ]
+        ctk.CTkLabel(
+            checklist_card,
+            text="\n".join(checklist_lines),
+            font=UI_FONT_BODY,
+            text_color=theme.get("button_fg", theme["fg"]),
+            anchor="nw",
+            justify="left",
+        ).pack(fill=tk.BOTH, expand=True, padx=14, pady=14)
+
+        action_bar = ctk.CTkFrame(inner, fg_color=theme["bg"], corner_radius=0)
+        action_bar.pack(side=tk.BOTTOM, fill=tk.X, pady=(8, 52))
+
+        ctk.CTkButton(
+            action_bar,
+            text="Unlock Restock Door Again",
+            font=(UI_FONT, 11, "bold"),
+            command=lambda: self.unlock_access_door("restock"),
+            fg_color=theme.get("accent", "#22c55e"),
+            hover_color=theme.get("accent_hover", "#16a34a"),
+            text_color=theme.get("on_accent", "#ffffff"),
+            corner_radius=980,
+            height=40,
+        ).pack(side=tk.LEFT, padx=(8, 10))
+
+        ctk.CTkButton(
+            action_bar,
+            text="Unlock Troubleshoot Door Again",
+            font=(UI_FONT, 11, "bold"),
+            command=lambda: self.unlock_access_door("troubleshoot"),
+            fg_color=theme.get("accent", "#22c55e"),
+            hover_color=theme.get("accent_hover", "#16a34a"),
+            text_color=theme.get("on_accent", "#ffffff"),
+            corner_radius=980,
+            height=40,
+        ).pack(side=tk.LEFT, padx=(0, 10))
+
+        ctk.CTkButton(
+            action_bar,
+            text="Go To Restock",
+            font=(UI_FONT, 12, "bold"),
+            command=lambda: self.show_restock_screen(staff_user),
+            fg_color=theme.get("button_bg", "#ffffff"),
+            hover_color=theme.get("card_border", "#d1d1d6"),
+            text_color=theme.get("button_fg", "#1c1c1e"),
+            corner_radius=980,
+            height=40,
+            border_width=1,
+            border_color=theme.get("card_border", "#d1d1d6"),
+        ).pack(side=tk.LEFT, padx=(0, 10))
 
         ctk.CTkButton(
             action_bar,
