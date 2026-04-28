@@ -2328,9 +2328,13 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             if entry["product"]["id"] != product_id:
                 continue
             old_qty = int(entry["quantity"] if entry["quantity"] is not None else 1)
-            max_stock = int(entry["product"].get("current_stock") or old_qty)
+            product = entry["product"]
             try:
-                cap = int(entry["product"].get("capacity") or 0)
+                max_stock = int(product["current_stock"])
+            except Exception:
+                max_stock = old_qty
+            try:
+                cap = int(product["capacity"])
                 if cap > 0:
                     max_stock = min(max_stock, cap)
             except Exception:
