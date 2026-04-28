@@ -5,6 +5,7 @@ import { debounce } from '../utils/timing'
 const AUTH_KEY = 'syntax-error-auth'
 const LEGACY_USERS_KEY = 'syntax-error-users'
 const USERS_KEY = 'syntax-error-user-accounts'
+const LOGIN_THROTTLE_KEY = 'syntax-error-login-throttle-v1'
 /** Clears old bundled accounts + legacy storage once per browser (see SYNC_KEY). */
 const ACCOUNT_SYNC_KEY = 'syntax-error-account-sync-v2'
 
@@ -22,6 +23,67 @@ function syncStoredAccountsOnce() {
 }
 
 syncStoredAccountsOnce()
+
+function _nowMs() {
+  return Date.now()
+}
+
+function loadLoginThrottle() {
+  if (typeof window === 'undefined') return { fails: 0, lockUntil: 0 }
+  try {
+    const raw = localStorage.getItem(LOGIN_THROTTLE_KEY)
+    if (!raw) return { fails: 0, lockUntil: 0 }
+    const parsed = JSON.parse(raw)
+    const fails = Number(parsed?.fails ?? 0)
+    const lockUntil = Number(parsed?.lockUntil ?? 0)
+    return {
+      fails: Number.isFinite(fails) && fails > 0 ? fails : 0,
+      lockUntil: Number.isFinite(lockUntil) && lockUntil > 0 ? lockUntil : 0,
+    }
+  } catch {
+    return { fails: 0, lockUntil: 0 }
+  }
+}
+
+function saveLoginThrottle(next) {
+  if (typeof window === 'undefined') return
+  try {
+    localStorage.setItem(LOGIN_THROTTLE_KEY, JSON.stringify(next))
+  } catch (_) {
+    /* ignore quota / private mode */
+  }
+}
+
+function resetLoginThrottle() {
+  saveLoginThrottle({ fails: 0, lockUntil: 0 })
+}
+
+function isLockedOut() {
+  const t = loadLoginThrottle()
+  const now = _nowMs()
+  if (t.lockUntil && now < t.lockUntil) {
+    return { locked: true, lockUntil: t.lockUntil, remainingMs: t.lockUntil - now, fails: t.fails }
+  }
+  if (t.lockUntil && now >= t.lockUntil) {
+    // Lock expired; clear it so refreshes don't show stale state.
+    resetLoginThrottle()
+  }
+  return { locked: false, lockUntil: 0, remainingMs: 0, fails: 0 }
+}
+
+function registerFailedLogin() {
+  const t = loadLoginThrottle()
+  const nextFails = (Number(t.fails ?? 0) || 0) + 1
+  const maxFails = 5
+  const lockMs = 30_000
+  if (nextFails >= maxFails) {
+    const lockUntil = _nowMs() + lockMs
+    saveLoginThrottle({ fails: nextFails, lockUntil })
+    return { locked: true, lockUntil, remainingMs: lockMs, fails: nextFails, maxFails }
+  }
+  saveLoginThrottle({ fails: nextFails, lockUntil: 0 })
+  return { locked: false, lockUntil: 0, remainingMs: 0, fails: nextFails, maxFails }
+}
 
 function loadUsers() {
   if (typeof window !== 'undefined') {
@@ -108,6 +170,17 @@ export function useAuth() {
   const isAdmin = computed(() => currentUser.value?.role === 'admin')
 
   async function login(username, password) {
+    const lock = isLockedOut()
+    if (lock.locked) {
+      return {
+        success: false,
+        code: 'LOCKED',
+        lockUntil: lock.lockUntil,
+        remainingMs: lock.remainingMs,
+        message: `Too many incorrect attempts. Please wait ${Math.ceil(lock.remainingMs / 1000)}s and try again.`,
+      }
+    }
+
     const key = String(username || '').trim().toLowerCase()
     if (!isTupSchoolEmail(key)) {
       return { success: false, message: 'Use your TUP email (@tup.edu.ph).' }
@@ -119,6 +192,7 @@ export function useAuth() {
       currentUser.value = { username: user.username, role: user.role }
       localStorage.setItem(AUTH_KEY, JSON.stringify(currentUser.value))
       syncEmailRowToSupabase(user.username, password, user.role)
+      resetLoginThrottle()
       return { success: true }
     }
 
@@ -136,12 +210,29 @@ export function useAuth() {
       const row = Array.isArray(data) ? data[0] : null
       const storedPwd = row?.password != null ? String(row.password) : ''
       if (!row || !storedPwd || storedPwd !== String(password ?? '')) {
-        return { success: false, message: 'Invalid email or password' }
+        const t = registerFailedLogin()
+        if (t.locked) {
+          return {
+            success: false,
+            code: 'LOCKED',
+            lockUntil: t.lockUntil,
+            remainingMs: t.remainingMs,
+            message: `Too many incorrect attempts. Please wait ${Math.ceil(t.remainingMs / 1000)}s and try again.`,
+          }
+        }
+        return {
+          success: false,
+          code: 'INVALID',
+          fails: t.fails,
+          attemptsLeft: Math.max(0, t.maxFails - t.fails),
+          message: `Invalid email or password (${Math.max(0, t.maxFails - t.fails)} attempt(s) left)`,
+        }
       }
 
       const role = row.role === 'admin' ? 'admin' : 'staff'
       currentUser.value = { username: key, role }
       localStorage.setItem(AUTH_KEY, JSON.stringify(currentUser.value))
+      resetLoginThrottle()
 
       // Cache into this browser for faster next logins and for Manage Users list.
       if (!users.value.find((u) => u.username.toLowerCase() === key)) {

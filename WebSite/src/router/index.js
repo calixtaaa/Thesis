@@ -1,10 +1,11 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import HomePage from '../views/HomePage.vue'
-import TeamPage from '../views/TeamPage.vue'
-import AdviserPage from '../views/AdviserPage.vue'
-import DashboardPage from '../views/DashboardPage.vue'
-import LoginPage from '../views/LoginPage.vue'
 import { useAuth } from '../composables/useAuth'
+
+const HomePage = () => import('../views/HomePage.vue')
+const TeamPage = () => import('../views/TeamPage.vue')
+const AdviserPage = () => import('../views/AdviserPage.vue')
+const LoginPage = () => import('../views/LoginPage.vue')
+const DashboardPage = () => import('../views/DashboardPage.vue')
 
 const routes = [
   {

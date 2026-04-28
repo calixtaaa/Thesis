@@ -7,7 +7,7 @@ from datetime import datetime
 
 
 # App version (bump when releasing; shown in title, footers, and patch notes)
-VERSION = "v1.0.1"
+VERSION = "v1.0.2"
 
 
 # ---------------------------------------------------------------------------
@@ -170,15 +170,37 @@ PATCH_v1_0_1 = {
     ],
 }
 
+# v1.0.2 – Hygiene Hero personalization + website light mode polish
+PATCH_v1_0_2 = {
+    "version": "v1.0.2",
+    "added": [
+        "Hygiene Hero offline personalization: learns user behavior from local vending.db transactions and adds short personalized tips (top products + peak hours/days).",
+        "Expanded Hygiene Hero product knowledge to match the actual machine catalog (pads, wipes, tissues, deodorant, mouthwash, etc.) including common synonyms.",
+    ],
+    "improved": [
+        "Hygiene Hero responses: better intent matching for multi-word products and fewer irrelevant replies (narrower hygiene-tip trigger).",
+        "Hygiene Hero fallback now asks a clear 1-step clarifying choice instead of random responses.",
+        "Website dashboard light mode: improved contrast and readability for Prediction Analysis cards, insights, and chart panels.",
+    ],
+    "bugs_fixed": [
+        "Website light mode: low-contrast text in Prediction Analysis/Insights that looked washed out on light cards.",
+        "Hygiene Hero: product matching was too substring-based, causing missed/incorrect matches for real product names.",
+    ],
+    "future": [
+        "Optional: add opt-in per-user recommendation chips (e.g., 'You often buy at 16:00 — want a quick restock list?').",
+        "Optional: extend Hygiene Hero knowledge base with more FAQs and richer Tagalog phrasing for product guidance.",
+    ],
+}
+
 # All versions in order (oldest first)
-PATCH_HISTORY = [PATCH_v0_01, PATCH_v0_02, PATCH_v0_03, PATCH_v1_0_0, PATCH_v1_0_1]
+PATCH_HISTORY = [PATCH_v0_01, PATCH_v0_02, PATCH_v0_03, PATCH_v1_0_0, PATCH_v1_0_1, PATCH_v1_0_2]
 
 
 def get_patch_notes_text() -> str:
     """Return a single string with full version history for the Patch Notes dialog.
     Latest version is shown first (at the top), oldest at the bottom.
     """
-    lines = [f"Patch Notes / Updates  —  Current: {VERSION}", ""]
+    lines = [f"Patch Notes / Updates  -  Current: {VERSION}", ""]
     for patch in reversed(PATCH_HISTORY):
         v = patch["version"]
         lines.extend([f"═══════════════════════════════════  {v}  ═══════════════════════════════════", ""])

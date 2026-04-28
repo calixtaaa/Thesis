@@ -501,7 +501,9 @@ def build_chatbot_screen(app):
         def _get_reply():
             # Simulate slight thinking delay (makes it feel more natural)
             time.sleep(0.6)
-            response = _bot.get_response(text)
+            # Optional offline personalization (uses local SQLite + last RFID session)
+            user_id = getattr(app, "_last_rfid_user_id", None)
+            response = _bot.get_response(text, user_id=user_id)
 
             def _show_reply():
                 # Remove typing indicator

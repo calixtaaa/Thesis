@@ -29,10 +29,12 @@ begin
     ' · slot ' || coalesce(new.slot_number::text, '?') ||
     ' · ₱' || coalesce(new.total_amount::text, '0');
 
-  insert into public.live_feed (event_type, message, payload)
+  insert into public.live_feed (event_type, message, quantity, total_amount, payload)
   values (
     'sale',
     msg,
+    new.quantity,
+    new.total_amount,
     jsonb_strip_nulls(
       jsonb_build_object(
         'transaction_id', new.id,

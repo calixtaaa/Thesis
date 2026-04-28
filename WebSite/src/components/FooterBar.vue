@@ -22,7 +22,7 @@
         </div>
 
         <!-- Quick Links -->
-        <div class="flex items-center gap-6">
+        <div class="flex items-center gap-6 flex-wrap justify-center">
           <router-link
             v-for="link in links"
             :key="link.path"

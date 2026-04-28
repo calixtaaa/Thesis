@@ -150,16 +150,16 @@ def init_db():
     if cur.fetchone()["c"] == 0:
         sample_products = [
             # Slot → Product (per latest physical tray layout)
-            ("Alcohol", "Green Cross Isopropyl Alcohol 70% Solution, 60mL", 25.00, 1, 10, 5),
-            ("Soap", "Soap, 10grams", 5.00, 2, 10, 5),
-            ("Deodorant", "Rexona Shower Clean, 3ml*12packs", 10.00, 3, 10, 5),
-            ("Mouthwash", "Scoban Mint Flavor, 10ml*10 packs", 8.00, 4, 10, 5),
-            ("Tissues", "Sanicare Hankies, 6 packs", 8.00, 5, 10, 5),
-            ("Wet Wipes", "Sanicare Mini Wipes, 6 packs x 8 sheets", 18.00, 6, 10, 5),
-            ("Panty Liners", "Charmee Breathable, 20 liners", 5.00, 7, 10, 5),
-            ("All Night Pads", "Charmee All Night Plus, 4 pads", 10.00, 8, 10, 5),
-            ("Regular W/ Wings Pads", "Charmee Dry Net with wings, 8 pads", 7.00, 9, 10, 5),
-            ("Non-Wing Pads", "Charmee Cottony without wings, 8 pads", 7.00, 10, 10, 5),
+            ("Alcohol", "Green Cross Isopropyl Alcohol 70% Solution, 60mL", 25.00, 1, 3, 3),
+            ("Soap", "Soap, 10grams", 5.00, 2, 7, 7),
+            ("Deodorant", "Rexona Shower Clean, 3ml*12packs", 10.00, 3, 9, 9),
+            ("Mouthwash", "Scoban Mint Flavor, 10ml*10 packs", 8.00, 4, 7, 7),
+            ("Tissues", "Sanicare Hankies, 6 packs", 8.00, 5, 3, 3),
+            ("Wet Wipes", "Sanicare Mini Wipes, 6 packs x 8 sheets", 18.00, 6, 3, 3),
+            ("Panty Liners", "Charmee Breathable, 20 liners", 5.00, 7, 8, 8),
+            ("All Night Pads", "Charmee All Night Plus, 4 pads", 10.00, 8, 6, 6),
+            ("Regular W/ Wings Pads", "Charmee Dry Net with wings, 8 pads", 7.00, 9, 7, 7),
+            ("Non-Wing Pads", "Charmee Cottony without wings, 8 pads", 7.00, 10, 7, 7),
         ]
         cur.executemany(
             """
@@ -568,8 +568,23 @@ def get_admin_overview_stats():
     )
     active_customers = cur.fetchone()["active_customers"]
 
-    cur.execute("SELECT COUNT(*) AS low_count FROM products WHERE current_stock < 4")
-    low_stock = cur.fetchone()["low_count"]
+    # Low-stock thresholds (per final product layout)
+    cur.execute("SELECT name, current_stock FROM products")
+    rows = cur.fetchall()
+
+    def _threshold(name: str) -> int:
+        n = (name or "").strip().lower()
+        if n == "alcohol":
+            return 1
+        if n in ("wet wipes", "wetwipes", "wipes"):
+            return 1
+        if n in ("tissue", "tissues"):
+            return 1
+        if n in ("all night pads", "all-night pads"):
+            return 2
+        return 3
+
+    low_stock = sum(1 for r in rows if int(r["current_stock"] or 0) <= _threshold(r["name"]))
 
     conn.close()
 
@@ -699,26 +714,30 @@ def get_top_selling_products(limit: int | None = None):
 
 
 def get_low_stock_chart_data(limit: int = 10):
-    """Return low-stock product data for charting (current stock under 4)."""
+    """Return low-stock product data for charting (per-product thresholds)."""
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute(
-        """
-        SELECT name, current_stock, capacity
-        FROM products
-        WHERE current_stock < 4
-        ORDER BY current_stock ASC, name ASC
-        LIMIT ?
-        """,
-        (limit,),
-    )
+    cur.execute("SELECT name, current_stock, capacity FROM products")
     rows = cur.fetchall()
     conn.close()
+
+    def _threshold(name: str) -> int:
+        n = (name or "").strip().lower()
+        if n == "alcohol":
+            return 1
+        if n in ("wet wipes", "wetwipes", "wipes"):
+            return 1
+        if n in ("tissue", "tissues"):
+            return 1
+        if n in ("all night pads", "all-night pads"):
+            return 2
+        return 3
+
+    low = [r for r in rows if int(r["current_stock"] or 0) <= _threshold(r["name"])]
+    low.sort(key=lambda r: (int(r["current_stock"] or 0), str(r["name"] or "")))
+    low = low[: int(limit)]
+
     return [
-        {
-            "label": row["name"],
-            "value": float(row["current_stock"]),
-            "capacity": float(row["capacity"]),
-        }
-        for row in rows
+        {"label": row["name"], "value": float(row["current_stock"]), "capacity": float(row["capacity"])}
+        for row in low
     ]

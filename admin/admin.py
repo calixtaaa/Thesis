@@ -4,6 +4,8 @@ import tkinter as tk
 from tkinter import messagebox, simpledialog
 import customtkinter as ctk
 
+from touch_scroll import install_ctk_scroll_support
+
 from admin.reports import list_sales_reports, open_sales_report
 from pathlib import Path as _Path
 import secrets as _secrets
@@ -33,6 +35,8 @@ def _verify_password(password: str, stored_hash: str) -> bool:
 UI_FONT = "Segoe UI"
 UI_FONT_SMALL = (UI_FONT, 10)
 UI_FONT_BODY = (UI_FONT, 12)
+
+install_ctk_scroll_support(ctk)
 
 
 class AdminMixin:
@@ -64,7 +68,7 @@ class AdminMixin:
 
         canvas = tk.Canvas(
             chart_inner,
-            height=180,
+            height=220,
             bg=self.current_theme.get("card_bg", "#ffffff"),
             highlightthickness=0,
             bd=0,
@@ -78,7 +82,7 @@ class AdminMixin:
             left_pad = 46
             right_pad = 20
             top_pad = 20
-            bottom_pad = 52
+            bottom_pad = 76
 
             plot_w = width - left_pad - right_pad
             plot_h = height - top_pad - bottom_pad
@@ -133,7 +137,7 @@ class AdminMixin:
                 )
                 canvas.create_text(
                     x,
-                    top_pad + plot_h + 18,
+                    top_pad + plot_h + 26,
                     text=point["label"],
                     fill=axis_color,
                     font=(UI_FONT, 8),
@@ -829,7 +833,7 @@ class AdminMixin:
             left_pad=28,
             right_pad=34,
         )
-        self.create_low_stock_chart(body, "Low-stock Products", "Items with fewer than 4 stocks left (current/capacity)", low_stock_points)
+        self.create_low_stock_chart(body, "Low-stock Products", "Per-product low-stock thresholds (current/capacity)", low_stock_points)
 
         # -----------------------------
         # Prediction Analysis (runtime)
@@ -906,40 +910,60 @@ class AdminMixin:
             headers = ["Product", "Predicted Sales Tomorrow", "Restock Needed"]
             head_row = ctk.CTkFrame(table, fg_color=card_bg)
             head_row.pack(fill=tk.X)
-            for h in headers:
-                ctk.CTkLabel(
-                    head_row,
-                    text=h,
-                    font=(UI_FONT, 10, "bold"),
-                    text_color=self.current_theme["fg"],
-                    anchor="w",
-                ).pack(side=tk.LEFT, fill=tk.X, expand=True)
+            head_row.grid_columnconfigure(0, weight=3)
+            head_row.grid_columnconfigure(1, weight=1, minsize=160)
+            head_row.grid_columnconfigure(2, weight=1, minsize=130)
+            ctk.CTkLabel(
+                head_row,
+                text=headers[0],
+                font=(UI_FONT, 10, "bold"),
+                text_color=self.current_theme["fg"],
+                anchor="w",
+            ).grid(row=0, column=0, sticky="ew", padx=(0, 8))
+            ctk.CTkLabel(
+                head_row,
+                text=headers[1],
+                font=(UI_FONT, 10, "bold"),
+                text_color=self.current_theme["fg"],
+                anchor="e",
+            ).grid(row=0, column=1, sticky="ew", padx=(0, 8))
+            ctk.CTkLabel(
+                head_row,
+                text=headers[2],
+                font=(UI_FONT, 10, "bold"),
+                text_color=self.current_theme["fg"],
+                anchor="center",
+            ).grid(row=0, column=2, sticky="ew")
 
             for r in results[:6]:
                 row = ctk.CTkFrame(table, fg_color=card_bg)
                 row.pack(fill=tk.X, pady=1)
+                row.grid_columnconfigure(0, weight=3)
+                row.grid_columnconfigure(1, weight=1, minsize=160)
+                row.grid_columnconfigure(2, weight=1, minsize=130)
                 ctk.CTkLabel(
                     row,
                     text=str(getattr(r, "product_name", "")),
                     font=UI_FONT_SMALL,
                     text_color=self.current_theme["fg"],
                     anchor="w",
-                ).pack(side=tk.LEFT, fill=tk.X, expand=True)
+                ).grid(row=0, column=0, sticky="ew", padx=(0, 8))
+                pred_val = float(getattr(r, "predicted_sales_tomorrow", 0) or 0)
                 ctk.CTkLabel(
                     row,
-                    text=str(getattr(r, "predicted_sales_tomorrow", 0)),
+                    text=f"{pred_val:.2f}",
                     font=UI_FONT_SMALL,
                     text_color=self.current_theme["fg"],
-                    anchor="w",
-                ).pack(side=tk.LEFT, fill=tk.X, expand=True)
+                    anchor="e",
+                ).grid(row=0, column=1, sticky="ew", padx=(0, 8))
                 need = "Yes" if getattr(r, "recommended_restock_qty", 0) > 0 else "No"
                 ctk.CTkLabel(
                     row,
                     text=need,
                     font=UI_FONT_SMALL,
                     text_color=self.current_theme.get("accent", "#10b981") if need == "Yes" else self.current_theme.get("muted", self.current_theme["fg"]),
-                    anchor="w",
-                ).pack(side=tk.LEFT, fill=tk.X, expand=True)
+                    anchor="center",
+                ).grid(row=0, column=2, sticky="ew")
 
         ctk.CTkButton(
             body,

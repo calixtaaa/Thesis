@@ -114,8 +114,24 @@
         <p v-if="!machine.loading" class="text-xs text-surface-500 mb-4">{{ machineSummaryLine }}</p>
 
         <!-- Realtime activity from vending machine -->
-        <div class="ios-card rounded-2xl p-5 sm:p-6 mb-6">
-          <h3 class="text-sm font-bold text-surface-200 light:text-surface-900 mb-1">Machine live feed</h3>
+          <div class="ios-card rounded-2xl p-5 sm:p-6 mb-6">
+            <div class="flex items-start justify-between gap-3 mb-1">
+              <h3 class="text-sm font-bold text-surface-200 light:text-surface-900 mb-1">Machine live feed</h3>
+              <div class="flex items-center gap-1.5">
+                <button
+                  v-for="opt in liveFeedRangeOptions"
+                  :key="opt.id"
+                  type="button"
+                  class="px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-colors border"
+                  :class="liveFeedRange === opt.id
+                    ? 'bg-brand-600 text-white border-brand-500/30 shadow-lg shadow-brand-900/25'
+                    : 'bg-surface-900/30 text-surface-400 border-surface-800/40 hover:text-surface-200 hover:bg-surface-800/30'"
+                  @click="liveFeedRange = opt.id"
+                >
+                  {{ opt.label }}
+                </button>
+              </div>
+            </div>
           <div class="overflow-x-auto max-h-52 overflow-y-auto rounded-xl border border-surface-800/30">
             <table class="w-full text-sm">
               <thead class="sticky top-0 bg-surface-950/95 light:bg-surface-100/95 z-10">
@@ -123,6 +139,9 @@
                   <th class="text-left text-xs text-surface-400 uppercase pb-2 pr-3 font-semibold">Time (PH)</th>
                   <th class="text-left text-xs text-surface-400 uppercase pb-2 pr-3 font-semibold">Type</th>
                   <th class="text-left text-xs text-surface-400 uppercase pb-2 font-semibold">Message</th>
+                  <th class="text-right text-xs text-surface-400 uppercase pb-2 pr-3 font-semibold whitespace-nowrap">Quantity</th>
+                  <th class="text-left text-xs text-surface-400 uppercase pb-2 font-semibold whitespace-nowrap">IR - Beam Sensed</th>
+                  <th class="text-right text-xs text-surface-400 uppercase pb-2 font-semibold whitespace-nowrap">Total</th>
                 </tr>
               </thead>
               <tbody>
@@ -130,11 +149,27 @@
                   <td class="py-2 pr-3 text-surface-500 text-xs whitespace-nowrap">{{ row.time }}</td>
                   <td class="py-2 pr-3 text-brand-400 text-xs">{{ row.type }}</td>
                   <td class="py-2 text-surface-200 text-xs">{{ row.message }}</td>
+                  <td class="py-2 pr-3 text-right text-surface-300 text-xs whitespace-nowrap">{{ row.quantity ?? '—' }}</td>
+                  <td class="py-2 text-surface-300 text-xs whitespace-nowrap">{{ row.irBeamSensed ?? '—' }}</td>
+                  <td class="py-2 text-right text-surface-300 text-xs whitespace-nowrap">{{ row.totalAmount != null ? `₱${row.totalAmount}` : '—' }}</td>
                 </tr>
                 <tr v-if="liveFeedPreview.length === 0">
-                  <td colspan="3" class="py-10 text-center text-surface-500 text-sm">No feed rows yet — run <code class="text-surface-400">machine_live_feed.sql</code> and insert from the machine.</td>
+                  <td colspan="6" class="py-10 text-center text-surface-500 text-sm">No feed rows yet — run <code class="text-surface-400">machine_live_feed.sql</code> and insert from the machine.</td>
                 </tr>
               </tbody>
+              <tfoot v-if="liveFeedPreview.length > 0" class="sticky bottom-0 bg-surface-950/95 light:bg-surface-100/95 border-t border-surface-800/40">
+                <tr>
+                  <td colspan="3" class="py-2.5 pr-3 pl-0">
+                    <span class="text-xs font-bold text-surface-300">Total</span>
+                    <span class="text-xs text-surface-500 ml-2">{{ liveFeedPreviewTotals.count }} row(s)</span>
+                  </td>
+                  <td class="py-2.5 pr-3 text-right text-surface-200 text-xs font-bold whitespace-nowrap">{{ liveFeedPreviewTotals.totalQty }}</td>
+                  <td class="py-2.5 text-surface-400 text-xs whitespace-nowrap">
+                    Yes: <span class="text-surface-200 font-semibold">{{ liveFeedPreviewTotals.irYes }}</span>
+                  </td>
+                  <td class="py-2.5 text-right text-surface-200 text-xs font-bold whitespace-nowrap">₱{{ liveFeedPreviewTotals.totalAmount }}</td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         </div>
@@ -176,9 +211,14 @@
               </button>
             </div>
             <p class="text-xs text-surface-500 mt-4">
-              Selected: <span class="text-surface-200 font-semibold">{{ selectedYmd }}</span>
-              · Total: <span class="text-emerald-400 font-bold">₱{{ selectedDayTotal.toFixed(2) }}</span>
-              · {{ salesForSelectedDay.length }} sale(s)
+              <template v-if="selectedYmd">
+                Selected: <span class="text-surface-200 font-semibold">{{ selectedYmd }}</span>
+                · Total: <span class="text-emerald-400 font-bold">₱{{ selectedDayTotal.toFixed(2) }}</span>
+                · {{ salesForSelectedDay.length }} sale(s)
+              </template>
+              <template v-else>
+                Select a date to view transaction history.
+              </template>
             </p>
           </div>
 
@@ -191,6 +231,7 @@
                   <tr>
                     <th class="text-left text-xs text-surface-200 light:text-surface-800 uppercase tracking-wider pb-2 pr-3 font-semibold">Item</th>
                     <th class="text-left text-xs text-surface-200 light:text-surface-800 uppercase tracking-wider pb-2 pr-3 font-semibold">Time (PH)</th>
+                    <th class="text-right text-xs text-surface-200 light:text-surface-800 uppercase tracking-wider pb-2 pr-3 font-semibold">Qty</th>
                     <th class="text-right text-xs text-surface-200 light:text-surface-800 uppercase tracking-wider pb-2 font-semibold">Amount</th>
                   </tr>
                 </thead>
@@ -198,10 +239,13 @@
                   <tr v-for="row in salesForSelectedDayRows" :key="row.key" class="border-b border-surface-800/20 last:border-0">
                     <td class="py-2.5 pr-3 text-surface-200">{{ row.item }}</td>
                     <td class="py-2.5 pr-3 text-surface-500 text-xs whitespace-nowrap">{{ row.timePh }}</td>
+                    <td class="py-2.5 pr-3 text-right text-surface-300 text-xs whitespace-nowrap">{{ row.qty }}</td>
                     <td class="py-2.5 text-right font-semibold text-emerald-400">₱{{ row.amount }}</td>
                   </tr>
                   <tr v-if="salesForSelectedDayRows.length === 0">
-                    <td colspan="3" class="py-8 text-center text-surface-500 text-sm">No sales for this day in the loaded history.</td>
+                    <td colspan="4" class="py-8 text-center text-surface-500 text-sm">
+                      {{ selectedYmd ? 'No sales for this day in the loaded history.' : 'Select a date on the calendar.' }}
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -209,9 +253,66 @@
           </div>
         </div>
 
+        <div class="ios-card rounded-2xl p-5 sm:p-6 mb-6">
+          <h3 class="text-sm font-bold text-surface-200 light:text-surface-900 mb-1">Machine events on selected date</h3>
+          <p class="text-xs text-surface-500 light:text-surface-600 mb-4">Filtered from <code class="text-surface-400">live_feed</code> using the calendar date.</p>
+          <div class="overflow-x-auto max-h-72 overflow-y-auto rounded-xl border border-surface-800/30">
+            <table class="w-full text-sm">
+              <thead class="sticky top-0 bg-surface-950/95 light:bg-surface-100/95 z-10 border-b border-surface-800/40">
+                <tr>
+                  <th class="text-left text-xs text-surface-400 uppercase py-3 px-4 font-semibold">Time (PH)</th>
+                  <th class="text-left text-xs text-surface-400 uppercase py-3 px-4 font-semibold">Type</th>
+                  <th class="text-left text-xs text-surface-400 uppercase py-3 px-4 font-semibold">Message</th>
+                  <th class="text-right text-xs text-surface-400 uppercase py-3 px-4 font-semibold whitespace-nowrap">Quantity</th>
+                  <th class="text-left text-xs text-surface-400 uppercase py-3 px-4 font-semibold whitespace-nowrap">IR - Beam Sensed</th>
+                  <th class="text-right text-xs text-surface-400 uppercase py-3 px-4 font-semibold whitespace-nowrap">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in liveFeedForSelectedDayRows" :key="row.key" class="border-b border-surface-800/20">
+                  <td class="py-3 px-4 text-surface-500 text-xs whitespace-nowrap">{{ row.time }}</td>
+                  <td class="py-3 px-4 text-brand-400 text-xs font-medium">{{ row.type }}</td>
+                  <td class="py-3 px-4 text-surface-200">{{ row.message }}</td>
+                  <td class="py-3 px-4 text-right text-surface-300 text-xs whitespace-nowrap">{{ row.quantity }}</td>
+                  <td class="py-3 px-4 text-surface-300 text-xs whitespace-nowrap">{{ row.irBeamSensed }}</td>
+                  <td class="py-3 px-4 text-right text-surface-300 text-xs whitespace-nowrap">{{ row.totalAmount != null ? `₱${row.totalAmount}` : '—' }}</td>
+                </tr>
+                <tr v-if="liveFeedForSelectedDayRows.length === 0">
+                  <td colspan="6" class="py-10 text-center text-surface-500 text-sm">
+                    {{ selectedYmd ? 'No machine events for this day.' : 'Select a date on the calendar.' }}
+                  </td>
+                </tr>
+              </tbody>
+              <tfoot v-if="liveFeedForSelectedDayRows.length > 0" class="sticky bottom-0 bg-surface-950/95 light:bg-surface-100/95 border-t border-surface-800/40">
+                <tr>
+                  <td colspan="3" class="py-3 px-4">
+                    <span class="text-xs font-bold text-surface-300">Total</span>
+                    <span class="text-xs text-surface-500 ml-2">{{ liveFeedForSelectedDayTotals.count }} row(s)</span>
+                  </td>
+                  <td class="py-3 px-4 text-right text-surface-200 text-xs font-bold whitespace-nowrap">{{ liveFeedForSelectedDayTotals.totalQty }}</td>
+                  <td class="py-3 px-4 text-surface-400 text-xs whitespace-nowrap">
+                    Yes: <span class="text-surface-200 font-semibold">{{ liveFeedForSelectedDayTotals.irYes }}</span>
+                  </td>
+                  <td class="py-3 px-4 text-right text-surface-200 text-xs font-bold whitespace-nowrap">₱{{ liveFeedForSelectedDayTotals.totalAmount }}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+
         <!-- Email signups (Supabase `emails` table) -->
         <div class="ios-card rounded-2xl p-5 sm:p-6 mb-6">
-          <h3 class="text-sm font-bold text-surface-200 light:text-surface-900 mb-3">Newsletter &amp; contact emails</h3>
+          <div class="flex items-start justify-between gap-3 mb-3">
+            <div>
+              <h3 class="text-sm font-bold text-surface-200 light:text-surface-900 mb-1">Newsletter &amp; contact emails</h3>
+              <p class="text-xs text-surface-500">Passwords are masked. Click a password to copy its SHA-256 hash.</p>
+            </div>
+            <transition name="text-fade">
+              <span v-if="passHashToast" class="text-xs px-3 py-1.5 rounded-xl bg-surface-800/30 border border-surface-700/40 text-surface-300 whitespace-nowrap">
+                {{ passHashToast }}
+              </span>
+            </transition>
+          </div>
           <div class="overflow-x-auto max-h-64 overflow-y-auto">
             <table class="w-full text-sm">
               <thead>
@@ -224,7 +325,17 @@
               <tbody>
                 <tr v-for="row in subscriberEmailRows" :key="row.id" class="border-b border-surface-800/20 last:border-0 light:border-surface-200/60">
                   <td class="py-3 pr-4 text-surface-200 light:text-surface-900">{{ row.email }}</td>
-                  <td class="py-3 pr-4 text-surface-300 light:text-surface-800 font-mono text-xs">{{ row.passwordHint }}</td>
+                  <td class="py-3 pr-4">
+                    <button
+                      type="button"
+                      class="font-mono text-xs text-surface-300 light:text-surface-800 hover:text-surface-100 transition-colors underline decoration-surface-700/60 underline-offset-4"
+                      :disabled="!row.passwordRaw"
+                      @click="copyPasswordHash(row.passwordRaw)"
+                      :title="row.passwordRaw ? 'Copy SHA-256 hash to clipboard' : 'No password saved'"
+                    >
+                      {{ row.passwordRaw ? '********' : '—' }}
+                    </button>
+                  </td>
                   <td class="py-3 text-surface-400 light:text-surface-700 text-xs">{{ row.createdPh }}</td>
                 </tr>
                 <tr v-if="subscriberEmailRows.length === 0">
@@ -237,17 +348,53 @@
 
         <!-- Sales Trend Chart -->
         <div class="ios-card rounded-2xl p-5 sm:p-6 mb-6">
-          <h3 class="text-sm font-bold text-surface-200 mb-0.5">Sales by Created Date</h3>
-          <p class="text-xs text-surface-500 mb-4">Last 15 days</p>
-          <div class="w-full h-52 sm:h-64">
+          <div class="flex items-start justify-between gap-3 mb-1">
+            <div>
+              <h3 class="text-sm font-bold text-surface-200 mb-0.5">Sales by Created Date</h3>
+              <p class="text-xs text-surface-500">Realtime synced from transactions</p>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <button
+                v-for="opt in salesRangeOptions"
+                :key="opt.id"
+                type="button"
+                class="px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-colors border"
+                :class="salesTrendRange === opt.id
+                  ? 'bg-brand-600 text-white border-brand-500/30 shadow-lg shadow-brand-900/25'
+                  : 'bg-surface-900/30 text-surface-400 border-surface-800/40 hover:text-surface-200 hover:bg-surface-800/30'"
+                @click="salesTrendRange = opt.id"
+              >
+                {{ opt.label }}
+              </button>
+            </div>
+          </div>
+          <div class="w-full h-56 sm:h-72">
             <canvas ref="salesTrendChart"></canvas>
           </div>
         </div>
 
         <!-- Monthly Sales Chart -->
         <div class="ios-card rounded-2xl p-5 sm:p-6 mb-6">
-          <h3 class="text-sm font-bold text-surface-200 mb-0.5">Monthly Sales</h3>
-          <p class="text-xs text-surface-500 mb-4">Last 6 months</p>
+          <div class="flex items-start justify-between gap-3 mb-1">
+            <div>
+              <h3 class="text-sm font-bold text-surface-200 mb-0.5">Monthly Sales</h3>
+              <p class="text-xs text-surface-500">Realtime synced from transactions</p>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <button
+                v-for="opt in monthlyRangeOptions"
+                :key="opt.id"
+                type="button"
+                class="px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-colors border"
+                :class="monthlyRange === opt.id
+                  ? 'bg-brand-600 text-white border-brand-500/30 shadow-lg shadow-brand-900/25'
+                  : 'bg-surface-900/30 text-surface-400 border-surface-800/40 hover:text-surface-200 hover:bg-surface-800/30'"
+                @click="monthlyRange = opt.id"
+              >
+                {{ opt.label }}
+              </button>
+            </div>
+          </div>
           <div class="w-full h-52 sm:h-64">
             <canvas ref="monthlySalesChart"></canvas>
           </div>
@@ -258,7 +405,7 @@
           <!-- Top Selling Products -->
           <div class="ios-card rounded-2xl p-5 sm:p-6">
             <h3 class="text-sm font-bold text-surface-200 mb-0.5">Top-selling Products</h3>
-            <p class="text-xs text-surface-500 mb-4">All products by quantity sold</p>
+            <p class="text-xs text-surface-500 mb-4">Bars extend to the right · realtime synced</p>
             <div class="w-full h-52 sm:h-64">
               <canvas ref="topProductsChart"></canvas>
             </div>
@@ -268,21 +415,42 @@
           <div class="ios-card rounded-2xl p-5 sm:p-6">
             <h3 class="text-sm font-bold text-surface-200 mb-0.5">Low-stock Products</h3>
             <p class="text-xs text-surface-500 mb-4">Current stock vs capacity</p>
-            <div class="space-y-3 mt-2">
-              <p v-if="lowStockItems.length === 0" class="text-sm text-surface-500 py-6 text-center">No low-stock rows — restock data appears when <code class="text-surface-400">products</code> has stock under 4.</p>
-              <template v-else>
-                <div v-for="item in lowStockItems" :key="item.name" class="flex items-center justify-between gap-3">
-                  <span class="text-xs text-surface-300 w-28 truncate shrink-0">{{ item.name }}</span>
-                  <div class="flex-1 h-2 bg-surface-800/50 rounded-full overflow-hidden">
-                    <div
-                      class="h-full rounded-full transition-all duration-700"
-                      :class="item.stock / Math.max(item.capacity, 1) > 0.5 ? 'bg-emerald-400' : item.stock / Math.max(item.capacity, 1) > 0.25 ? 'bg-amber-400' : 'bg-red-400'"
-                      :style="{ width: `${Math.min(100, (item.stock / Math.max(item.capacity, 1)) * 100)}%` }"
-                    ></div>
-                  </div>
-                  <span class="text-xs font-semibold text-surface-400 w-14 text-right">{{ item.stock }}/{{ item.capacity || '—' }}</span>
-                </div>
-              </template>
+            <div class="mt-2 overflow-x-auto rounded-xl border border-surface-800/30">
+              <table class="w-full text-sm">
+                <thead class="bg-surface-950/60 light:bg-surface-100/80 border-b border-surface-800/40">
+                  <tr>
+                    <th class="text-left text-[11px] text-surface-400 uppercase tracking-wider py-3 px-3 font-semibold whitespace-nowrap">Slot#</th>
+                    <th class="text-left text-[11px] text-surface-400 uppercase tracking-wider py-3 px-3 font-semibold">Product</th>
+                    <th class="text-right text-[11px] text-surface-400 uppercase tracking-wider py-3 px-3 font-semibold whitespace-nowrap">Price</th>
+                    <th class="text-right text-[11px] text-surface-400 uppercase tracking-wider py-3 px-3 font-semibold whitespace-nowrap">Ratio</th>
+                    <th class="text-left text-[11px] text-surface-400 uppercase tracking-wider py-3 px-3 font-semibold whitespace-nowrap">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="row in lowStockTableRows"
+                    :key="row.key"
+                    class="border-b border-surface-800/20 last:border-0"
+                  >
+                    <td class="py-2.5 px-3 text-surface-300 font-mono text-xs whitespace-nowrap">{{ row.slot }}</td>
+                    <td class="py-2.5 px-3 text-surface-200 font-medium truncate max-w-[14rem]">{{ row.product }}</td>
+                    <td class="py-2.5 px-3 text-right text-surface-300 whitespace-nowrap">₱{{ row.price }}</td>
+                    <td class="py-2.5 px-3 text-right text-surface-400 font-semibold whitespace-nowrap">{{ row.ratio }}</td>
+                    <td class="py-2.5 px-3">
+                      <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold border"
+                        :class="row.statusClass"
+                      >
+                        {{ row.status }}
+                      </span>
+                    </td>
+                  </tr>
+                  <tr v-if="lowStockTableRows.length === 0">
+                    <td colspan="5" class="py-10 text-center text-surface-500 text-sm">
+                      No low-stock products right now.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -321,8 +489,78 @@
       <!-- LIVE FEED (full list) -->
       <div v-else-if="activeSection === 'machine-feed'">
         <div class="ios-card rounded-2xl p-5 sm:p-6">
-          <h3 class="text-lg font-bold text-surface-100 light:text-surface-900 mb-1">Machine live feed</h3>
-          <p class="text-sm text-surface-500 mb-6">Realtime stream from <code class="text-surface-400">public.live_feed</code> (same data as Overview, full history in view).</p>
+          <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-4">
+            <div>
+              <h3 class="text-lg font-bold text-surface-100 light:text-surface-900 mb-1">Machine live feed</h3>
+              <p class="text-sm text-surface-500">Realtime stream from <code class="text-surface-400">public.live_feed</code>.</p>
+            </div>
+          </div>
+
+          <!-- Calendar-like filter (same behavior as Sales Calendar) -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <div class="rounded-2xl border border-surface-800/30 bg-surface-900/20 p-4">
+              <div class="flex items-center justify-between gap-3 mb-3">
+                <p class="text-xs font-bold text-surface-300 uppercase tracking-wider">Filter by date (PH)</p>
+                <div class="flex items-center gap-2">
+                  <button type="button" class="p-2 rounded-lg text-surface-400 hover:bg-surface-800/50 hover:text-surface-200 transition-colors" @click="feedCalendarPrevMonth" aria-label="Previous month">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
+                  </button>
+                  <span class="text-xs font-semibold text-surface-300 min-w-[8.5rem] text-center">{{ feedCalendarTitle }}</span>
+                  <button type="button" class="p-2 rounded-lg text-surface-400 hover:bg-surface-800/50 hover:text-surface-200 transition-colors" @click="feedCalendarNextMonth" aria-label="Next month">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                  </button>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-7 gap-1 text-center text-[10px] uppercase tracking-wider text-surface-500 mb-2">
+                <span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span>
+              </div>
+              <div class="grid grid-cols-7 gap-1">
+                <button
+                  v-for="(cell, idx) in feedCalendarCells"
+                  :key="idx"
+                  type="button"
+                  :disabled="!cell.ymd"
+                  @click="cell.ymd && selectFeedCalendarDay(cell.ymd)"
+                  class="aspect-square rounded-xl text-xs font-medium transition-all disabled:opacity-0 disabled:pointer-events-none"
+                  :class="cell.ymd === feedSelectedYmd
+                    ? 'bg-brand-600 text-white shadow-lg shadow-brand-900/30'
+                    : cell.isToday
+                      ? 'border border-brand-500/40 text-brand-300 hover:bg-surface-800/40'
+                      : 'text-surface-300 hover:bg-surface-800/40'"
+                >
+                  {{ cell.day }}
+                </button>
+              </div>
+
+              <p class="text-xs text-surface-500 mt-3">
+                <template v-if="feedSelectedYmd">
+                  Selected: <span class="text-surface-200 font-semibold">{{ feedSelectedYmd }}</span>
+                  · {{ liveFeedRowsForSelectedDay.length }} event(s)
+                </template>
+                <template v-else>
+                  Select a date to view machine events.
+                </template>
+              </p>
+            </div>
+
+            <div class="rounded-2xl border border-surface-800/30 bg-surface-900/20 p-4">
+              <p class="text-xs font-bold text-surface-300 uppercase tracking-wider mb-2">Quick actions</p>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  class="px-3 py-2 rounded-xl text-xs font-bold transition-colors border bg-surface-900/30 text-surface-300 border-surface-800/40 hover:bg-surface-800/30"
+                  @click="feedSelectedYmd = ''"
+                >
+                  Clear selection
+                </button>
+              </div>
+              <p class="text-xs text-surface-500 mt-3">
+                This view shows <span class="text-surface-300 font-semibold">no history</span> until you pick a date, same as the Sales Calendar.
+              </p>
+            </div>
+          </div>
+
           <div class="overflow-x-auto max-h-[70vh] overflow-y-auto rounded-xl border border-surface-800/30">
             <table class="w-full text-sm">
               <thead class="sticky top-0 bg-surface-950/95 light:bg-surface-100/95 z-10 border-b border-surface-800/40">
@@ -330,18 +568,39 @@
                   <th class="text-left text-xs text-surface-400 uppercase py-3 px-4 font-semibold">Time (PH)</th>
                   <th class="text-left text-xs text-surface-400 uppercase py-3 px-4 font-semibold">Type</th>
                   <th class="text-left text-xs text-surface-400 uppercase py-3 px-4 font-semibold">Message</th>
+                  <th class="text-right text-xs text-surface-400 uppercase py-3 px-4 font-semibold whitespace-nowrap">Quantity</th>
+                  <th class="text-left text-xs text-surface-400 uppercase py-3 px-4 font-semibold whitespace-nowrap">IR - Beam Sensed</th>
+                  <th class="text-right text-xs text-surface-400 uppercase py-3 px-4 font-semibold whitespace-nowrap">Total</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="row in liveFeedRows" :key="row.id" class="border-b border-surface-800/20">
+                <tr v-for="row in liveFeedRowsForSelectedDay" :key="row.id" class="border-b border-surface-800/20">
                   <td class="py-3 px-4 text-surface-500 text-xs whitespace-nowrap">{{ row.time }}</td>
                   <td class="py-3 px-4 text-brand-400 text-xs font-medium">{{ row.type }}</td>
                   <td class="py-3 px-4 text-surface-200">{{ row.message }}</td>
+                  <td class="py-3 px-4 text-right text-surface-300 text-xs whitespace-nowrap">{{ row.quantity ?? '—' }}</td>
+                  <td class="py-3 px-4 text-surface-300 text-xs whitespace-nowrap">{{ row.irBeamSensed ?? '—' }}</td>
+                  <td class="py-3 px-4 text-right text-surface-300 text-xs whitespace-nowrap">{{ row.totalAmount != null ? `₱${row.totalAmount}` : '—' }}</td>
                 </tr>
-                <tr v-if="liveFeedRows.length === 0">
-                  <td colspan="3" class="py-16 text-center text-surface-500">No events. Insert into <code class="text-surface-400">live_feed</code> from the machine or SQL Editor to test.</td>
+                <tr v-if="liveFeedRowsForSelectedDay.length === 0">
+                  <td colspan="6" class="py-16 text-center text-surface-500">
+                    {{ feedSelectedYmd ? 'No machine events for this day.' : 'Select a date on the calendar to view history.' }}
+                  </td>
                 </tr>
               </tbody>
+              <tfoot v-if="liveFeedRowsForSelectedDay.length > 0" class="sticky bottom-0 bg-surface-950/95 light:bg-surface-100/95 border-t border-surface-800/40">
+                <tr>
+                  <td colspan="3" class="py-3 px-4">
+                    <span class="text-xs font-bold text-surface-300">Total</span>
+                    <span class="text-xs text-surface-500 ml-2">{{ liveFeedSelectedTotals.count }} row(s)</span>
+                  </td>
+                  <td class="py-3 px-4 text-right text-surface-200 text-xs font-bold whitespace-nowrap">{{ liveFeedSelectedTotals.totalQty }}</td>
+                  <td class="py-3 px-4 text-surface-400 text-xs whitespace-nowrap">
+                    Yes: <span class="text-surface-200 font-semibold">{{ liveFeedSelectedTotals.irYes }}</span>
+                  </td>
+                  <td class="py-3 px-4 text-right text-surface-200 text-xs font-bold whitespace-nowrap">₱{{ liveFeedSelectedTotals.totalAmount }}</td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         </div>
@@ -350,9 +609,9 @@
       <!-- PREDICTION ANALYSIS SECTION -->
       <div v-else-if="activeSection === 'prediction'">
         <div class="ios-card rounded-2xl p-5 sm:p-6">
-          <h3 class="text-sm font-bold text-surface-200 mb-0.5">Prediction Analysis (Demand + Restock)</h3>
-          <p class="text-xs text-surface-500 mb-4">
-            Predicts sales tomorrow and recommends restock using historical transactions (runs once per session).
+          <h3 class="text-sm font-bold text-surface-200 light:text-surface-900 mb-0.5">Prediction Analysis (Demand + Restock)</h3>
+          <p class="text-xs text-surface-500 light:text-surface-600 mb-4">
+            Loads deep-learning (MLP) forecasts when available and renders charts for quick decisions.
           </p>
 
           <div class="flex items-center gap-3 mb-4">
@@ -366,27 +625,44 @@
             >
               {{ predictionRan ? '✓ Prediction Ready' : 'Run Prediction Analysis' }}
             </button>
-            <span v-if="predictionLoading" class="text-xs text-surface-400 animate-pulse">Analyzing...</span>
+            <span v-if="predictionLoading" class="text-xs text-surface-400 light:text-surface-600 animate-pulse">Analyzing...</span>
+            <span v-if="predictionModelLabel" class="text-xs text-surface-500 light:text-surface-700">Model: <span class="text-surface-300 light:text-surface-900 font-semibold">{{ predictionModelLabel }}</span></span>
+          </div>
+
+          <!-- Charts -->
+          <div v-if="predictionResults.length > 0" class="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-4">
+            <div class="rounded-2xl border border-surface-800/30 light:border-surface-200/80 bg-surface-900/20 light:bg-white/80 p-4 shadow-sm light:shadow-md">
+              <p class="text-xs font-bold text-surface-300 light:text-surface-800 mb-2 uppercase tracking-wider">Restock quantity (Top)</p>
+              <div class="w-full h-56">
+                <canvas ref="predictionRestockChart"></canvas>
+              </div>
+            </div>
+            <div class="rounded-2xl border border-surface-800/30 light:border-surface-200/80 bg-surface-900/20 light:bg-white/80 p-4 shadow-sm light:shadow-md">
+              <p class="text-xs font-bold text-surface-300 light:text-surface-800 mb-2 uppercase tracking-wider">Restock split</p>
+              <div class="w-full h-56">
+                <canvas ref="predictionSplitChart"></canvas>
+              </div>
+            </div>
           </div>
 
           <!-- Results Table -->
           <div v-if="predictionResults.length > 0" class="mt-4">
-            <p class="text-xs text-surface-500 mb-3">Based on transaction data from the vending machine</p>
+            <p class="text-xs text-surface-500 light:text-surface-600 mb-3">Based on transaction data from the vending machine</p>
             <div class="overflow-x-auto">
               <table class="w-full text-sm">
                 <thead>
                   <tr class="border-b border-surface-800/40">
-                    <th class="text-left text-xs text-surface-500 uppercase tracking-wider pb-3 pr-4">Product</th>
-                    <th class="text-left text-xs text-surface-500 uppercase tracking-wider pb-3 pr-4">Predicted Sales Tomorrow</th>
-                    <th class="text-left text-xs text-surface-500 uppercase tracking-wider pb-3 pr-4">Current Stock</th>
-                    <th class="text-left text-xs text-surface-500 uppercase tracking-wider pb-3">Restock Needed</th>
+                    <th class="text-left text-xs text-surface-500 light:text-surface-600 uppercase tracking-wider pb-3 pr-4">Product</th>
+                    <th class="text-left text-xs text-surface-500 light:text-surface-600 uppercase tracking-wider pb-3 pr-4">Predicted Sales Tomorrow</th>
+                    <th class="text-left text-xs text-surface-500 light:text-surface-600 uppercase tracking-wider pb-3 pr-4">Current Stock</th>
+                    <th class="text-left text-xs text-surface-500 light:text-surface-600 uppercase tracking-wider pb-3">Restock Needed</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr v-for="r in predictionResults" :key="r.product_name" class="border-b border-surface-800/20 last:border-0">
-                    <td class="py-3 pr-4 text-surface-200 font-medium">{{ r.product_name }}</td>
-                    <td class="py-3 pr-4 text-surface-300">{{ r.predicted_sales_tomorrow }}</td>
-                    <td class="py-3 pr-4 text-surface-300">{{ r.current_stock }}/{{ r.capacity }}</td>
+                    <td class="py-3 pr-4 text-surface-200 light:text-surface-900 font-medium">{{ r.product_name }}</td>
+                    <td class="py-3 pr-4 text-surface-300 light:text-surface-700 tabular-nums">{{ Number(r.predicted_sales_tomorrow ?? 0).toFixed(2) }}</td>
+                    <td class="py-3 pr-4 text-surface-300 light:text-surface-700 tabular-nums whitespace-nowrap">{{ r.current_stock }}/{{ r.capacity }}</td>
                     <td class="py-3">
                       <span
                         class="px-2.5 py-1 rounded-lg text-xs font-bold"
@@ -405,30 +681,45 @@
 
           <!-- Insights -->
           <div v-if="predictionInsights" class="mt-5 pt-4 border-t border-surface-800/20">
-            <h4 class="text-xs font-bold text-surface-300 uppercase tracking-wider mb-3">Insights from Transaction Data</h4>
+            <h4 class="text-xs font-bold text-surface-300 light:text-surface-800 uppercase tracking-wider mb-3">Insights from Transaction Data</h4>
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <!-- Top Products -->
-              <div class="p-3 rounded-xl bg-surface-800/20">
-                <p class="text-xs font-bold text-surface-400 mb-2">🏆 Top Products</p>
+              <div class="p-3 rounded-xl bg-surface-800/20 light:bg-surface-100/90 border border-transparent light:border-surface-200/70">
+                <p class="text-xs font-bold text-surface-400 light:text-surface-800 mb-2">🏆 Top Products</p>
                 <div v-for="(item, i) in predictionInsights.topProducts.slice(0, 5)" :key="item.name" class="flex justify-between text-xs py-0.5">
-                  <span class="text-surface-300">{{ i + 1 }}. {{ item.name }}</span>
-                  <span class="text-surface-500 font-medium">{{ item.qty }} sold</span>
+                  <span class="text-surface-300 light:text-surface-800">{{ i + 1 }}. {{ item.name }}</span>
+                  <span class="text-surface-500 light:text-surface-600 font-medium">{{ item.qty }} sold</span>
                 </div>
               </div>
               <!-- Peak Hours -->
-              <div class="p-3 rounded-xl bg-surface-800/20">
-                <p class="text-xs font-bold text-surface-400 mb-2">⏰ Peak Hours</p>
+              <div class="p-3 rounded-xl bg-surface-800/20 light:bg-surface-100/90 border border-transparent light:border-surface-200/70">
+                <p class="text-xs font-bold text-surface-400 light:text-surface-800 mb-2">⏰ Peak Hours</p>
                 <div v-for="item in predictionInsights.peakHours.slice(0, 5)" :key="item.hour" class="flex justify-between text-xs py-0.5">
-                  <span class="text-surface-300">{{ item.hour }}:00</span>
-                  <span class="text-surface-500 font-medium">{{ item.qty }} items</span>
+                  <span class="text-surface-300 light:text-surface-800">{{ item.hour }}:00</span>
+                  <span class="text-surface-500 light:text-surface-600 font-medium">{{ item.qty }} items</span>
                 </div>
               </div>
               <!-- Busiest Days -->
-              <div class="p-3 rounded-xl bg-surface-800/20">
-                <p class="text-xs font-bold text-surface-400 mb-2">📅 Busiest Days</p>
+              <div class="p-3 rounded-xl bg-surface-800/20 light:bg-surface-100/90 border border-transparent light:border-surface-200/70">
+                <p class="text-xs font-bold text-surface-400 light:text-surface-800 mb-2">📅 Busiest Days</p>
                 <div v-for="item in predictionInsights.weekdays.slice(0, 5)" :key="item.day" class="flex justify-between text-xs py-0.5">
-                  <span class="text-surface-300">{{ item.day }}</span>
-                  <span class="text-surface-500 font-medium">{{ item.qty }} items</span>
+                  <span class="text-surface-300 light:text-surface-800">{{ item.day }}</span>
+                  <span class="text-surface-500 light:text-surface-600 font-medium">{{ item.qty }} items</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-4">
+              <div class="rounded-2xl border border-surface-800/30 light:border-surface-200/80 bg-surface-900/20 light:bg-white/80 p-4 shadow-sm light:shadow-md">
+                <p class="text-xs font-bold text-surface-300 light:text-surface-800 mb-2 uppercase tracking-wider">Peak hours (items)</p>
+                <div class="w-full h-52">
+                  <canvas ref="predictionPeakHoursChart"></canvas>
+                </div>
+              </div>
+              <div class="rounded-2xl border border-surface-800/30 light:border-surface-200/80 bg-surface-900/20 light:bg-white/80 p-4 shadow-sm light:shadow-md">
+                <p class="text-xs font-bold text-surface-300 light:text-surface-800 mb-2 uppercase tracking-wider">Busiest days</p>
+                <div class="w-full h-52">
+                  <canvas ref="predictionWeekdaysChart"></canvas>
                 </div>
               </div>
             </div>
@@ -558,10 +849,17 @@ import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
 import { useRealtimeMachineData } from '../composables/useRealtimeMachineData'
-import { Chart, registerables } from 'chart.js'
+let Chart = null
+let registerables = null
 import { debounce } from '../utils/timing'
 
-Chart.register(...registerables)
+async function ensureChartsLoaded() {
+  if (Chart && registerables) return
+  const mod = await import('chart.js')
+  Chart = mod.Chart
+  registerables = mod.registerables
+  Chart.register(...registerables)
+}
 
 const router = useRouter()
 const { currentUser, isAdmin, logout, createUser, getUsers, deleteUser } = useAuth()
@@ -609,7 +907,61 @@ function refreshPhClock() {
 
 const calYear = ref(new Date().getFullYear())
 const calMonth = ref(new Date().getMonth() + 1)
-const selectedYmd = ref('')
+const selectedYmd = ref('') // only set when user clicks a date
+
+// Live feed calendar (same behavior as Sales Calendar)
+const feedCalYear = ref(new Date().getFullYear())
+const feedCalMonth = ref(new Date().getMonth() + 1)
+const feedSelectedYmd = ref('')
+
+const feedCalendarTitle = computed(() => {
+  const d = new Date(feedCalYear.value, feedCalMonth.value - 1, 1)
+  return d.toLocaleString('en-PH', { month: 'long', year: 'numeric' })
+})
+
+const feedCalendarCells = computed(() => {
+  const y = feedCalYear.value
+  const m = feedCalMonth.value
+  const dim = new Date(y, m, 0).getDate()
+  const firstWd = manilaWeekdaySun0(y, m, 1)
+  const today = manilaDayFmt.format(new Date())
+  const cells = []
+  for (let i = 0; i < firstWd; i++) cells.push({ day: null, ymd: null })
+  for (let d = 1; d <= dim; d++) {
+    const ymd = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+    cells.push({ day: d, ymd, isToday: ymd === today, isSelected: ymd === feedSelectedYmd.value })
+  }
+  while (cells.length % 7 !== 0) cells.push({ day: null, ymd: null })
+  while (cells.length < 42) cells.push({ day: null, ymd: null })
+  return cells.slice(0, 42)
+})
+
+function feedCalendarPrevMonth() {
+  if (feedCalMonth.value <= 1) {
+    feedCalMonth.value = 12
+    feedCalYear.value--
+  } else {
+    feedCalMonth.value--
+  }
+  feedSelectedYmd.value = ''
+}
+
+function feedCalendarNextMonth() {
+  if (feedCalMonth.value >= 12) {
+    feedCalMonth.value = 1
+    feedCalYear.value++
+  } else {
+    feedCalMonth.value++
+  }
+  feedSelectedYmd.value = ''
+}
+
+function selectFeedCalendarDay(ymd) {
+  feedSelectedYmd.value = ymd
+  const [y, m] = ymd.split('-').map(Number)
+  feedCalYear.value = y
+  feedCalMonth.value = m
+}
 
 const calendarTitle = computed(() => {
   const d = new Date(calYear.value, calMonth.value - 1, 1)
@@ -640,6 +992,8 @@ function calendarPrevMonth() {
   } else {
     calMonth.value--
   }
+  // Changing month should clear selected-day history
+  selectedYmd.value = ''
 }
 
 function calendarNextMonth() {
@@ -649,6 +1003,8 @@ function calendarNextMonth() {
   } else {
     calMonth.value++
   }
+  // Changing month should clear selected-day history
+  selectedYmd.value = ''
 }
 
 function selectCalendarDay(ymd) {
@@ -668,6 +1024,43 @@ const salesForSelectedDay = computed(() => {
   })
 })
 
+const liveFeedForSelectedDay = computed(() => {
+  const key = selectedYmd.value
+  if (!key) return []
+  return machine.liveFeed.value.filter((r) => {
+    if (!r?.created_at) return false
+    return toManilaYmd(r.created_at) === key
+  })
+})
+
+const liveFeedForSelectedDayRows = computed(() => {
+  const tf = new Intl.DateTimeFormat('en-PH', {
+    timeZone: 'Asia/Manila',
+    dateStyle: 'short',
+    timeStyle: 'medium',
+  })
+  return liveFeedForSelectedDay.value
+    .slice()
+    .sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0))
+    .map((r, i) => ({
+      key: `${r.id ?? i}-${r.created_at ?? ''}`,
+      time: r.created_at ? tf.format(new Date(r.created_at)) : '—',
+      type: r.event_type || 'info',
+      message: r.message || '—',
+      quantity: r.quantity ?? r.qty ?? r.dispensed_qty ?? r.dispensedQuantity ?? '—',
+      irBeamSensed: r.ir_beam_sensed ?? r.irBeamSensed ?? r.beam_sensed ?? r.beamSensed ?? '—',
+      totalAmount: r.total_amount ?? r.totalAmount ?? (r.payload && (r.payload.total_amount ?? r.payload.totalAmount)) ?? null,
+    }))
+})
+
+const liveFeedForSelectedDayTotals = computed(() => {
+  const rows = liveFeedForSelectedDayRows.value
+  const totalQty = rows.reduce((sum, r) => sum + (Number.isFinite(Number(r.quantity)) ? Number(r.quantity) : 0), 0)
+  const irYes = rows.reduce((sum, r) => sum + (r.irBeamSensed === true ? 1 : 0), 0)
+  const totalAmount = rows.reduce((sum, r) => sum + (Number.isFinite(Number(r.totalAmount)) ? Number(r.totalAmount) : 0), 0)
+  return { count: rows.length, totalQty, irYes, totalAmount: totalAmount.toFixed(2) }
+})
+
 const selectedDayTotal = computed(() =>
   salesForSelectedDay.value.reduce((sum, t) => sum + Number(t.total_amount ?? 0), 0)
 )
@@ -681,12 +1074,16 @@ const manilaTimeOnlyFmt = new Intl.DateTimeFormat('en-PH', {
 })
 
 const salesForSelectedDayRows = computed(() => {
-  return salesForSelectedDay.value.map((t, i) => {
+  return salesForSelectedDay.value
+    .slice()
+    .sort((a, b) => new Date(a.created_at || a.timestamp || 0) - new Date(b.created_at || b.timestamp || 0))
+    .map((t, i) => {
     const ts = t.created_at || t.timestamp
     return {
       key: `${t.id ?? i}-${ts}`,
       item: t.product_name || t.product_id || 'Unknown',
       timePh: ts ? manilaTimeOnlyFmt.format(new Date(ts)) : '—',
+      qty: Number(t.quantity ?? 1),
       amount: Number(t.total_amount ?? 0).toFixed(2),
     }
   })
@@ -696,10 +1093,33 @@ const subscriberEmailRows = computed(() => {
   return machine.subscriberEmails.value.map((r) => ({
     id: r.id,
     email: r.email,
-    passwordHint: r.password != null && String(r.password).length ? String(r.password) : '—',
+    passwordRaw: r.password != null && String(r.password).length ? String(r.password) : '',
     createdPh: r.created_at ? `${manilaDayFmt.format(new Date(r.created_at))} ${manilaTimeOnlyFmt.format(new Date(r.created_at))}` : '—',
   }))
 })
+
+const passHashToast = ref('')
+let passHashToastTimer = null
+
+function _bytesToHex(bytes) {
+  return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+async function copyPasswordHash(raw) {
+  if (!raw) return
+  try {
+    const enc = new TextEncoder().encode(String(raw))
+    const digest = await crypto.subtle.digest('SHA-256', enc)
+    const hex = _bytesToHex(new Uint8Array(digest))
+    await navigator.clipboard.writeText(hex)
+    passHashToast.value = `Copied SHA-256: ${hex.slice(0, 10)}…`
+  } catch (e) {
+    passHashToast.value = 'Could not copy hash (clipboard blocked).'
+  } finally {
+    if (passHashToastTimer) clearTimeout(passHashToastTimer)
+    passHashToastTimer = setTimeout(() => { passHashToast.value = '' }, 1800)
+  }
+}
 
 const activeSection = ref('overview')
 const sidebarOpen = ref(false)
@@ -749,6 +1169,72 @@ const overviewStats = computed(() => ([
 const lowStockItems = computed(() => machine.lowStockItems.value)
 const recentTransactions = computed(() => machine.recentTransactions.value)
 
+function lowStockThresholdByName(rawName) {
+  const name = String(rawName ?? '').trim().toLowerCase()
+  if (name === 'alcohol') return 1
+  if (name === 'wipes' || name === 'wet wipes' || name === 'wetwipes') return 1
+  if (name === 'tissue' || name === 'tissues') return 1
+  if (name === 'all night pads' || name === 'all-night pads') return 2
+  if (name === 'deo' || name === 'deodorant') return 3
+  if (name === 'soap') return 3
+  if (name === 'mouth wash' || name === 'mouthwash') return 3
+  if (name === 'panty liner' || name === 'panty liners' || name === 'pantyliners' || name === 'panti liner') return 3
+  if (name === 'regular with wings' || name === 'regular w/ wings pads' || name === 'regular with wings pads') return 3
+  if (name === 'non wing pad' || name === 'non-wing pads' || name === 'non wing pads' || name === 'non-wing pad') return 3
+  return 3
+}
+
+const stockStatusRows = computed(() => {
+  const products = Array.isArray(machine.products.value) ? machine.products.value : []
+
+  return products
+    .slice()
+    .sort((a, b) => Number(a.slot_number ?? a.slot ?? 0) - Number(b.slot_number ?? b.slot ?? 0))
+    .map((p, idx) => {
+      const slot = p.slot_number ?? p.slot ?? idx + 1
+      const stock = Number(p.current_stock ?? p.stock ?? p.quantity ?? 0)
+      const capacity = Math.max(1, Number(p.capacity ?? p.max_stock ?? 0) || 1)
+      const priceNum = Number(p.price ?? p.unit_price ?? 0)
+      const ratioPct = Math.round((stock / capacity) * 100)
+
+      const status =
+        stock <= 0 ? 'Empty'
+        : stock >= capacity ? 'Full'
+        : 'Low'
+
+      const statusClass =
+        status === 'Full'
+          ? 'bg-emerald-400/15 text-emerald-300 border-emerald-400/25'
+          : status === 'Low'
+            ? 'bg-amber-400/15 text-amber-300 border-amber-400/25'
+            : 'bg-red-400/15 text-red-300 border-red-400/25'
+
+      return {
+        key: String(p.id ?? `${slot}-${p.name ?? p.product_name ?? 'product'}`),
+        slot: String(slot),
+        product: p.name ?? p.product_name ?? '—',
+        price: Number.isFinite(priceNum) ? priceNum.toFixed(2) : '0.00',
+        ratio: `${stock}/${capacity} (${Math.min(100, Math.max(0, ratioPct))}%)`,
+        status,
+        statusClass,
+        isLow: stock <= lowStockThresholdByName(p.name ?? p.product_name),
+      }
+    })
+})
+
+const lowStockTableRows = computed(() => {
+  return stockStatusRows.value
+    .filter((r) => r.isLow && r.status !== 'Full')
+    .sort((a, b) => {
+      // empty first, then lowest ratio
+      if (a.status === 'Empty' && b.status !== 'Empty') return -1
+      if (b.status === 'Empty' && a.status !== 'Empty') return 1
+      const ap = Number(String(a.ratio).match(/\((\d+)%\)/)?.[1] ?? 0)
+      const bp = Number(String(b.ratio).match(/\((\d+)%\)/)?.[1] ?? 0)
+      return ap - bp
+    })
+})
+
 const machineSummaryLine = computed(() => {
   const p = machine.products.value.length
   const t = machine.transactions.value.length
@@ -756,7 +1242,26 @@ const machineSummaryLine = computed(() => {
   return `Synced from Supabase: ${p} product row(s) · ${t} transaction row(s) loaded · ${f} live_feed event(s). Charts update automatically.`
 })
 
-const liveFeedRows = computed(() => {
+const liveFeedRange = ref('day') // day | week | month (overview preview only)
+const liveFeedRangeOptions = [
+  { id: 'day', label: 'Day' },
+  { id: 'week', label: '1 Week' },
+  { id: 'month', label: 'Month' },
+]
+
+function liveFeedInRange(iso, range) {
+  if (!iso) return false
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return false
+  const now = new Date()
+  const deltaMs = now.getTime() - d.getTime()
+  const dayMs = 24 * 60 * 60 * 1000
+  if (range === 'day') return deltaMs <= dayMs
+  if (range === 'week') return deltaMs <= 7 * dayMs
+  return deltaMs <= 31 * dayMs
+}
+
+const liveFeedRowsAll = computed(() => {
   const tf = new Intl.DateTimeFormat('en-PH', {
     timeZone: 'Asia/Manila',
     dateStyle: 'short',
@@ -767,17 +1272,94 @@ const liveFeedRows = computed(() => {
     time: r.created_at ? tf.format(new Date(r.created_at)) : '—',
     type: r.event_type || 'info',
     message: r.message || '—',
+    quantity: r.quantity ?? r.qty ?? r.dispensed_qty ?? r.dispensedQuantity ?? null,
+    irBeamSensed: r.ir_beam_sensed ?? r.irBeamSensed ?? r.beam_sensed ?? r.beamSensed ?? null,
+    totalAmount: r.total_amount ?? r.totalAmount ?? (r.payload && (r.payload.total_amount ?? r.payload.totalAmount)) ?? null,
+    _createdAt: r.created_at ?? null,
   }))
 })
 
+const liveFeedRows = computed(() => {
+  const range = liveFeedRange.value
+  return liveFeedRowsAll.value.filter((r) => liveFeedInRange(r._createdAt, range))
+})
+
 const liveFeedPreview = computed(() => liveFeedRows.value.slice(0, 10))
+
+const liveFeedRowsForSelectedDay = computed(() => {
+  const key = feedSelectedYmd.value
+  if (!key) return []
+  return liveFeedRowsAll.value.filter((r) => r._createdAt && toManilaYmd(r._createdAt) === key)
+})
+
+const liveFeedPreviewTotals = computed(() => {
+  const rows = liveFeedPreview.value
+  const totalQty = rows.reduce((sum, r) => sum + (Number.isFinite(Number(r.quantity)) ? Number(r.quantity) : 0), 0)
+  const irYes = rows.reduce((sum, r) => sum + (r.irBeamSensed === true ? 1 : 0), 0)
+  const totalAmount = rows.reduce((sum, r) => sum + (Number.isFinite(Number(r.totalAmount)) ? Number(r.totalAmount) : 0), 0)
+  return { count: rows.length, totalQty, irYes, totalAmount: totalAmount.toFixed(2) }
+})
+
+const liveFeedTotals = computed(() => {
+  const rows = liveFeedRows.value
+  const totalQty = rows.reduce((sum, r) => sum + (Number.isFinite(Number(r.quantity)) ? Number(r.quantity) : 0), 0)
+  const irYes = rows.reduce((sum, r) => sum + (r.irBeamSensed === true ? 1 : 0), 0)
+  const totalAmount = rows.reduce((sum, r) => sum + (Number.isFinite(Number(r.totalAmount)) ? Number(r.totalAmount) : 0), 0)
+  return { count: rows.length, totalQty, irYes, totalAmount: totalAmount.toFixed(2) }
+})
+
+const liveFeedSelectedTotals = computed(() => {
+  const rows = liveFeedRowsForSelectedDay.value
+  const totalQty = rows.reduce((sum, r) => sum + (Number.isFinite(Number(r.quantity)) ? Number(r.quantity) : 0), 0)
+  const irYes = rows.reduce((sum, r) => sum + (r.irBeamSensed === true ? 1 : 0), 0)
+  const totalAmount = rows.reduce((sum, r) => sum + (Number.isFinite(Number(r.totalAmount)) ? Number(r.totalAmount) : 0), 0)
+  return { count: rows.length, totalQty, irYes, totalAmount: totalAmount.toFixed(2) }
+})
 
 // === CHARTS ===
 const salesTrendChart = ref(null)
 const monthlySalesChart = ref(null)
 const topProductsChart = ref(null)
+const predictionRestockChart = ref(null)
+const predictionSplitChart = ref(null)
+const predictionPeakHoursChart = ref(null)
+const predictionWeekdaysChart = ref(null)
 
 let chartInstances = {}
+
+// Chart ranges
+const salesTrendRange = ref('15d') // 15d | 7d | 6m | 1y
+const monthlyRange = ref('6m') // 1m | 3m | 6m
+
+const salesRangeOptions = [
+  { id: '15d', label: '15 Days' },
+  { id: '7d', label: '7 Days' },
+  { id: '6m', label: '1–6 Mo' },
+  { id: '1y', label: '1 Year' },
+]
+
+const monthlyRangeOptions = [
+  { id: '1m', label: '1 Month' },
+  { id: '3m', label: '3 Months' },
+  { id: '6m', label: '6 Months' },
+]
+
+function glow3dPlugin() {
+  // Soft shadow behind datasets to fake a subtle "3D" depth.
+  return {
+    id: 'glow3d',
+    beforeDatasetDraw(chart) {
+      const ctx = chart.ctx
+      ctx.save()
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.45)'
+      ctx.shadowBlur = 12
+      ctx.shadowOffsetY = 6
+    },
+    afterDatasetDraw(chart) {
+      chart.ctx.restore()
+    },
+  }
+}
 
 function getChartColors() {
   return {
@@ -789,13 +1371,13 @@ function getChartColors() {
   }
 }
 
-function buildSalesTrendFromTx(transactions) {
+function buildDailyTrend(transactions, days) {
   const fmtMd = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Manila', month: 'numeric', day: 'numeric' })
   const labels = []
   const keys = []
-  for (let i = 14; i >= 0; i--) {
+  for (let i = days - 1; i >= 0; i--) {
     const d = new Date()
-    d.setDate(d.getDate() - (14 - i))
+    d.setDate(d.getDate() - (days - 1 - i))
     keys.push(manilaDayFmt.format(d))
     labels.push(fmtMd.format(d))
   }
@@ -808,26 +1390,33 @@ function buildSalesTrendFromTx(transactions) {
   return { labels, data: keys.map((k) => Number(sums[k].toFixed(2))) }
 }
 
-function buildMonthlyFromTx(transactions) {
+function buildMonthlyTrend(transactions, months) {
   const labels = []
   const keys = []
-  for (let i = 5; i >= 0; i--) {
+  for (let i = months - 1; i >= 0; i--) {
     const d = new Date()
-    d.setMonth(d.getMonth() - (5 - i))
+    d.setMonth(d.getMonth() - (months - 1 - i))
     const y = d.getFullYear()
     const m = String(d.getMonth() + 1).padStart(2, '0')
     keys.push(`${y}-${m}`)
     labels.push(d.toLocaleString('en-PH', { month: 'short', year: '2-digit' }))
   }
   const monthFmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit' })
-  const sums = keys.map(() => 0)
+  const sums = Object.fromEntries(keys.map((k) => [k, 0]))
   for (const t of transactions) {
     if (!t.created_at) continue
-    const mk = monthFmt.format(new Date(t.created_at))
-    const idx = keys.indexOf(mk)
-    if (idx >= 0) sums[idx] += Number(t.total_amount ?? 0)
+    const k = monthFmt.format(new Date(t.created_at))
+    if (sums[k] !== undefined) sums[k] += Number(t.total_amount ?? 0)
   }
-  return { labels, data: sums.map((x) => Number(x.toFixed(2))) }
+  return { labels, data: keys.map((k) => Number(sums[k].toFixed(2))) }
+}
+
+function buildSalesByCreated(transactions, mode) {
+  if (mode === '7d') return buildDailyTrend(transactions, 7)
+  if (mode === '15d') return buildDailyTrend(transactions, 15)
+  if (mode === '1y') return buildMonthlyTrend(transactions, 12)
+  // "1–6 Mo"
+  return buildMonthlyTrend(transactions, 6)
 }
 
 function buildTopProductsFromTx(transactions, products) {
@@ -852,20 +1441,25 @@ function buildTopProductsFromTx(transactions, products) {
 
 function updateChartsFromMachine() {
   const colors = getChartColors()
+  const glow3d = glow3dPlugin()
   const chartDefaults = {
     responsive: true,
     maintainAspectRatio: false,
+    layout: {
+      padding: { bottom: 18 },
+    },
     plugins: {
       legend: { display: false },
     },
     scales: {
       x: {
         grid: { color: colors.grid },
-        ticks: { color: colors.text, font: { size: 10 } },
+        ticks: { color: colors.text, font: { size: 10 }, padding: 8 },
       },
       y: {
+        position: 'right',
         grid: { color: colors.grid },
-        ticks: { color: colors.text, font: { size: 10 } },
+        ticks: { color: colors.text, font: { size: 10 }, padding: 6 },
         beginAtZero: true,
       },
     },
@@ -873,12 +1467,19 @@ function updateChartsFromMachine() {
 
   const tx = machine.transactions.value
   const prod = machine.products.value
-  const trend = buildSalesTrendFromTx(tx)
-  const monthly = buildMonthlyFromTx(tx)
+  const trend = buildSalesByCreated(tx, salesTrendRange.value)
+  const monthsCount = monthlyRange.value === '1m' ? 1 : monthlyRange.value === '3m' ? 3 : 6
+  const monthly = buildMonthlyTrend(tx, monthsCount)
   const topP = buildTopProductsFromTx(tx, prod)
+
+  if (!Chart) return
 
   if (salesTrendChart.value) {
     if (chartInstances.salesTrend) chartInstances.salesTrend.destroy()
+    const ctx = salesTrendChart.value.getContext('2d')
+    const gradient = ctx.createLinearGradient(0, 0, 0, salesTrendChart.value.height || 240)
+    gradient.addColorStop(0, 'rgba(16, 185, 129, 0.45)')
+    gradient.addColorStop(1, 'rgba(16, 185, 129, 0.03)')
     chartInstances.salesTrend = new Chart(salesTrendChart.value, {
       type: 'line',
       data: {
@@ -886,7 +1487,7 @@ function updateChartsFromMachine() {
         datasets: [{
           data: trend.data,
           borderColor: colors.line,
-          backgroundColor: 'rgba(16, 185, 129, 0.1)',
+          backgroundColor: gradient,
           fill: true,
           tension: 0.4,
           pointRadius: 4,
@@ -894,43 +1495,99 @@ function updateChartsFromMachine() {
           borderWidth: 2,
         }],
       },
-      options: chartDefaults,
+      options: {
+        ...chartDefaults,
+        plugins: {
+          ...chartDefaults.plugins,
+          tooltip: {
+            enabled: true,
+            callbacks: {
+              label: (ctx) => `₱${Number(ctx.parsed.y ?? 0).toFixed(2)}`,
+            },
+          },
+        },
+      },
+      plugins: [glow3d],
     })
   }
 
   if (monthlySalesChart.value) {
     if (chartInstances.monthly) chartInstances.monthly.destroy()
+    const ctx = monthlySalesChart.value.getContext('2d')
+    const barGrad = ctx.createLinearGradient(0, 0, 0, monthlySalesChart.value.height || 240)
+    barGrad.addColorStop(0, 'rgba(66, 165, 245, 0.95)')
+    barGrad.addColorStop(1, 'rgba(66, 165, 245, 0.25)')
     chartInstances.monthly = new Chart(monthlySalesChart.value, {
       type: 'bar',
       data: {
         labels: monthly.labels,
         datasets: [{
           data: monthly.data,
-          backgroundColor: colors.bar1,
-          borderRadius: 6,
+          backgroundColor: barGrad,
+          borderRadius: 10,
           borderSkipped: false,
-          maxBarThickness: 40,
+          maxBarThickness: 48,
         }],
       },
-      options: chartDefaults,
+      options: {
+        ...chartDefaults,
+        plugins: {
+          ...chartDefaults.plugins,
+          tooltip: {
+            callbacks: {
+              label: (ctx) => `₱${Number(ctx.parsed.y ?? 0).toFixed(2)}`,
+            },
+          },
+        },
+      },
+      plugins: [glow3d],
     })
   }
 
   if (topProductsChart.value) {
     if (chartInstances.topProducts) chartInstances.topProducts.destroy()
+    const ctx = topProductsChart.value.getContext('2d')
+    const topGrad = ctx.createLinearGradient(0, 0, topProductsChart.value.width || 360, 0)
+    topGrad.addColorStop(0, 'rgba(126, 87, 194, 0.25)')
+    topGrad.addColorStop(1, 'rgba(126, 87, 194, 0.95)')
     chartInstances.topProducts = new Chart(topProductsChart.value, {
       type: 'bar',
       data: {
         labels: topP.labels.length ? topP.labels : ['No sales yet'],
         datasets: [{
           data: topP.data.length ? topP.data : [0],
-          backgroundColor: colors.bar2,
-          borderRadius: 6,
+          backgroundColor: topGrad,
+          borderRadius: 10,
           borderSkipped: false,
-          maxBarThickness: 40,
+          maxBarThickness: 28,
         }],
       },
-      options: chartDefaults,
+      options: {
+        ...chartDefaults,
+        indexAxis: 'y',
+        scales: {
+          x: {
+            position: 'right',
+            grid: { color: colors.grid },
+            ticks: { color: colors.text, font: { size: 10 } },
+            beginAtZero: true,
+          },
+          y: {
+            position: 'left',
+            grid: { display: false },
+            ticks: { color: colors.text, font: { size: 10 } },
+          },
+        },
+        plugins: {
+          ...chartDefaults.plugins,
+          tooltip: {
+            callbacks: {
+              label: (ctx) => `${Number(ctx.parsed.x ?? 0)} sold`,
+            },
+          },
+        },
+      },
+      plugins: [glow3d],
     })
   }
 }
@@ -979,7 +1636,13 @@ watch(activeSection, async (val) => {
 })
 
 watch(
-  () => [machine.loading.value, machine.transactions.value.length, machine.products.value.length],
+  () => [
+    machine.loading.value,
+    machine.transactions.value.length,
+    machine.products.value.length,
+    salesTrendRange.value,
+    monthlyRange.value,
+  ],
   async () => {
     await nextTick()
     if (activeSection.value === 'overview') debouncedUpdateCharts()
@@ -990,11 +1653,11 @@ onMounted(async () => {
   refreshPhClock()
   phTimer = setInterval(refreshPhClock, 1000)
   const today = manilaDayFmt.format(new Date())
-  selectedYmd.value = today
   const [y, m] = today.split('-').map(Number)
   calYear.value = y
   calMonth.value = m
   await nextTick()
+  await ensureChartsLoaded()
   debouncedUpdateCharts()
 })
 
@@ -1007,61 +1670,216 @@ const predictionRan = ref(false)
 const predictionLoading = ref(false)
 const predictionResults = ref([])
 const predictionInsights = ref(null)
+const predictionModelLabel = ref('')
 
-function runPrediction() {
+function buildPredictionCharts() {
+  const colors = getChartColors()
+  const glow3d = glow3dPlugin()
+
+  if (!Chart) return
+
+  if (predictionRestockChart.value) {
+    if (chartInstances.predRestock) chartInstances.predRestock.destroy()
+    const rows = predictionResults.value
+      .slice()
+      .sort((a, b) => Number(b.recommended_restock_qty ?? 0) - Number(a.recommended_restock_qty ?? 0))
+      .slice(0, 8)
+    const ctx = predictionRestockChart.value.getContext('2d')
+    const grad = ctx.createLinearGradient(0, 0, predictionRestockChart.value.width || 360, 0)
+    grad.addColorStop(0, 'rgba(245, 158, 11, 0.18)')
+    grad.addColorStop(1, 'rgba(245, 158, 11, 0.95)')
+    chartInstances.predRestock = new Chart(predictionRestockChart.value, {
+      type: 'bar',
+      data: {
+        labels: rows.map((r) => r.product_name),
+        datasets: [{
+          data: rows.map((r) => Number(r.recommended_restock_qty ?? 0)),
+          backgroundColor: grad,
+          borderRadius: 10,
+          borderSkipped: false,
+          maxBarThickness: 26,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        indexAxis: 'y',
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: (c) => `Restock: ${Number(c.parsed.x ?? 0)}` } },
+        },
+        scales: {
+          x: { position: 'right', grid: { color: colors.grid }, ticks: { color: colors.text, font: { size: 10 } }, beginAtZero: true },
+          y: { grid: { display: false }, ticks: { color: colors.text, font: { size: 10 } } },
+        },
+      },
+      plugins: [glow3d],
+    })
+  }
+
+  if (predictionSplitChart.value) {
+    if (chartInstances.predSplit) chartInstances.predSplit.destroy()
+    const yes = predictionResults.value.filter((r) => Number(r.recommended_restock_qty ?? 0) > 0).length
+    const no = Math.max(0, predictionResults.value.length - yes)
+    chartInstances.predSplit = new Chart(predictionSplitChart.value, {
+      type: 'doughnut',
+      data: {
+        labels: ['Restock needed', 'No restock'],
+        datasets: [{
+          data: [yes, no],
+          backgroundColor: ['rgba(245, 158, 11, 0.85)', 'rgba(16, 185, 129, 0.55)'],
+          borderColor: ['rgba(245, 158, 11, 0.2)', 'rgba(16, 185, 129, 0.2)'],
+          borderWidth: 2,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '62%',
+        plugins: {
+          legend: { position: 'bottom', labels: { color: colors.text, boxWidth: 10, padding: 14 } },
+          tooltip: { callbacks: { label: (c) => `${c.label}: ${c.parsed}` } },
+        },
+      },
+      plugins: [glow3d],
+    })
+  }
+
+  if (predictionInsights.value?.peakHours?.length && predictionPeakHoursChart.value) {
+    if (chartInstances.predPeakHours) chartInstances.predPeakHours.destroy()
+    const rows = predictionInsights.value.peakHours.slice().sort((a, b) => Number(a.hour) - Number(b.hour)).slice(0, 12)
+    const ctx = predictionPeakHoursChart.value.getContext('2d')
+    const grad = ctx.createLinearGradient(0, 0, 0, predictionPeakHoursChart.value.height || 220)
+    grad.addColorStop(0, 'rgba(56, 189, 248, 0.9)')
+    grad.addColorStop(1, 'rgba(56, 189, 248, 0.18)')
+    chartInstances.predPeakHours = new Chart(predictionPeakHoursChart.value, {
+      type: 'bar',
+      data: {
+        labels: rows.map((r) => `${String(r.hour).padStart(2, '0')}:00`),
+        datasets: [{
+          data: rows.map((r) => Number(r.qty ?? 0)),
+          backgroundColor: grad,
+          borderRadius: 10,
+          borderSkipped: false,
+          maxBarThickness: 28,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: (c) => `${Number(c.parsed.y ?? 0)} items` } },
+        },
+        scales: {
+          x: { grid: { color: colors.grid }, ticks: { color: colors.text, font: { size: 10 } } },
+          y: { position: 'right', grid: { color: colors.grid }, ticks: { color: colors.text, font: { size: 10 } }, beginAtZero: true },
+        },
+      },
+      plugins: [glow3d],
+    })
+  }
+
+  if (predictionInsights.value?.weekdays?.length && predictionWeekdaysChart.value) {
+    if (chartInstances.predWeekdays) chartInstances.predWeekdays.destroy()
+    const rows = predictionInsights.value.weekdays.slice()
+    chartInstances.predWeekdays = new Chart(predictionWeekdaysChart.value, {
+      type: 'pie',
+      data: {
+        labels: rows.map((r) => r.day),
+        datasets: [{
+          data: rows.map((r) => Number(r.qty ?? 0)),
+          backgroundColor: [
+            'rgba(99, 102, 241, 0.85)',
+            'rgba(16, 185, 129, 0.75)',
+            'rgba(245, 158, 11, 0.78)',
+            'rgba(236, 72, 153, 0.72)',
+            'rgba(56, 189, 248, 0.72)',
+            'rgba(168, 85, 247, 0.7)',
+            'rgba(244, 63, 94, 0.68)',
+          ],
+          borderColor: 'rgba(15, 23, 42, 0.7)',
+          borderWidth: 2,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom', labels: { color: colors.text, boxWidth: 10, padding: 14 } },
+          tooltip: { callbacks: { label: (c) => `${c.label}: ${c.parsed} items` } },
+        },
+      },
+      plugins: [glow3d],
+    })
+  }
+}
+
+async function runPrediction() {
   if (predictionRan.value) return
   predictionLoading.value = true
 
-  // Simulate analysis delay, then load data from predictionAnalysis outputs
-  setTimeout(() => {
-    // Prediction results based on the machine's forecast data
-    predictionResults.value = [
-      { product_name: 'Panty Liners', predicted_sales_tomorrow: 4.2, current_stock: 1, capacity: 10, recommended_restock_qty: 9 },
-      { product_name: 'All Night Pads', predicted_sales_tomorrow: 3.8, current_stock: 1, capacity: 10, recommended_restock_qty: 9 },
-      { product_name: 'Regular W/ Wings Pads', predicted_sales_tomorrow: 2.5, current_stock: 3, capacity: 10, recommended_restock_qty: 5 },
-      { product_name: 'Non-Wing Pads', predicted_sales_tomorrow: 1.8, current_stock: 10, capacity: 10, recommended_restock_qty: 0 },
-      { product_name: 'Mouthwash', predicted_sales_tomorrow: 1.5, current_stock: 0, capacity: 10, recommended_restock_qty: 5 },
-      { product_name: 'Soap', predicted_sales_tomorrow: 1.3, current_stock: 0, capacity: 10, recommended_restock_qty: 4 },
-      { product_name: 'Wet Wipes', predicted_sales_tomorrow: 1.0, current_stock: 10, capacity: 10, recommended_restock_qty: 0 },
-      { product_name: 'Deodorant', predicted_sales_tomorrow: 0.8, current_stock: 1, capacity: 10, recommended_restock_qty: 2 },
-      { product_name: 'Alcohol', predicted_sales_tomorrow: 0.5, current_stock: 10, capacity: 10, recommended_restock_qty: 0 },
-    ]
-
-    // Insights parsed from insights.txt
-    predictionInsights.value = {
-      topProducts: [
-        { name: 'Panty Liners', qty: 24 },
-        { name: 'All Night Pads', qty: 15 },
-        { name: 'Regular W/ Wings Pads', qty: 12 },
-        { name: 'Non-Wing Pads', qty: 5 },
-        { name: 'Mouthwash', qty: 5 },
-        { name: 'Soap', qty: 5 },
-        { name: 'Wet Wipes', qty: 4 },
-        { name: 'Deodorant', qty: 4 },
-        { name: 'Alcohol', qty: 2 },
-      ],
-      peakHours: [
-        { hour: '06', qty: 24 },
-        { hour: '08', qty: 18 },
-        { hour: '09', qty: 11 },
-        { hour: '11', qty: 11 },
-        { hour: '10', qty: 6 },
-        { hour: '07', qty: 4 },
-        { hour: '05', qty: 2 },
-      ],
-      weekdays: [
-        { day: 'Friday', qty: 43 },
-        { day: 'Saturday', qty: 12 },
-        { day: 'Tuesday', qty: 8 },
-        { day: 'Monday', qty: 7 },
-        { day: 'Sunday', qty: 4 },
-        { day: 'Thursday', qty: 2 },
-      ],
+  try {
+    // Preferred: deep-learning (MLP) output produced by predictionAnalysis/run_all.py
+    const res = await fetch('/prediction/forecast_next_day_deep.json', { cache: 'no-store' })
+    if (res.ok) {
+      const data = await res.json()
+      if (Array.isArray(data) && data.length) {
+        predictionResults.value = data
+          .map((r) => ({
+            product_name: r.product_name,
+            predicted_sales_tomorrow: Number(r.predicted_sales_tomorrow ?? 0),
+            current_stock: Number(r.current_stock ?? 0),
+            capacity: Number(r.capacity ?? 0),
+            recommended_restock_qty: Number(r.recommended_restock_qty ?? 0),
+          }))
+          .sort((a, b) => b.predicted_sales_tomorrow - a.predicted_sales_tomorrow)
+        predictionModelLabel.value = 'Deep (MLP)'
+      }
     }
+  } catch (_) {
+    // ignore and fallback below
+  }
 
-    predictionLoading.value = false
-    predictionRan.value = true
-  }, 1500)
+  // Load insights (peak hours + busiest days)
+  try {
+    const insRes = await fetch('/prediction/insights.json', { cache: 'no-store' })
+    if (insRes.ok) {
+      const ins = await insRes.json()
+      if (ins && typeof ins === 'object') {
+        predictionInsights.value = {
+          topProducts: Array.isArray(ins.top_products) ? ins.top_products.map((r) => ({ name: r.name, qty: Number(r.qty ?? 0) })) : [],
+          peakHours: Array.isArray(ins.peak_hours) ? ins.peak_hours.map((r) => ({ hour: String(r.hour).padStart(2, '0'), qty: Number(r.qty ?? 0) })) : [],
+          weekdays: Array.isArray(ins.weekdays) ? ins.weekdays.map((r) => ({ day: r.day, qty: Number(r.qty ?? 0) })) : [],
+        }
+      }
+    }
+  } catch (_) {
+    // ignore
+  }
+
+  // Fallback: lightweight realtime estimate from currently loaded transactions (no server required).
+  if (!predictionResults.value.length) {
+    const by = {}
+    for (const t of machine.transactions.value) {
+      const name = String(t.product_name || 'Unknown')
+      by[name] = (by[name] || 0) + Number(t.quantity ?? 1)
+    }
+    const top = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 10)
+    predictionResults.value = top.map(([product_name, qty]) => ({
+      product_name,
+      predicted_sales_tomorrow: Number((qty / 30).toFixed(2)),
+      current_stock: 0,
+      capacity: 0,
+      recommended_restock_qty: 0,
+    }))
+    predictionModelLabel.value = 'Realtime (heuristic fallback)'
+  }
+
+  await nextTick()
+  buildPredictionCharts()
+  predictionLoading.value = false
+  predictionRan.value = true
 }
 </script>
 
@@ -1074,12 +1892,19 @@ function runPrediction() {
 }
 
 html.light .ios-card {
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(148, 163, 184, 0.15);
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  box-shadow: 0 10px 30px rgba(2, 6, 23, 0.08);
 }
 
 .text-fade-enter-active { transition: all 0.3s ease-out; }
 .text-fade-leave-active { transition: all 0.2s ease-in; }
 .text-fade-enter-from { opacity: 0; transform: translateY(8px); }
 .text-fade-leave-to { opacity: 0; transform: translateY(-8px); }
+
+/* Mobile: momentum scrolling for overflow areas */
+.overflow-y-auto {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
 </style>
