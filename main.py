@@ -11,6 +11,8 @@ import tkinter as tk
 from tkinter import messagebox, simpledialog
 import customtkinter as ctk
 
+from touch_scroll import install_ctk_scroll_support
+
 import prediction_runtime
 from customer import checkout_ui, main_menu_ui, status_ui
 from chatbot.chatbot_ui import build_chatbot_screen
@@ -49,6 +51,8 @@ from database import (
     get_low_stock_chart_data,
 )
 from patchNotes import get_patch_notes_text, VERSION
+
+install_ctk_scroll_support(ctk)
 
 try:
     from mfrc522 import SimpleMFRC522, MFRC522  # type: ignore
