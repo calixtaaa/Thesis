@@ -7,14 +7,105 @@ All data is embedded directly — no internet connection required.
 #  Product catalogue (matches the vending machine)
 # ──────────────────────────────────────────────
 PRODUCTS = {
+    # --- Real machine catalog (synonyms map to same intent) ---
+    "alcohol": {
+        "name": "Alcohol (70%)",
+        "benefits": (
+            "70% isopropyl alcohol helps kill most germs on hands and small surfaces when soap and water aren’t available."
+        ),
+        "tip": "Rub until dry (~20 seconds). Cover palms, between fingers, and fingertips.",
+        "extra": {
+            "why_70": (
+                "70% alcohol works better than 40% because the water slows evaporation, giving more contact time to kill germs."
+            ),
+        },
+    },
     "soap": {
         "name": "Antibacterial Soap",
-        "benefits": (
-            "Antibacterial soap helps remove dirt, bacteria, and viruses from your hands. "
-            "It is especially useful after using the restroom, before eating, or after touching shared surfaces."
-        ),
-        "tip": "Lather for at least 20 seconds—about the time it takes to hum 'Happy Birthday' twice.",
+        "benefits": "Soap lifts dirt and germs off skin so they rinse away with water.",
+        "tip": "Lather for at least 20 seconds (palms, back of hands, between fingers, nails).",
     },
+    "deodorant": {
+        "name": "Deodorant",
+        "benefits": "Helps reduce body odor and keeps you feeling fresh through the day.",
+        "tip": "Apply to clean, dry underarms. Reapply after heavy sweating if needed.",
+    },
+    "deo": {
+        "name": "Deodorant",
+        "benefits": "Helps reduce body odor and keeps you feeling fresh through the day.",
+        "tip": "Apply to clean, dry underarms. Reapply after heavy sweating if needed.",
+    },
+    "mouthwash": {
+        "name": "Mouthwash",
+        "benefits": "Freshens breath and helps reduce odor-causing bacteria in the mouth.",
+        "tip": "Swish for 30 seconds, then spit out (do not swallow).",
+    },
+    "mouth wash": {
+        "name": "Mouthwash",
+        "benefits": "Freshens breath and helps reduce odor-causing bacteria in the mouth.",
+        "tip": "Swish for 30 seconds, then spit out (do not swallow).",
+    },
+    "wet wipes": {
+        "name": "Wet Wipes",
+        "benefits": "Quick clean-up on the go when you don’t have soap and water.",
+        "tip": "Great for hands and small spills; wash with soap later when possible.",
+    },
+    "wipes": {
+        "name": "Wet Wipes",
+        "benefits": "Quick clean-up on the go when you don’t have soap and water.",
+        "tip": "Great for hands and small spills; wash with soap later when possible.",
+    },
+    "tissues": {
+        "name": "Tissues",
+        "benefits": "Helps you cover coughs/sneezes and keep hands clean.",
+        "tip": "Throw used tissues away right away and sanitize hands.",
+    },
+    "tissue": {
+        "name": "Tissues",
+        "benefits": "Helps you cover coughs/sneezes and keep hands clean.",
+        "tip": "Throw used tissues away right away and sanitize hands.",
+    },
+    "panty liner": {
+        "name": "Panty Liners",
+        "benefits": "Light protection for daily freshness, discharge, or very light days.",
+        "tip": "Change regularly to stay comfortable and reduce odor.",
+    },
+    "panty liners": {
+        "name": "Panty Liners",
+        "benefits": "Light protection for daily freshness, discharge, or very light days.",
+        "tip": "Change regularly to stay comfortable and reduce odor.",
+    },
+    "all night pads": {
+        "name": "All Night Pads",
+        "benefits": "Extra coverage designed for overnight use and heavier flow.",
+        "tip": "Change in the morning and whenever it feels damp for comfort.",
+    },
+    "regular w/ wings": {
+        "name": "Regular Pads (With Wings)",
+        "benefits": "Everyday protection with wings for a more secure fit.",
+        "tip": "Wings help prevent shifting—press firmly to keep it in place.",
+    },
+    "regular with wings": {
+        "name": "Regular Pads (With Wings)",
+        "benefits": "Everyday protection with wings for a more secure fit.",
+        "tip": "Wings help prevent shifting—press firmly to keep it in place.",
+    },
+    "regular w wings": {
+        "name": "Regular Pads (With Wings)",
+        "benefits": "Everyday protection with wings for a more secure fit.",
+        "tip": "Wings help prevent shifting—press firmly to keep it in place.",
+    },
+    "non-wing pads": {
+        "name": "Non-wing Pads",
+        "benefits": "Simple everyday protection without wings.",
+        "tip": "If you move a lot, consider wings for extra hold.",
+    },
+    "non wing pad": {
+        "name": "Non-wing Pads",
+        "benefits": "Simple everyday protection without wings.",
+        "tip": "If you move a lot, consider wings for extra hold.",
+    },
+    # Legacy keys below (keep only ones not already defined above)
     "toothpaste": {
         "name": "Fluoride Toothpaste",
         "benefits": (
@@ -38,21 +129,6 @@ PRODUCTS = {
             "preventing the spread of germs. Dispose of used tissues immediately."
         ),
         "tip": "Always carry tissues so you never have to cough into your hands.",
-    },
-    "alcohol": {
-        "name": "Rubbing Alcohol (70%)",
-        "benefits": (
-            "70% isopropyl alcohol is the gold standard for hand sanitizing. "
-            "It kills 99.9% of common bacteria and most viruses including flu and COVID-19."
-        ),
-        "tip": "Apply enough to cover all surfaces of both hands, then rub until dry (~20 seconds).",
-        "extra": {
-            "why_70": (
-                "70% alcohol works better than 40% because the water content slows evaporation, "
-                "giving the alcohol more contact time to destroy germs. "
-                "Pure 99% alcohol evaporates too fast to be effective."
-            ),
-        },
     },
     "face mask": {
         "name": "Disposable Face Mask",

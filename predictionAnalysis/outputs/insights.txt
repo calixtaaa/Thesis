@@ -1,32 +1,37 @@
 Prediction Analysis Insights
 
 Most frequently purchased products (Top 10):
-- Panty Liners: 24
-- All Night Pads: 15
-- Regular W/ Wings Pads: 12
-- Non-Wing Pads: 5
-- Mouthwash: 5
-- Soap: 5
-- Wet Wipes: 4
-- Deodorant: 4
-- Alcohol: 2
+- Soap: 56
+- Alcohol: 44
+- Deodorant: 18
+- Wet Wipes: 11
+- Non-Wing Pads: 11
+- Mouthwash: 10
+- Regular W/ Wings Pads: 9
+- All Night Pads: 9
+- Tissues: 8
+- Panty Liners: 2
 
 Peak purchase hours (Top 10):
-- 06:00 → 24 items
-- 08:00 → 18 items
-- 09:00 → 11 items
-- 11:00 → 11 items
-- 10:00 → 6 items
-- 07:00 → 4 items
-- 05:00 → 2 items
+- 17:00 → 31 items
+- 16:00 → 30 items
+- 14:00 → 27 items
+- 19:00 → 16 items
+- 01:00 → 13 items
+- 15:00 → 12 items
+- 00:00 → 9 items
+- 18:00 → 9 items
+- 22:00 → 9 items
+- 02:00 → 3 items
 
 Purchases by weekday:
-- Fri: 43 items
-- Sat: 12 items
-- Tue: 8 items
-- Mon: 7 items
-- Sun: 4 items
-- Thu: 2 items
+- Fri: 68 items
+- Mon: 36 items
+- Sat: 23 items
+- Tue: 21 items
+- Sun: 20 items
+- Thu: 10 items
 
 Monthly sales quantity trend:
-- 2026-03: 76 items
+- 2026-03: 119 items
+- 2026-04: 59 items

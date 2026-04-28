@@ -124,7 +124,23 @@ export function useRealtimeMachineData() {
   }
 
   const overview = computed(() => {
-    const lowStock = products.value.filter((p) => Number(p.current_stock ?? 0) < 4).length
+    const lowStock = products.value.filter((p) => {
+      const stock = Number(p.current_stock ?? 0)
+      const name = String(p.name ?? '').trim().toLowerCase()
+      const threshold =
+        name === 'alcohol' ? 1
+          : (name === 'wipes' || name === 'wet wipes' || name === 'wetwipes') ? 1
+            : (name === 'tissue' || name === 'tissues') ? 1
+              : (name === 'all night pads' || name === 'all-night pads') ? 2
+                : (name === 'deo' || name === 'deodorant') ? 3
+                  : (name === 'soap') ? 3
+                    : (name === 'mouth wash' || name === 'mouthwash') ? 3
+                      : (name === 'panty liner' || name === 'panty liners' || name === 'pantyliners' || name === 'panti liner') ? 3
+                        : (name === 'regular with wings' || name === 'regular w/ wings pads' || name === 'regular with wings pads') ? 3
+                          : (name === 'non wing pad' || name === 'non-wing pads' || name === 'non wing pads' || name === 'non-wing pad') ? 3
+                            : 3
+      return stock <= threshold
+    }).length
     const totalSales = transactions.value.reduce((sum, t) => sum + Number(t.total_amount ?? 0), 0)
     const orders = transactions.value.length
     const activeCustomers = new Set(
@@ -140,9 +156,23 @@ export function useRealtimeMachineData() {
         name: p.name,
         stock: Number(p.current_stock ?? 0),
         capacity: Number(p.capacity ?? 0),
+        threshold: (() => {
+          const name = String(p.name ?? '').trim().toLowerCase()
+          if (name === 'alcohol') return 1
+          if (name === 'wipes' || name === 'wet wipes' || name === 'wetwipes') return 1
+          if (name === 'tissue' || name === 'tissues') return 1
+          if (name === 'all night pads' || name === 'all-night pads') return 2
+          if (name === 'deo' || name === 'deodorant') return 3
+          if (name === 'soap') return 3
+          if (name === 'mouth wash' || name === 'mouthwash') return 3
+          if (name === 'panty liner' || name === 'panty liners' || name === 'pantyliners' || name === 'panti liner') return 3
+          if (name === 'regular with wings' || name === 'regular w/ wings pads' || name === 'regular with wings pads') return 3
+          if (name === 'non wing pad' || name === 'non-wing pads' || name === 'non wing pads' || name === 'non-wing pad') return 3
+          return 3
+        })(),
       }))
-      .filter((p) => p.stock < 4)
-      .sort((a, b) => a.stock - b.stock)
+      .filter((p) => p.stock <= p.threshold)
+      .sort((a, b) => (a.stock - a.threshold) - (b.stock - b.threshold))
       .slice(0, 10)
   })
 

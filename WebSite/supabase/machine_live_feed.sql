@@ -13,10 +13,23 @@ create table if not exists public.live_feed (
   created_at timestamptz not null default now(),
   event_type text not null default 'info',
   message text not null,
+  quantity integer,
+  ir_beam_sensed boolean,
+  total_amount numeric,
   payload jsonb default '{}'::jsonb
 );
 
 create index if not exists live_feed_created_at_idx on public.live_feed (created_at desc);
+
+-- Backwards-compatible: add new columns if the table already exists
+alter table public.live_feed
+  add column if not exists quantity integer;
+
+alter table public.live_feed
+  add column if not exists ir_beam_sensed boolean;
+
+alter table public.live_feed
+  add column if not exists total_amount numeric;
 
 alter table public.live_feed enable row level security;
 

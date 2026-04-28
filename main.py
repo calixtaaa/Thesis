@@ -686,6 +686,10 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         self.current_product = None
         self.current_quantity = 1
 
+        # Last known user context (for offline personalization: Hygiene Hero advice, etc.)
+        self._last_rfid_user_id = None
+        self._last_rfid_uid = None
+
         # Theme state
         self.current_theme_name = "light"
         self.current_theme = THEMES[self.current_theme_name]
@@ -2324,7 +2328,13 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             if entry["product"]["id"] != product_id:
                 continue
             old_qty = int(entry["quantity"] if entry["quantity"] is not None else 1)
-            max_stock = int(entry["product"]["current_stock"] or old_qty)
+            max_stock = int(entry["product"].get("current_stock") or old_qty)
+            try:
+                cap = int(entry["product"].get("capacity") or 0)
+                if cap > 0:
+                    max_stock = min(max_stock, cap)
+            except Exception:
+                pass
             new_qty = max(1, min(max_stock, old_qty + int(delta)))
             if new_qty == old_qty:
                 return
@@ -2578,6 +2588,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
 
     def _do_dispense_rfid(self, items, rfid_user_id, new_balance):
         try:
+            self._last_rfid_user_id = rfid_user_id
             for it in items:
                 p = it["product"]
                 q = int(it["quantity"])
@@ -2826,6 +2837,8 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                 messagebox.showwarning("No amount", "Please add some amount to reload.")
                 return
             new_balance = user["balance"] + amount
+            self._last_rfid_user_id = user["id"]
+            self._last_rfid_uid = str(user.get("rfid_uid") or uid).strip().upper()
             update_user_balance(user["id"], new_balance)
             record_transaction(product_id=None, quantity=None, total_amount=amount, payment_method="rfid_reload", rfid_user_id=user["id"])
             self.show_success_screen("Reload Successful", f"New balance: ₱{new_balance:.2f}", on_ok=self.build_main_menu)
@@ -2913,6 +2926,8 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             scan_hint.configure(text=f"RFID {uid} accepted. Processing payment...")
             error_lbl.configure(text="")
 
+            self._last_rfid_user_id = user["id"]
+            self._last_rfid_uid = uid
             new_balance = user["balance"] - total_amount
             update_user_balance(user["id"], new_balance)
             items = self._get_checkout_items()

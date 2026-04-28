@@ -7,6 +7,8 @@ import pandas as pd
 
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error
+from sklearn.neural_network import MLPRegressor
+from sklearn.preprocessing import StandardScaler
 
 
 @dataclass
@@ -116,11 +118,60 @@ def fit_random_forest_forecaster(product_df: pd.DataFrame):
     return model, (mae, rmse, len(train), len(test)), next_pred
 
 
+def fit_mlp_forecaster(product_df: pd.DataFrame):
+    """
+    Fit a small neural network (MLPRegressor) on lag features for a single product.
+    Returns (model_bundle, metrics, next_day_prediction_qty or None)
+    """
+    features = ["lag_1", "lag_7", "lag_14", "roll7_mean", "dow", "month", "is_weekend", "price"]
+    usable = product_df.dropna(subset=["daily_qty"]).copy()
+    usable = usable.dropna(subset=["lag_1", "lag_7", "lag_14"]).copy()
+
+    train, test = _time_split(usable)
+    if train is None or test is None or train.empty or test.empty:
+      return None, None, None
+
+    X_train = train[features].astype(float)
+    y_train = train["daily_qty"].astype(float)
+    X_test = test[features].astype(float)
+    y_test = test["daily_qty"].astype(float)
+
+    scaler = StandardScaler()
+    X_train_s = scaler.fit_transform(X_train)
+    X_test_s = scaler.transform(X_test)
+
+    model = MLPRegressor(
+        hidden_layer_sizes=(32, 16),
+        activation="relu",
+        solver="adam",
+        alpha=1e-3,
+        learning_rate_init=1e-3,
+        max_iter=1200,
+        random_state=42,
+        early_stopping=True,
+        n_iter_no_change=20,
+    )
+    model.fit(X_train_s, y_train)
+    preds = model.predict(X_test_s)
+
+    mae = float(mean_absolute_error(y_test, preds))
+    rmse = float(mean_squared_error(y_test, preds, squared=False))
+
+    last_row = usable.sort_values("sale_date").iloc[-1]
+    next_features = last_row[features].astype(float).copy()
+    next_features["dow"] = int((int(next_features["dow"]) + 1) % 7)
+    next_features["is_weekend"] = int(next_features["dow"] >= 5)
+    next_pred = float(model.predict(scaler.transform(pd.DataFrame([next_features])))[0])
+    next_pred = max(0.0, next_pred)
+    return {"model": model, "scaler": scaler}, (mae, rmse, len(train), len(test)), next_pred
+
+
 def forecast_and_restock(
     daily_features: pd.DataFrame,
     *,
     current_stock_by_product: dict[int, int] | None = None,
     safety_days: int = 2,
+    model_type: str = "rf",  # rf | mlp
 ):
     """
     Forecast next-day demand per product and recommend restock.
@@ -134,7 +185,10 @@ def forecast_and_restock(
 
     for pid, g in daily_features.groupby("product_id"):
         product_name = str(g["product_name"].iloc[0]) if "product_name" in g.columns else str(pid)
-        model, m, next_pred = fit_random_forest_forecaster(g)
+        if model_type == "mlp":
+            model, m, next_pred = fit_mlp_forecaster(g)
+        else:
+            model, m, next_pred = fit_random_forest_forecaster(g)
         if m is None or next_pred is None:
             continue
         mae, rmse, train_days, test_days = m

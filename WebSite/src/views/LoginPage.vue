@@ -36,6 +36,7 @@
               inputmode="email"
               required
               autocomplete="email"
+              :disabled="isLocked"
               class="w-full px-4 py-3 rounded-xl bg-surface-800/50 border border-surface-700/50 text-surface-100 placeholder-surface-500 focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 transition-all duration-300 text-sm"
               placeholder="name@tup.edu.ph"
             />
@@ -51,6 +52,7 @@
                 :type="showPassword ? 'text' : 'password'"
                 required
                 autocomplete="current-password"
+                :disabled="isLocked"
                 class="w-full px-4 py-3 rounded-xl bg-surface-800/50 border border-surface-700/50 text-surface-100 placeholder-surface-500 focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 transition-all duration-300 text-sm pr-12"
                 placeholder="Enter password"
               />
@@ -79,9 +81,10 @@
 
           <button
             type="submit"
-            class="w-full btn-primary text-center justify-center"
+            :disabled="isLocked"
+            class="w-full btn-primary text-center justify-center disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            Sign In
+            {{ isLocked ? `Try again in ${lockSeconds}s` : 'Sign In' }}
           </button>
 
           <button
@@ -171,7 +174,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
 import logoImg from '../assets/LogoThesis.png'
@@ -184,14 +187,50 @@ const username = ref('')
 const password = ref('')
 const showPassword = ref(false)
 const error = ref('')
+const lockUntilMs = ref(0)
+const nowMs = ref(Date.now())
+let lockTimer = null
+
+const remainingMs = computed(() => Math.max(0, lockUntilMs.value - nowMs.value))
+const isLocked = computed(() => remainingMs.value > 0)
+const lockSeconds = computed(() => Math.ceil(remainingMs.value / 1000))
+
+function startLockCountdown(untilMs) {
+  lockUntilMs.value = Number(untilMs ?? 0) || 0
+  if (lockTimer) clearInterval(lockTimer)
+  if (!lockUntilMs.value) return
+  lockTimer = setInterval(() => {
+    nowMs.value = Date.now()
+    if (Date.now() >= lockUntilMs.value) {
+      clearInterval(lockTimer)
+      lockTimer = null
+      lockUntilMs.value = 0
+    }
+  }, 250)
+}
+
+function readLockFromStorage() {
+  try {
+    const raw = localStorage.getItem('syntax-error-login-throttle-v1')
+    if (!raw) return 0
+    const parsed = JSON.parse(raw)
+    return Number(parsed?.lockUntil ?? 0) || 0
+  } catch {
+    return 0
+  }
+}
 
 async function handleLogin() {
   error.value = ''
+  if (isLocked.value) return
   const result = await login(username.value, password.value)
   if (result.success) {
     router.push('/dashboard')
   } else {
     error.value = result.message
+    if (result.code === 'LOCKED' && result.lockUntil) {
+      startLockCountdown(result.lockUntil)
+    }
   }
 }
 
@@ -223,6 +262,15 @@ function handleCreateUser() {
         : result.message
   }
 }
+
+onMounted(() => {
+  const until = readLockFromStorage()
+  if (until && Date.now() < until) startLockCountdown(until)
+})
+
+onBeforeUnmount(() => {
+  if (lockTimer) clearInterval(lockTimer)
+})
 </script>
 
 <style scoped>
