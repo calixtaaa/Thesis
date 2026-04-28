@@ -684,6 +684,8 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         self.current_theme_name = "light"
         self.current_theme = THEMES[self.current_theme_name]
         self.configure(bg=self.current_theme["bg"])
+        # UI scaling hints (used by customer/admin screens). Default 1.0 for desktop dev.
+        self._lcd_scale = 1.0
         self._ui_font_name = UI_FONT
         self._ui_font_bold = UI_FONT_BOLD
         self._ui_font_title = UI_FONT_TITLE
@@ -862,6 +864,36 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                 x = max(0, (screen_w - target_w) // 2)
                 y = max(0, (screen_h - target_h) // 2)
                 self.geometry(f"{target_w}x{target_h}+{x}+{y}")
+        except Exception:
+            pass
+
+        # Font + widget scaling for small 7-inch LCDs (800x480/1024x600): bump sizes for readability.
+        try:
+            screen_w = self.winfo_screenwidth()
+            screen_h = self.winfo_screenheight()
+            is_small_lcd = screen_w <= 1024 or screen_h <= 600
+            scale = 1.25 if is_small_lcd else 1.0
+            self._lcd_scale = scale
+
+            # CustomTkinter global scaling (keeps paddings/controls readable).
+            try:
+                ctk.set_widget_scaling(scale)
+            except Exception:
+                pass
+
+            if scale > 1.0:
+                # Keep font family, bump point sizes.
+                self._ui_font_bold = (UI_FONT, 26, "bold")
+                self._ui_font_title = (UI_FONT, 24, "bold")
+                self._ui_font_body = (UI_FONT, 16)
+                self._ui_font_small = (UI_FONT, 13)
+                self._ui_font_button = (UI_FONT, 16, "bold")
+            else:
+                self._ui_font_bold = UI_FONT_BOLD
+                self._ui_font_title = UI_FONT_TITLE
+                self._ui_font_body = UI_FONT_BODY
+                self._ui_font_small = UI_FONT_SMALL
+                self._ui_font_button = UI_FONT_BUTTON
         except Exception:
             pass
 
