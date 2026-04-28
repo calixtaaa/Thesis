@@ -15,6 +15,8 @@ create table if not exists public.emails (
 
 -- Copy of dashboard login password for @tup.edu.ph accounts (thesis lookup). Not for production.
 alter table public.emails add column if not exists password text;
+-- Role for dashboard access (admin/staff). Stored here so logins work across browsers/devices (thesis).
+alter table public.emails add column if not exists role text default 'staff';
 
 create index if not exists emails_created_at_idx on public.emails (created_at desc);
 

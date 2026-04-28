@@ -92,12 +92,13 @@ const _syncEmailRowToSupabaseDebounced = debounce(async (payload, hasPwd, emailT
   }
 }, 400)
 
-function syncEmailRowToSupabase(emailRaw, password) {
+function syncEmailRowToSupabase(emailRaw, password, role) {
   if (!isTupSchoolEmail(emailRaw)) return
   const emailTrim = emailRaw.trim().toLowerCase()
   const hasPwd = password != null && String(password).length > 0
   const payload = { email: emailTrim }
   if (hasPwd) payload.password = String(password)
+  if (role === 'admin' || role === 'staff') payload.role = role
 
   void _syncEmailRowToSupabaseDebounced(payload, hasPwd, emailTrim)
 }
@@ -106,7 +107,7 @@ export function useAuth() {
   const isLoggedIn = computed(() => !!currentUser.value)
   const isAdmin = computed(() => currentUser.value?.role === 'admin')
 
-  function login(username, password) {
+  async function login(username, password) {
     const key = String(username || '').trim().toLowerCase()
     if (!isTupSchoolEmail(key)) {
       return { success: false, message: 'Use your TUP email (@tup.edu.ph).' }
@@ -117,10 +118,41 @@ export function useAuth() {
     if (user) {
       currentUser.value = { username: user.username, role: user.role }
       localStorage.setItem(AUTH_KEY, JSON.stringify(currentUser.value))
-      syncEmailRowToSupabase(user.username, password)
+      syncEmailRowToSupabase(user.username, password, user.role)
       return { success: true }
     }
-    return { success: false, message: 'Invalid email or password' }
+
+    // Incognito / new browser: no localStorage users yet. Fall back to Supabase `emails` table.
+    try {
+      const { data, error } = await supabase
+        .from('emails')
+        .select('email, password, role')
+        .eq('email', key)
+        .limit(1)
+      if (error) {
+        if (import.meta.env.DEV) console.warn('[auth supabase login]', error.message)
+        return { success: false, message: 'Login service unavailable. Try again.' }
+      }
+      const row = Array.isArray(data) ? data[0] : null
+      const storedPwd = row?.password != null ? String(row.password) : ''
+      if (!row || !storedPwd || storedPwd !== String(password ?? '')) {
+        return { success: false, message: 'Invalid email or password' }
+      }
+
+      const role = row.role === 'admin' ? 'admin' : 'staff'
+      currentUser.value = { username: key, role }
+      localStorage.setItem(AUTH_KEY, JSON.stringify(currentUser.value))
+
+      // Cache into this browser for faster next logins and for Manage Users list.
+      if (!users.value.find((u) => u.username.toLowerCase() === key)) {
+        users.value.push({ username: key, password: String(password ?? ''), role })
+        saveUsers(users.value)
+      }
+      return { success: true }
+    } catch (e) {
+      if (import.meta.env.DEV) console.warn('[auth supabase login]', e)
+      return { success: false, message: 'Login service unavailable. Try again.' }
+    }
   }
 
   function logout() {
@@ -144,7 +176,7 @@ export function useAuth() {
     }
     users.value.push({ username: normalized, password, role })
     saveUsers(users.value)
-    syncEmailRowToSupabase(normalized, password)
+    syncEmailRowToSupabase(normalized, password, role)
     return { success: true }
   }
 

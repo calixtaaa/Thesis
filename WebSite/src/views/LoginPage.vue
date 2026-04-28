@@ -185,9 +185,9 @@ const password = ref('')
 const showPassword = ref(false)
 const error = ref('')
 
-function handleLogin() {
+async function handleLogin() {
   error.value = ''
-  const result = login(username.value, password.value)
+  const result = await login(username.value, password.value)
   if (result.success) {
     router.push('/dashboard')
   } else {
