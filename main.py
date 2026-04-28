@@ -2323,7 +2323,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             self._build_order_panel(self._main_row)
 
     def _change_cart_quantity(self, product_id: int, delta: int):
-        """Update a single cart item's quantity and its on-screen label in place."""
+        """Update a single cart item's quantity, removing it when it reaches zero."""
         for entry in self.cart:
             if entry["product"]["id"] != product_id:
                 continue
@@ -2339,7 +2339,10 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                     max_stock = min(max_stock, cap)
             except Exception:
                 pass
-            new_qty = max(1, min(max_stock, old_qty + int(delta)))
+            new_qty = min(max_stock, old_qty + int(delta))
+            if new_qty <= 0:
+                self._remove_product_from_cart(product)
+                return
             if new_qty == old_qty:
                 return
             entry["quantity"] = new_qty
