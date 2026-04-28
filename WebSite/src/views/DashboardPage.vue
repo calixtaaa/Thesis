@@ -16,8 +16,8 @@
       <div class="p-5 lg:p-6 pb-2">
         <div class="flex items-center justify-between mb-6">
           <div>
-            <h2 class="text-2xl lg:text-3xl font-bold font-display text-surface-100 mb-0.5 tracking-tight">Admin</h2>
-            <p class="text-xs lg:text-sm text-surface-500 font-medium capitalize">{{ currentUser?.username || 'admin' }}</p>
+            <h2 class="text-2xl lg:text-3xl font-bold font-display text-surface-100 light:text-surface-900 mb-0.5 tracking-tight">Admin</h2>
+            <p class="text-xs lg:text-sm text-surface-400 light:text-surface-700 font-medium break-all">{{ currentUser?.username || '—' }}</p>
           </div>
           <!-- Profile Image Upload Node -->
           <div class="relative group cursor-pointer w-12 h-12 shrink-0">
@@ -47,8 +47,16 @@
 
       <div class="flex-1"></div>
 
+      <!-- Philippines clock (sidebar bottom, above logout) -->
+      <div class="px-5 lg:px-6 pb-3">
+        <div class="rounded-2xl border border-surface-800/40 light:border-surface-200/80 bg-surface-900/50 light:bg-surface-100/90 px-3 py-3 text-center shadow-inner">
+          <p class="text-lg font-mono font-bold text-surface-100 light:text-surface-900 tabular-nums tracking-tight">{{ phTime }}</p>
+          <p class="text-[11px] text-surface-400 light:text-surface-600 mt-1">{{ phDate }} · PHT</p>
+        </div>
+      </div>
+
       <!-- Logout -->
-      <div class="p-5 lg:p-6 pt-4 border-t border-surface-800/30 mt-auto">
+      <div class="p-5 lg:p-6 pt-2 border-t border-surface-800/30 mt-auto">
         <button
           @click="handleLogout"
           class="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-[14.5px] font-bold text-red-500 hover:bg-red-500/10 hover:text-red-400 transition-all duration-300"
@@ -103,6 +111,130 @@
           </div>
         </div>
 
+        <p v-if="!machine.loading" class="text-xs text-surface-500 mb-4">{{ machineSummaryLine }}</p>
+
+        <!-- Realtime activity from vending machine -->
+        <div class="ios-card rounded-2xl p-5 sm:p-6 mb-6">
+          <h3 class="text-sm font-bold text-surface-200 light:text-surface-900 mb-1">Machine live feed</h3>
+          <div class="overflow-x-auto max-h-52 overflow-y-auto rounded-xl border border-surface-800/30">
+            <table class="w-full text-sm">
+              <thead class="sticky top-0 bg-surface-950/95 light:bg-surface-100/95 z-10">
+                <tr class="border-b border-surface-800/40">
+                  <th class="text-left text-xs text-surface-400 uppercase pb-2 pr-3 font-semibold">Time (PH)</th>
+                  <th class="text-left text-xs text-surface-400 uppercase pb-2 pr-3 font-semibold">Type</th>
+                  <th class="text-left text-xs text-surface-400 uppercase pb-2 font-semibold">Message</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in liveFeedPreview" :key="row.id" class="border-b border-surface-800/20">
+                  <td class="py-2 pr-3 text-surface-500 text-xs whitespace-nowrap">{{ row.time }}</td>
+                  <td class="py-2 pr-3 text-brand-400 text-xs">{{ row.type }}</td>
+                  <td class="py-2 text-surface-200 text-xs">{{ row.message }}</td>
+                </tr>
+                <tr v-if="liveFeedPreview.length === 0">
+                  <td colspan="3" class="py-10 text-center text-surface-500 text-sm">No feed rows yet — run <code class="text-surface-400">machine_live_feed.sql</code> and insert from the machine.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Calendar (Manila dates) + sales for selected day -->
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
+          <div class="ios-card rounded-2xl p-5 sm:p-6">
+            <div class="flex items-center justify-between gap-3 mb-4">
+              <h3 class="text-sm font-bold text-surface-200">Sales calendar</h3>
+              <div class="flex items-center gap-2">
+                <button type="button" class="p-2 rounded-lg text-surface-400 hover:bg-surface-800/50 hover:text-surface-200 transition-colors" @click="calendarPrevMonth" aria-label="Previous month">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
+                </button>
+                <span class="text-xs font-semibold text-surface-300 min-w-[8.5rem] text-center">{{ calendarTitle }}</span>
+                <button type="button" class="p-2 rounded-lg text-surface-400 hover:bg-surface-800/50 hover:text-surface-200 transition-colors" @click="calendarNextMonth" aria-label="Next month">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                </button>
+              </div>
+            </div>
+            <p class="text-xs text-surface-500 mb-3">Dates use <strong class="text-surface-400">Asia/Manila</strong>. Click a day to list sales.</p>
+            <div class="grid grid-cols-7 gap-1 text-center text-[10px] uppercase tracking-wider text-surface-500 mb-2">
+              <span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span>
+            </div>
+            <div class="grid grid-cols-7 gap-1">
+              <button
+                v-for="(cell, idx) in calendarCells"
+                :key="idx"
+                type="button"
+                :disabled="!cell.ymd"
+                @click="cell.ymd && selectCalendarDay(cell.ymd)"
+                class="aspect-square rounded-xl text-xs font-medium transition-all disabled:opacity-0 disabled:pointer-events-none"
+                :class="cell.ymd === selectedYmd
+                  ? 'bg-brand-600 text-white shadow-lg shadow-brand-900/30'
+                  : cell.isToday
+                    ? 'border border-brand-500/40 text-brand-300 hover:bg-surface-800/40'
+                    : 'text-surface-300 hover:bg-surface-800/40'"
+              >
+                {{ cell.day }}
+              </button>
+            </div>
+            <p class="text-xs text-surface-500 mt-4">
+              Selected: <span class="text-surface-200 font-semibold">{{ selectedYmd }}</span>
+              · Total: <span class="text-emerald-400 font-bold">₱{{ selectedDayTotal.toFixed(2) }}</span>
+              · {{ salesForSelectedDay.length }} sale(s)
+            </p>
+          </div>
+
+          <div class="ios-card rounded-2xl p-5 sm:p-6">
+            <h3 class="text-sm font-bold text-surface-200 light:text-surface-900 mb-1">Sales on selected date</h3>
+            <p class="text-xs text-surface-500 light:text-surface-600 mb-4">From synced machine transactions (same timezone as calendar).</p>
+            <div class="overflow-x-auto max-h-72 overflow-y-auto">
+              <table class="w-full text-sm">
+                <thead class="sticky top-0 z-10 border-b border-surface-800/40 light:border-surface-200/80 bg-surface-950/95 light:bg-surface-200/95 backdrop-blur">
+                  <tr>
+                    <th class="text-left text-xs text-surface-200 light:text-surface-800 uppercase tracking-wider pb-2 pr-3 font-semibold">Item</th>
+                    <th class="text-left text-xs text-surface-200 light:text-surface-800 uppercase tracking-wider pb-2 pr-3 font-semibold">Time (PH)</th>
+                    <th class="text-right text-xs text-surface-200 light:text-surface-800 uppercase tracking-wider pb-2 font-semibold">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="row in salesForSelectedDayRows" :key="row.key" class="border-b border-surface-800/20 last:border-0">
+                    <td class="py-2.5 pr-3 text-surface-200">{{ row.item }}</td>
+                    <td class="py-2.5 pr-3 text-surface-500 text-xs whitespace-nowrap">{{ row.timePh }}</td>
+                    <td class="py-2.5 text-right font-semibold text-emerald-400">₱{{ row.amount }}</td>
+                  </tr>
+                  <tr v-if="salesForSelectedDayRows.length === 0">
+                    <td colspan="3" class="py-8 text-center text-surface-500 text-sm">No sales for this day in the loaded history.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Email signups (Supabase `emails` table) -->
+        <div class="ios-card rounded-2xl p-5 sm:p-6 mb-6">
+          <h3 class="text-sm font-bold text-surface-200 light:text-surface-900 mb-3">Newsletter &amp; contact emails</h3>
+          <div class="overflow-x-auto max-h-64 overflow-y-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b border-surface-800/40 light:border-surface-200/80">
+                  <th class="text-left text-xs text-surface-400 light:text-surface-600 uppercase tracking-wider pb-3 pr-4 font-semibold">Email</th>
+                  <th class="text-left text-xs text-surface-400 light:text-surface-600 uppercase tracking-wider pb-3 pr-4 font-semibold">Password</th>
+                  <th class="text-left text-xs text-surface-400 light:text-surface-600 uppercase tracking-wider pb-3 font-semibold">Signed up (PH)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in subscriberEmailRows" :key="row.id" class="border-b border-surface-800/20 last:border-0 light:border-surface-200/60">
+                  <td class="py-3 pr-4 text-surface-200 light:text-surface-900">{{ row.email }}</td>
+                  <td class="py-3 pr-4 text-surface-300 light:text-surface-800 font-mono text-xs">{{ row.passwordHint }}</td>
+                  <td class="py-3 text-surface-400 light:text-surface-700 text-xs">{{ row.createdPh }}</td>
+                </tr>
+                <tr v-if="subscriberEmailRows.length === 0">
+                  <td colspan="3" class="py-8 text-center text-surface-500 text-sm">No rows yet — create the table and submit the homepage signup form.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
         <!-- Sales Trend Chart -->
         <div class="ios-card rounded-2xl p-5 sm:p-6 mb-6">
           <h3 class="text-sm font-bold text-surface-200 mb-0.5">Sales by Created Date</h3>
@@ -137,17 +269,20 @@
             <h3 class="text-sm font-bold text-surface-200 mb-0.5">Low-stock Products</h3>
             <p class="text-xs text-surface-500 mb-4">Current stock vs capacity</p>
             <div class="space-y-3 mt-2">
-              <div v-for="item in lowStockItems" :key="item.name" class="flex items-center justify-between gap-3">
-                <span class="text-xs text-surface-300 w-28 truncate shrink-0">{{ item.name }}</span>
-                <div class="flex-1 h-2 bg-surface-800/50 rounded-full overflow-hidden">
-                  <div
-                    class="h-full rounded-full transition-all duration-700"
-                    :class="item.stock / item.capacity > 0.5 ? 'bg-emerald-400' : item.stock / item.capacity > 0.25 ? 'bg-amber-400' : 'bg-red-400'"
-                    :style="{ width: `${(item.stock / item.capacity) * 100}%` }"
-                  ></div>
+              <p v-if="lowStockItems.length === 0" class="text-sm text-surface-500 py-6 text-center">No low-stock rows — restock data appears when <code class="text-surface-400">products</code> has stock under 4.</p>
+              <template v-else>
+                <div v-for="item in lowStockItems" :key="item.name" class="flex items-center justify-between gap-3">
+                  <span class="text-xs text-surface-300 w-28 truncate shrink-0">{{ item.name }}</span>
+                  <div class="flex-1 h-2 bg-surface-800/50 rounded-full overflow-hidden">
+                    <div
+                      class="h-full rounded-full transition-all duration-700"
+                      :class="item.stock / Math.max(item.capacity, 1) > 0.5 ? 'bg-emerald-400' : item.stock / Math.max(item.capacity, 1) > 0.25 ? 'bg-amber-400' : 'bg-red-400'"
+                      :style="{ width: `${Math.min(100, (item.stock / Math.max(item.capacity, 1)) * 100)}%` }"
+                    ></div>
+                  </div>
+                  <span class="text-xs font-semibold text-surface-400 w-14 text-right">{{ item.stock }}/{{ item.capacity || '—' }}</span>
                 </div>
-                <span class="text-xs font-semibold text-surface-400 w-14 text-right">{{ item.stock }}/{{ item.capacity }}</span>
-              </div>
+              </template>
             </div>
           </div>
         </div>
@@ -165,10 +300,46 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="tx in recentTransactions" :key="tx.time" class="border-b border-surface-800/20 last:border-0">
-                  <td class="py-3 pr-4 text-surface-200">{{ tx.item }}</td>
-                  <td class="py-3 pr-4 text-surface-500 text-xs">{{ tx.time }}</td>
-                  <td class="py-3 text-right font-semibold text-emerald-400">₱{{ tx.amount }}</td>
+                <template v-if="recentTransactions.length === 0">
+                  <tr>
+                    <td colspan="3" class="py-10 text-center text-surface-500 text-sm">No transactions yet — purchases appear when the machine inserts into <code class="text-surface-400">transactions</code>.</td>
+                  </tr>
+                </template>
+                <template v-else>
+                  <tr v-for="tx in recentTransactions" :key="tx.id ?? tx.time" class="border-b border-surface-800/20 last:border-0">
+                    <td class="py-3 pr-4 text-surface-200">{{ tx.item }}</td>
+                    <td class="py-3 pr-4 text-surface-500 text-xs">{{ tx.time }}</td>
+                    <td class="py-3 text-right font-semibold text-emerald-400">₱{{ tx.amount }}</td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- LIVE FEED (full list) -->
+      <div v-else-if="activeSection === 'machine-feed'">
+        <div class="ios-card rounded-2xl p-5 sm:p-6">
+          <h3 class="text-lg font-bold text-surface-100 light:text-surface-900 mb-1">Machine live feed</h3>
+          <p class="text-sm text-surface-500 mb-6">Realtime stream from <code class="text-surface-400">public.live_feed</code> (same data as Overview, full history in view).</p>
+          <div class="overflow-x-auto max-h-[70vh] overflow-y-auto rounded-xl border border-surface-800/30">
+            <table class="w-full text-sm">
+              <thead class="sticky top-0 bg-surface-950/95 light:bg-surface-100/95 z-10 border-b border-surface-800/40">
+                <tr>
+                  <th class="text-left text-xs text-surface-400 uppercase py-3 px-4 font-semibold">Time (PH)</th>
+                  <th class="text-left text-xs text-surface-400 uppercase py-3 px-4 font-semibold">Type</th>
+                  <th class="text-left text-xs text-surface-400 uppercase py-3 px-4 font-semibold">Message</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in liveFeedRows" :key="row.id" class="border-b border-surface-800/20">
+                  <td class="py-3 px-4 text-surface-500 text-xs whitespace-nowrap">{{ row.time }}</td>
+                  <td class="py-3 px-4 text-brand-400 text-xs font-medium">{{ row.type }}</td>
+                  <td class="py-3 px-4 text-surface-200">{{ row.message }}</td>
+                </tr>
+                <tr v-if="liveFeedRows.length === 0">
+                  <td colspan="3" class="py-16 text-center text-surface-500">No events. Insert into <code class="text-surface-400">live_feed</code> from the machine or SQL Editor to test.</td>
                 </tr>
               </tbody>
             </table>
@@ -289,6 +460,9 @@
       <!-- USER MANAGEMENT SECTION -->
       <div v-else-if="activeSection === 'users'">
         <div class="ios-card rounded-2xl p-6 sm:p-8">
+          <p class="text-xs text-surface-500 mb-4 max-w-xl">
+            <strong class="text-surface-400">Remove</strong> deletes the saved login on this browser and removes the matching row in Supabase <code class="text-surface-400">emails</code>. Deleting a row only in the Supabase Table Editor does not sign the user out or remove credentials from localStorage.
+          </p>
           <div class="flex items-center justify-between mb-6">
             <h3 class="text-lg font-bold text-surface-100">User Management</h3>
             <button
@@ -305,8 +479,8 @@
             <form v-if="showUserForm" @submit.prevent="handleCreateUser" class="ios-card rounded-xl p-5 mb-6 space-y-4">
               <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label class="block text-xs text-surface-500 uppercase tracking-wider mb-1">Username</label>
-                  <input v-model="newUser.username" type="text" required
+                  <label class="block text-xs text-surface-500 uppercase tracking-wider mb-1">Email (@tup.edu.ph)</label>
+                  <input v-model="newUser.username" type="email" inputmode="email" autocomplete="email" required placeholder="name@tup.edu.ph"
                     class="w-full px-3 py-2.5 rounded-xl bg-surface-800/40 border border-surface-700/40 text-surface-100 text-sm focus:border-brand-600 focus:outline-none transition-colors" />
                 </div>
                 <div>
@@ -349,7 +523,7 @@
                 </div>
               </div>
               <button
-                v-if="isAdmin && user.username !== 'admin'"
+                v-if="isAdmin"
                 @click="handleDeleteUser(user.username)"
                 class="text-xs text-red-400 hover:text-red-300 transition-colors px-3 py-1.5 rounded-lg hover:bg-red-400/10"
               >
@@ -380,11 +554,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
 import { useRealtimeMachineData } from '../composables/useRealtimeMachineData'
 import { Chart, registerables } from 'chart.js'
+import { debounce } from '../utils/timing'
 
 Chart.register(...registerables)
 
@@ -392,12 +567,147 @@ const router = useRouter()
 const { currentUser, isAdmin, logout, createUser, getUsers, deleteUser } = useAuth()
 const machine = useRealtimeMachineData()
 
+const manilaDayFmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit' })
+const manilaTimeFmt = new Intl.DateTimeFormat('en-PH', {
+  timeZone: 'Asia/Manila',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hour12: true,
+})
+const manilaDateLongFmt = new Intl.DateTimeFormat('en-PH', {
+  timeZone: 'Asia/Manila',
+  weekday: 'short',
+  year: 'numeric',
+  month: 'short',
+  day: 'numeric',
+})
+
+function toManilaYmd(iso) {
+  if (!iso) return ''
+  return manilaDayFmt.format(new Date(iso))
+}
+
+function manilaWeekdaySun0(y, m, d) {
+  const iso = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}T12:00:00+08:00`
+  const wd = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Manila', weekday: 'short' })
+    .format(new Date(iso))
+    .slice(0, 3)
+  const map = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }
+  return map[wd] ?? 0
+}
+
+const phTime = ref('')
+const phDate = ref('')
+let phTimer = null
+
+function refreshPhClock() {
+  const now = new Date()
+  phTime.value = manilaTimeFmt.format(now)
+  phDate.value = manilaDateLongFmt.format(now)
+}
+
+const calYear = ref(new Date().getFullYear())
+const calMonth = ref(new Date().getMonth() + 1)
+const selectedYmd = ref('')
+
+const calendarTitle = computed(() => {
+  const d = new Date(calYear.value, calMonth.value - 1, 1)
+  return d.toLocaleString('en-PH', { month: 'long', year: 'numeric' })
+})
+
+const calendarCells = computed(() => {
+  const y = calYear.value
+  const m = calMonth.value
+  const dim = new Date(y, m, 0).getDate()
+  const firstWd = manilaWeekdaySun0(y, m, 1)
+  const today = manilaDayFmt.format(new Date())
+  const cells = []
+  for (let i = 0; i < firstWd; i++) cells.push({ day: null, ymd: null })
+  for (let d = 1; d <= dim; d++) {
+    const ymd = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+    cells.push({ day: d, ymd, isToday: ymd === today, isSelected: ymd === selectedYmd.value })
+  }
+  while (cells.length % 7 !== 0) cells.push({ day: null, ymd: null })
+  while (cells.length < 42) cells.push({ day: null, ymd: null })
+  return cells.slice(0, 42)
+})
+
+function calendarPrevMonth() {
+  if (calMonth.value <= 1) {
+    calMonth.value = 12
+    calYear.value--
+  } else {
+    calMonth.value--
+  }
+}
+
+function calendarNextMonth() {
+  if (calMonth.value >= 12) {
+    calMonth.value = 1
+    calYear.value++
+  } else {
+    calMonth.value++
+  }
+}
+
+function selectCalendarDay(ymd) {
+  selectedYmd.value = ymd
+  const [y, m] = ymd.split('-').map(Number)
+  calYear.value = y
+  calMonth.value = m
+}
+
+const salesForSelectedDay = computed(() => {
+  const key = selectedYmd.value
+  if (!key) return []
+  return machine.transactions.value.filter((t) => {
+    const ts = t.created_at || t.timestamp
+    if (!ts) return false
+    return toManilaYmd(ts) === key
+  })
+})
+
+const selectedDayTotal = computed(() =>
+  salesForSelectedDay.value.reduce((sum, t) => sum + Number(t.total_amount ?? 0), 0)
+)
+
+const manilaTimeOnlyFmt = new Intl.DateTimeFormat('en-PH', {
+  timeZone: 'Asia/Manila',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hour12: true,
+})
+
+const salesForSelectedDayRows = computed(() => {
+  return salesForSelectedDay.value.map((t, i) => {
+    const ts = t.created_at || t.timestamp
+    return {
+      key: `${t.id ?? i}-${ts}`,
+      item: t.product_name || t.product_id || 'Unknown',
+      timePh: ts ? manilaTimeOnlyFmt.format(new Date(ts)) : '—',
+      amount: Number(t.total_amount ?? 0).toFixed(2),
+    }
+  })
+})
+
+const subscriberEmailRows = computed(() => {
+  return machine.subscriberEmails.value.map((r) => ({
+    id: r.id,
+    email: r.email,
+    passwordHint: r.password != null && String(r.password).length ? String(r.password) : '—',
+    createdPh: r.created_at ? `${manilaDayFmt.format(new Date(r.created_at))} ${manilaTimeOnlyFmt.format(new Date(r.created_at))}` : '—',
+  }))
+})
+
 const activeSection = ref('overview')
 const sidebarOpen = ref(false)
 
 // Sidebar items matching the machine's admin panel
 const sidebarItems = [
   { id: 'overview', label: 'Overview', icon: '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" /></svg>' },
+  { id: 'machine-feed', label: 'Live feed', icon: '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>' },
   { id: 'rfid', label: 'RFID Roles', icon: '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 9h3.75M15 12h3.75M15 15h3.75M4.5 19.5h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15A2.25 2.25 0 002.25 6.75v10.5A2.25 2.25 0 004.5 19.5zm6-10.125a1.875 1.875 0 11-3.75 0 1.875 1.875 0 013.75 0zm1.294 6.336a6.721 6.721 0 01-3.17.789 6.721 6.721 0 01-3.168-.789 3.376 3.376 0 016.338 0z" /></svg>' },
   { id: 'cash', label: 'Cash Pulse Settings', icon: '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>' },
   { id: 'hardware', label: 'Hardware Diagnostics', icon: '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" /></svg>' },
@@ -439,6 +749,29 @@ const overviewStats = computed(() => ([
 const lowStockItems = computed(() => machine.lowStockItems.value)
 const recentTransactions = computed(() => machine.recentTransactions.value)
 
+const machineSummaryLine = computed(() => {
+  const p = machine.products.value.length
+  const t = machine.transactions.value.length
+  const f = machine.liveFeed.value.length
+  return `Synced from Supabase: ${p} product row(s) · ${t} transaction row(s) loaded · ${f} live_feed event(s). Charts update automatically.`
+})
+
+const liveFeedRows = computed(() => {
+  const tf = new Intl.DateTimeFormat('en-PH', {
+    timeZone: 'Asia/Manila',
+    dateStyle: 'short',
+    timeStyle: 'medium',
+  })
+  return machine.liveFeed.value.map((r) => ({
+    id: r.id,
+    time: r.created_at ? tf.format(new Date(r.created_at)) : '—',
+    type: r.event_type || 'info',
+    message: r.message || '—',
+  }))
+})
+
+const liveFeedPreview = computed(() => liveFeedRows.value.slice(0, 10))
+
 // === CHARTS ===
 const salesTrendChart = ref(null)
 const monthlySalesChart = ref(null)
@@ -456,7 +789,68 @@ function getChartColors() {
   }
 }
 
-function initCharts() {
+function buildSalesTrendFromTx(transactions) {
+  const fmtMd = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Manila', month: 'numeric', day: 'numeric' })
+  const labels = []
+  const keys = []
+  for (let i = 14; i >= 0; i--) {
+    const d = new Date()
+    d.setDate(d.getDate() - (14 - i))
+    keys.push(manilaDayFmt.format(d))
+    labels.push(fmtMd.format(d))
+  }
+  const sums = Object.fromEntries(keys.map((k) => [k, 0]))
+  for (const t of transactions) {
+    if (!t.created_at) continue
+    const k = manilaDayFmt.format(new Date(t.created_at))
+    if (sums[k] !== undefined) sums[k] += Number(t.total_amount ?? 0)
+  }
+  return { labels, data: keys.map((k) => Number(sums[k].toFixed(2))) }
+}
+
+function buildMonthlyFromTx(transactions) {
+  const labels = []
+  const keys = []
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date()
+    d.setMonth(d.getMonth() - (5 - i))
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    keys.push(`${y}-${m}`)
+    labels.push(d.toLocaleString('en-PH', { month: 'short', year: '2-digit' }))
+  }
+  const monthFmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit' })
+  const sums = keys.map(() => 0)
+  for (const t of transactions) {
+    if (!t.created_at) continue
+    const mk = monthFmt.format(new Date(t.created_at))
+    const idx = keys.indexOf(mk)
+    if (idx >= 0) sums[idx] += Number(t.total_amount ?? 0)
+  }
+  return { labels, data: sums.map((x) => Number(x.toFixed(2))) }
+}
+
+function buildTopProductsFromTx(transactions, products) {
+  const qtyBy = {}
+  for (const t of transactions) {
+    const name = (t.product_name && String(t.product_name).trim()) || 'Unknown'
+    qtyBy[name] = (qtyBy[name] || 0) + Number(t.quantity ?? 1)
+  }
+  const entries = Object.entries(qtyBy).sort((a, b) => b[1] - a[1])
+  if (entries.length === 0 && products.length) {
+    return {
+      labels: products.slice(0, 6).map((p) => p.name || `Slot ${p.slot_number}`),
+      data: products.slice(0, 6).map(() => 0),
+    }
+  }
+  const top = entries.slice(0, 8)
+  return {
+    labels: top.map((e) => e[0]),
+    data: top.map((e) => e[1]),
+  }
+}
+
+function updateChartsFromMachine() {
   const colors = getChartColors()
   const chartDefaults = {
     responsive: true,
@@ -477,20 +871,20 @@ function initCharts() {
     },
   }
 
-  // Sales Trend (Line Chart)
+  const tx = machine.transactions.value
+  const prod = machine.products.value
+  const trend = buildSalesTrendFromTx(tx)
+  const monthly = buildMonthlyFromTx(tx)
+  const topP = buildTopProductsFromTx(tx, prod)
+
   if (salesTrendChart.value) {
     if (chartInstances.salesTrend) chartInstances.salesTrend.destroy()
-    const labels = Array.from({ length: 15 }, (_, i) => {
-      const d = new Date()
-      d.setDate(d.getDate() - (14 - i))
-      return `${d.getMonth() + 1}/${d.getDate()}`
-    })
     chartInstances.salesTrend = new Chart(salesTrendChart.value, {
       type: 'line',
       data: {
-        labels,
+        labels: trend.labels,
         datasets: [{
-          data: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          data: trend.data,
           borderColor: colors.line,
           backgroundColor: 'rgba(16, 185, 129, 0.1)',
           fill: true,
@@ -504,20 +898,14 @@ function initCharts() {
     })
   }
 
-  // Monthly Sales (Bar Chart)
   if (monthlySalesChart.value) {
     if (chartInstances.monthly) chartInstances.monthly.destroy()
-    const monthLabels = Array.from({ length: 6 }, (_, i) => {
-      const d = new Date()
-      d.setMonth(d.getMonth() - (5 - i))
-      return d.toLocaleString('default', { month: '2-digit', year: '2-digit' })
-    })
     chartInstances.monthly = new Chart(monthlySalesChart.value, {
       type: 'bar',
       data: {
-        labels: monthLabels,
+        labels: monthly.labels,
         datasets: [{
-          data: [0, 0, 0, 0, 2090, 0],
+          data: monthly.data,
           backgroundColor: colors.bar1,
           borderRadius: 6,
           borderSkipped: false,
@@ -528,15 +916,14 @@ function initCharts() {
     })
   }
 
-  // Top Products (Bar Chart)
   if (topProductsChart.value) {
     if (chartInstances.topProducts) chartInstances.topProducts.destroy()
     chartInstances.topProducts = new Chart(topProductsChart.value, {
       type: 'bar',
       data: {
-        labels: ['Hand Sanitizer', 'Face Mask', 'Wet Wipes', 'Tissue Pack', 'Alcohol Spray'],
+        labels: topP.labels.length ? topP.labels : ['No sales yet'],
         datasets: [{
-          data: [32, 28, 22, 15, 12],
+          data: topP.data.length ? topP.data : [0],
           backgroundColor: colors.bar2,
           borderRadius: 6,
           borderSkipped: false,
@@ -570,24 +957,49 @@ function handleCreateUser() {
   }
 }
 
-function handleDeleteUser(username) {
+async function handleDeleteUser(username) {
   const result = deleteUser(username)
   if (result.success) {
     allUsers.value = getUsers()
+    await machine.reload()
   }
 }
 
-// Init charts when overview is active
+// Charts: refresh when machine data or overview tab changes
+const debouncedUpdateCharts = debounce(() => {
+  if (activeSection.value !== 'overview') return
+  updateChartsFromMachine()
+}, 180)
+
 watch(activeSection, async (val) => {
   if (val === 'overview') {
     await nextTick()
-    initCharts()
+    debouncedUpdateCharts()
   }
 })
 
+watch(
+  () => [machine.loading.value, machine.transactions.value.length, machine.products.value.length],
+  async () => {
+    await nextTick()
+    if (activeSection.value === 'overview') debouncedUpdateCharts()
+  }
+)
+
 onMounted(async () => {
+  refreshPhClock()
+  phTimer = setInterval(refreshPhClock, 1000)
+  const today = manilaDayFmt.format(new Date())
+  selectedYmd.value = today
+  const [y, m] = today.split('-').map(Number)
+  calYear.value = y
+  calMonth.value = m
   await nextTick()
-  initCharts()
+  debouncedUpdateCharts()
+})
+
+onBeforeUnmount(() => {
+  if (phTimer) clearInterval(phTimer)
 })
 
 // === PREDICTION ANALYSIS ===

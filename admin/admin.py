@@ -8,6 +8,8 @@ from admin.reports import list_sales_reports, open_sales_report
 from pathlib import Path as _Path
 import secrets as _secrets
 
+from ui_timing import debounce_tk
+
 _SALT_FILE = _Path(__file__).resolve().parent.parent / ".secret_salt"
 if _SALT_FILE.exists():
     _PASSWORD_SALT = _SALT_FILE.read_text(encoding="utf-8").strip()
@@ -138,7 +140,7 @@ class AdminMixin:
                     angle=35,
                 )
 
-        canvas.bind("<Configure>", draw_chart)
+        canvas.bind("<Configure>", debounce_tk(canvas, 120, draw_chart))
         draw_chart()
         return chart_card
 
@@ -248,7 +250,7 @@ class AdminMixin:
                     angle=35,
                 )
 
-        canvas.bind("<Configure>", draw_chart)
+        canvas.bind("<Configure>", debounce_tk(canvas, 120, draw_chart))
         draw_chart()
         return chart_card
 
@@ -388,7 +390,7 @@ class AdminMixin:
                     anchor="w",
                 )
 
-        canvas.bind("<Configure>", draw_chart)
+        canvas.bind("<Configure>", debounce_tk(canvas, 120, draw_chart))
         draw_chart()
         return chart_card
 

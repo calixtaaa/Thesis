@@ -147,6 +147,8 @@ PATCH_v1_0_1 = {
         "Supabase realtime sync foundation: website now reads inventory/transactions from Supabase and subscribes to Realtime updates.",
         "Machine-to-cloud bridge script (sync/machine_supabase_bridge.py) that upserts products + posts new transactions to Supabase without changing hardware logic.",
         "Supabase SQL schema helper (supabase/schema_machine_sync.sql) for products + transactions tables (realtime-ready).",
+        "Website performance helpers: debounce/throttle utilities (WebSite/src/utils/timing.js).",
+        "Machine UI performance helpers: Tk debounce/throttle utilities (ui_timing.py).",
         "Product metadata support: new products.details column for brand/size/net weight display.",
     ],
     "improved": [
@@ -154,6 +156,9 @@ PATCH_v1_0_1 = {
         "Updated product prices to match the latest 'Selling Price' list.",
         "Customer product grid ordering now matches physical tray stacking (heaviest at bottom shown last).",
         "Product detail modal now shows brand/size/net weight when available.",
+        "Reduced cloud API traffic: product sync is throttled; transactions are still sent immediately after purchases.",
+        "Smoother admin charts: resize redraw is debounced to avoid lag during fast scrolling/resizing.",
+        "Smoother website interactions: heavy chart refresh is debounced and rapid key navigation is raf-throttled.",
     ],
     "bugs_fixed": [
         "Corrected pad naming alignment (Regular w/ wings, Regular w/o wings) so UI/DB naming matches the final product list.",

@@ -2950,9 +2950,55 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
 #  MAIN ENTRYPOINT
 # ======================
 
+_SUPABASE_BRIDGE_PROC = None
+
+
+def _stop_supabase_bridge():
+    """Terminate background SQLite→Supabase sync started by _start_supabase_bridge_if_configured."""
+    global _SUPABASE_BRIDGE_PROC
+    proc = _SUPABASE_BRIDGE_PROC
+    _SUPABASE_BRIDGE_PROC = None
+    if proc is None:
+        return
+    try:
+        proc.terminate()
+        proc.wait(timeout=6)
+    except Exception:
+        try:
+            proc.kill()
+        except Exception:
+            pass
+
+
+def _start_supabase_bridge_if_configured():
+    """POST new local transactions/products to Supabase so the website Realtime feed updates."""
+    global _SUPABASE_BRIDGE_PROC
+    try:
+        from sync.machine_supabase_bridge import env_configured
+    except ImportError:
+        print("[Supabase] Could not import sync.machine_supabase_bridge.")
+        return
+
+    if not env_configured():
+        print("[Supabase] Cloud sync off: add supabase.env next to main.py (see supabase.env.example).")
+        return
+    script = BASE_DIR / "sync" / "machine_supabase_bridge.py"
+    if not script.exists():
+        return
+    try:
+        _SUPABASE_BRIDGE_PROC = subprocess.Popen(
+            [sys.executable, "-u", str(script)],
+            cwd=str(BASE_DIR),
+        )
+        print("[Supabase] Background bridge started (local DB → Supabase → website Realtime).")
+    except Exception as e:
+        print(f"[Supabase] Could not start bridge process: {e}")
+
+
 def main():
     global ON_RPI, GPIO
     init_db()
+    _start_supabase_bridge_if_configured()
     if ON_RPI:
         print(f"[HW] GPIO backend module: {getattr(GPIO, '__file__', 'unknown')}")
         print(f"[HW] GPIO backend version: {getattr(GPIO, 'VERSION', 'unknown')}")
@@ -2989,6 +3035,7 @@ def main():
     except KeyboardInterrupt:
         print("\nStopped by user (Ctrl+C).")
     finally:
+        _stop_supabase_bridge()
         try:
             if _stepper_backend is not None:
                 _stepper_backend.cleanup()

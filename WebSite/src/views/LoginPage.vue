@@ -18,22 +18,26 @@
             Welcome Back
           </h1>
           <p class="text-sm text-surface-400 mt-2">Sign in to access the dashboard</p>
+          <p class="text-xs text-surface-500 mt-3 max-w-xs mx-auto leading-relaxed">
+            Use your <span class="text-surface-400">@tup.edu.ph</span> email only. No default login — use <span class="text-surface-400">Create a new account</span> first on this device if needed.
+          </p>
         </div>
 
         <!-- Login Form -->
         <form v-if="!showCreateUser" @submit.prevent="handleLogin" class="space-y-5">
           <div>
-            <label for="login-username" class="block text-xs font-semibold text-surface-400 uppercase tracking-wider mb-2">
-              Username
+            <label for="login-email" class="block text-xs font-semibold text-surface-400 uppercase tracking-wider mb-2">
+              Email
             </label>
             <input
-              id="login-username"
+              id="login-email"
               v-model="username"
-              type="text"
+              type="email"
+              inputmode="email"
               required
-              autocomplete="username"
+              autocomplete="email"
               class="w-full px-4 py-3 rounded-xl bg-surface-800/50 border border-surface-700/50 text-surface-100 placeholder-surface-500 focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 transition-all duration-300 text-sm"
-              placeholder="Enter username"
+              placeholder="name@tup.edu.ph"
             />
           </div>
           <div>
@@ -101,16 +105,18 @@
           </div>
 
           <div>
-            <label for="new-username" class="block text-xs font-semibold text-surface-400 uppercase tracking-wider mb-2">
-              Username
+            <label for="new-email" class="block text-xs font-semibold text-surface-400 uppercase tracking-wider mb-2">
+              Email
             </label>
             <input
-              id="new-username"
+              id="new-email"
               v-model="newUsername"
-              type="text"
+              type="email"
+              inputmode="email"
               required
+              autocomplete="email"
               class="w-full px-4 py-3 rounded-xl bg-surface-800/50 border border-surface-700/50 text-surface-100 placeholder-surface-500 focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 transition-all duration-300 text-sm"
-              placeholder="Choose username"
+              placeholder="name@tup.edu.ph"
             />
           </div>
           <div>
@@ -202,7 +208,7 @@ function handleCreateUser() {
   createSuccess.value = ''
   const result = createUser(newUsername.value, newPassword.value, newRole.value)
   if (result.success) {
-    createSuccess.value = `Account "${newUsername.value}" created! You can now sign in.`
+    createSuccess.value = `Account ${newUsername.value.trim()} created! You can now sign in.`
     newUsername.value = ''
     newPassword.value = ''
     newRole.value = 'staff'
@@ -211,7 +217,10 @@ function handleCreateUser() {
       createSuccess.value = ''
     }, 2000)
   } else {
-    createError.value = result.message
+    createError.value =
+      result.message === 'An account with this email already exists'
+        ? `${result.message} — sign in with that email, or use a different @tup.edu.ph address.`
+        : result.message
   }
 }
 </script>
