@@ -394,6 +394,27 @@ class AdminMixin:
         draw_chart()
         return chart_card
 
+    def reset_test_transactions_ui(self, staff_user):
+        if not messagebox.askyesno(
+            "Reset Test Transactions",
+            "Delete all transaction records from the local database?\n\n"
+            "This removes sales history used for testing and clears the admin analytics charts.\n"
+            "Products, users, and settings will remain unchanged.",
+        ):
+            return
+
+        try:
+            self.reset_transactions_data()
+        except Exception as exc:
+            messagebox.showerror("Reset Failed", str(exc))
+            return
+
+        self._prediction_results = None
+        self._prediction_summary = None
+        self._prediction_ran = False
+        messagebox.showinfo("Reset Complete", "All transaction records have been removed.")
+        self.show_admin_dashboard(staff_user)
+
     def enter_admin_dashboard(self):
         """Show in-app Admin Login with credential and RFID options."""
         self._current_screen_builder = self.enter_admin_dashboard
@@ -645,6 +666,18 @@ class AdminMixin:
         nav_btn("Hardware Diagnostics", self.show_hardware_diagnostics_screen)
         nav_btn("Sales Reports", self.show_sales_reports_screen)
         nav_btn("Generate Excel Report", self.export_sales_report_ui)
+        ctk.CTkButton(
+            sidebar,
+            text="Reset Test Transactions",
+            font=(UI_FONT, 12, "bold"),
+            anchor="w",
+            command=lambda: self.reset_test_transactions_ui(staff_user),
+            fg_color=self.current_theme.get("status_error", "#ef4444"),
+            hover_color=self.current_theme.get("status_error_hover", "#dc2626"),
+            text_color="#ffffff",
+            corner_radius=980,
+            height=38,
+        ).pack(fill=tk.X, padx=8, pady=(6, 3))
         nav_btn("Change Credentials", self.change_admin_credentials_screen)
         nav_btn("Back to Main", self.build_main_menu)
 

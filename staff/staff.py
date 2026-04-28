@@ -82,6 +82,20 @@ class StaffMixin:
         )
         scan_hint.pack(anchor="w", pady=(0, 12))
 
+        rfid_state_chip = ctk.CTkFrame(
+            inner,
+            fg_color=theme.get("status_error", "#ef4444"),
+            corner_radius=999,
+        )
+        rfid_state_chip.pack(anchor="w", pady=(0, 10))
+        rfid_state_text = ctk.CTkLabel(
+            rfid_state_chip,
+            text="RFID status: waiting",
+            font=(UI_FONT, 11, "bold"),
+            text_color="#ffffff",
+        )
+        rfid_state_text.pack(padx=12, pady=6)
+
         auth_status_var = tk.StringVar(value="Last accepted: none")
         auth_status_lbl = ctk.CTkLabel(
             inner,
@@ -120,49 +134,75 @@ class StaffMixin:
                 return "admin"
             return None
 
+        def set_rfid_state(accepted: bool, message: str):
+            chip_color = theme.get("accent", "#22c55e") if accepted else theme.get("status_error", "#ef4444")
+            if rfid_state_chip.winfo_exists():
+                rfid_state_chip.configure(fg_color=chip_color)
+            if rfid_state_text.winfo_exists():
+                rfid_state_text.configure(text=message)
+
+        def open_role_screen(user, selected_door: str):
+            if selected_door == "restock":
+                self.show_restock_screen(user)
+            else:
+                self.show_troubleshooting_screen(user)
+
         def handle_uid(uid: str):
             user = self.get_user_by_uid_data(uid)
             if not user:
                 error_lbl.configure(text=f"RFID {uid}: card not found")
+                set_rfid_state(False, "RFID status: waiting")
                 return
 
             selected_door = resolve_door_from_user(user)
             if not selected_door:
                 error_lbl.configure(text=f"RFID {uid}: role has no door access")
+                set_rfid_state(False, "RFID status: waiting")
                 return
             if not self.is_user_authorized_for_door(user, selected_door):
                 error_lbl.configure(text=f"RFID {uid}: not authorized for {selected_door} door")
+                set_rfid_state(False, "RFID status: waiting")
                 return
 
             role = str(user_value(user, "role", "")).strip().lower() or "unknown"
             if selected_door == "admin":
                 auth_status_var.set(f"Last accepted: UID {uid} | role {role} | doors restock + troubleshoot")
                 scan_hint.configure(text=f"RFID {uid} accepted. Unlocking restock and troubleshoot doors...")
+                set_rfid_state(True, f"RFID accepted: {uid}")
                 error_lbl.configure(text="")
-                try:
-                    self.unlock_access_door("restock")
-                    self.unlock_access_door("troubleshoot")
-                except Exception as exc:
-                    error_lbl.configure(text=f"Failed to unlock admin doors: {exc}")
-                    scan_hint.configure(text="Waiting for RFID tap...")
-                    return
-                self.show_troubleshooting_screen(user)
+                self.update_idletasks()
+
+                def finish_admin_unlock():
+                    try:
+                        self.unlock_access_door("restock")
+                        self.unlock_access_door("troubleshoot")
+                    except Exception as exc:
+                        error_lbl.configure(text=f"Failed to unlock admin doors: {exc}")
+                        scan_hint.configure(text="Waiting for RFID tap...")
+                        set_rfid_state(False, "RFID status: waiting")
+                        return
+                    self.show_troubleshooting_screen(user)
+
+                self.after(150, finish_admin_unlock)
                 return
 
             auth_status_var.set(f"Last accepted: UID {uid} | role {role} | door {selected_door}")
             scan_hint.configure(text=f"RFID {uid} accepted. Unlocking {selected_door} door...")
+            set_rfid_state(True, f"RFID accepted: {uid}")
             error_lbl.configure(text="")
-            try:
-                self.unlock_access_door(selected_door)
-            except Exception as exc:
-                error_lbl.configure(text=f"Failed to unlock {selected_door} door: {exc}")
-                scan_hint.configure(text="Waiting for RFID tap...")
-                return
+            self.update_idletasks()
 
-            if selected_door == "restock":
-                self.show_restock_screen(user)
-            else:
-                self.show_troubleshooting_screen(user)
+            def finish_unlock():
+                try:
+                    self.unlock_access_door(selected_door)
+                except Exception as exc:
+                    error_lbl.configure(text=f"Failed to unlock {selected_door} door: {exc}")
+                    scan_hint.configure(text="Waiting for RFID tap...")
+                    set_rfid_state(False, "RFID status: waiting")
+                    return
+                open_role_screen(user, selected_door)
+
+            self.after(150, finish_unlock)
 
         def poll_rfid():
             if not inner.winfo_exists():

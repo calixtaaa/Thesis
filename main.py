@@ -36,11 +36,13 @@ from database import (
     update_rfid_user,
     delete_rfid_user,
     update_rfid_user_role,
+    reset_transactions,
     get_hardware_setting,
     set_hardware_setting,
     restock_product,
     export_sales_report,
     get_admin_overview_stats,
+    get_ir_confirmation_stats,
     get_sales_trend_data,
     get_monthly_sales_data,
     get_top_selling_products,
@@ -1247,6 +1249,12 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
 
     def get_admin_overview_stats_data(self):
         return get_admin_overview_stats()
+
+    def get_ir_confirmation_stats_data(self):
+        return get_ir_confirmation_stats()
+
+    def reset_transactions_data(self):
+        return reset_transactions()
 
     def get_sales_trend_data_points(self, days: int = 15):
         return get_sales_trend_data(days)
@@ -2514,9 +2522,10 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                 line_total = float(p["price"]) * q
                 decrement_stock(p["id"], q)
                 dispense_from_slot(p["slot_number"], q)
-                if not wait_for_vend_confirmation(timeout_s=3.0):
+                ir_ok = wait_for_vend_confirmation(timeout_s=3.0)
+                if not ir_ok:
                     print(f"[HW] WARNING: No IR vend confirmation for slot {p['slot_number']}")
-                record_transaction(p["id"], q, line_total, "cash")
+                record_transaction(p["id"], q, line_total, "cash", ir_confirmed=ir_ok)
             change_note = ""
             if change > 0:
                 change_note = (
@@ -2571,7 +2580,8 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                 line_total = float(p["price"]) * q
                 decrement_stock(p["id"], q)
                 dispense_from_slot(p["slot_number"], q)
-                if not wait_for_vend_confirmation(timeout_s=3.0):
+                ir_ok = wait_for_vend_confirmation(timeout_s=3.0)
+                if not ir_ok:
                     print(f"[HW] WARNING: No IR vend confirmation for slot {p['slot_number']}")
                 record_transaction(
                     product_id=p["id"],
@@ -2579,6 +2589,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                     total_amount=line_total,
                     payment_method="rfid_purchase",
                     rfid_user_id=rfid_user_id,
+                    ir_confirmed=ir_ok,
                 )
             self.show_success_screen(
                 "Thank you!",

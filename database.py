@@ -66,6 +66,7 @@ def init_db():
         total_amount REAL,
         payment_method TEXT,
         rfid_user_id INTEGER,
+        ir_confirmed INTEGER NOT NULL DEFAULT 1,
         FOREIGN KEY(product_id) REFERENCES products(id)
     );
 
@@ -98,6 +99,13 @@ def init_db():
     user_cols = [row["name"] for row in cur.fetchall()]
     if "role" not in user_cols:
         cur.execute("ALTER TABLE rfid_users ADD COLUMN role TEXT NOT NULL DEFAULT 'customer'")
+        conn.commit()
+
+    # Ensure ir_confirmed column exists for tracking vend confirmation status.
+    cur.execute("PRAGMA table_info(transactions)")
+    txn_cols = [row["name"] for row in cur.fetchall()]
+    if "ir_confirmed" not in txn_cols:
+        cur.execute("ALTER TABLE transactions ADD COLUMN ir_confirmed INTEGER NOT NULL DEFAULT 1")
         conn.commit()
 
     # Backfill legacy cards to supported role model.
@@ -276,13 +284,25 @@ def decrement_stock(product_id: int, quantity: int):
     conn.close()
 
 
-def record_transaction(product_id, quantity, total_amount, payment_method, rfid_user_id=None):
+def record_transaction(product_id, quantity, total_amount, payment_method, rfid_user_id=None, ir_confirmed: bool = True):
     conn = get_connection()
     cur = conn.cursor()
     cur.execute("""
-        INSERT INTO transactions (product_id, quantity, total_amount, payment_method, rfid_user_id)
-        VALUES (?, ?, ?, ?, ?)
-    """, (product_id, quantity, total_amount, payment_method, rfid_user_id))
+        INSERT INTO transactions (product_id, quantity, total_amount, payment_method, rfid_user_id, ir_confirmed)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (product_id, quantity, total_amount, payment_method, rfid_user_id, 1 if ir_confirmed else 0))
+    conn.commit()
+    conn.close()
+
+
+def reset_transactions():
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM transactions")
+    try:
+        cur.execute("DELETE FROM sqlite_sequence WHERE name = 'transactions'")
+    except sqlite3.OperationalError:
+        pass
     conn.commit()
     conn.close()
 
@@ -558,6 +578,30 @@ def get_admin_overview_stats():
         "orders": orders,
         "active_customers": active_customers,
         "low_stock": low_stock,
+    }
+
+
+def get_ir_confirmation_stats():
+    """Return IR confirmation statistics: total transactions and count of unconfirmed."""
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT
+            COUNT(*) AS total_txns,
+            SUM(CASE WHEN ir_confirmed = 0 THEN 1 ELSE 0 END) AS ir_failed
+        FROM transactions
+        WHERE payment_method IN ('cash', 'rfid_purchase')
+        """
+    )
+    row = cur.fetchone()
+    conn.close()
+    total = row["total_txns"] or 0
+    failed = row["ir_failed"] or 0
+    return {
+        "total_dispensed": total,
+        "ir_failures": failed,
+        "ir_success_rate": (total - failed) / total * 100 if total > 0 else 100.0,
     }
 
 
