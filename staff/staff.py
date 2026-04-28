@@ -1,6 +1,8 @@
 import tkinter as tk
 from tkinter import messagebox, simpledialog
 import customtkinter as ctk
+import subprocess
+from pathlib import Path
 
 
 UI_FONT = "Segoe UI"
@@ -427,11 +429,80 @@ class StaffMixin:
             justify="left",
         ).pack(fill=tk.BOTH, expand=True, padx=14, pady=14)
 
+        # Hardware test tools launcher section
+        tools_card = ctk.CTkFrame(
+            inner,
+            fg_color=theme.get("card_bg", theme["button_bg"]),
+            corner_radius=14,
+            border_width=1,
+            border_color=theme.get("card_border", "#d1d1d6"),
+        )
+        tools_card.pack(fill=tk.X, pady=10)
+
+        ctk.CTkLabel(
+            tools_card,
+            text="Hardware Test Tools",
+            font=(UI_FONT, 13, "bold"),
+            text_color=theme["fg"],
+        ).pack(anchor="w", padx=14, pady=(12, 8))
+
+        tools_dir = Path(__file__).resolve().parent.parent
+
+        def launch_tool(script_name: str):
+            script_path = tools_dir / script_name
+            if script_path.exists():
+                try:
+                    subprocess.Popen(
+                        ["python", str(script_path)],
+                        cwd=str(tools_dir),
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                except Exception as e:
+                    messagebox.showerror("Launch Error", f"Failed to launch {script_name}: {e}")
+            else:
+                messagebox.showerror("Not Found", f"{script_name} not found at {script_path}")
+
+        tools_grid = ctk.CTkFrame(tools_card, fg_color="transparent")
+        tools_grid.pack(fill=tk.X, padx=14, pady=(0, 12))
+
+        tools_buttons = [
+            ("GPIO Test Tool", "gpio_test_tool.py"),
+            ("IR Break Beam", "ir_break_beam_test.py"),
+            ("Stepper MCP", "stepper_mcp.py"),
+            ("RFID Reader", "rfid_single_reader_test.py"),
+        ]
+
+        for label, script in tools_buttons:
+            ctk.CTkButton(
+                tools_grid,
+                text=label,
+                font=(UI_FONT, 11, "bold"),
+                command=lambda s=script: launch_tool(s),
+                fg_color=theme.get("button_bg", "#f1f5f9"),
+                hover_color=theme.get("card_border", "#d1d1d6"),
+                text_color=theme.get("button_fg", "#1c1c1e"),
+                corner_radius=8,
+                height=36,
+            ).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=4)
+
         action_bar = ctk.CTkFrame(inner, fg_color=theme["bg"], corner_radius=0)
         action_bar.pack(side=tk.BOTTOM, fill=tk.X, pady=(8, 52))
 
         button_row = ctk.CTkFrame(action_bar, fg_color=theme["bg"], corner_radius=0)
         button_row.pack(fill=tk.X, padx=8)
+
+        ctk.CTkButton(
+            button_row,
+            text="🔧 Diagnostics Dashboard",
+            font=(UI_FONT, 12, "bold"),
+            command=lambda: self.show_diagnostics_dashboard(staff_user),
+            fg_color=theme.get("accent", "#22c55e"),
+            hover_color=theme.get("accent_hover", "#16a34a"),
+            text_color=theme.get("on_accent", "#ffffff"),
+            corner_radius=980,
+            height=40,
+        ).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(0, 6))
 
         ctk.CTkButton(
             button_row,
@@ -445,7 +516,7 @@ class StaffMixin:
             height=40,
             border_width=1,
             border_color=theme.get("card_border", "#d1d1d6"),
-        ).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(0, 6))
+        ).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(6, 6))
 
         ctk.CTkButton(
             button_row,
@@ -476,7 +547,137 @@ class StaffMixin:
         self._slide_in(frame)
         self.add_theme_toggle_footer()
 
-    def restock_product_dialog(self, product_row):
+    def show_diagnostics_dashboard(self, staff_user):
+        """Show a tabbed diagnostics dashboard with embedded hardware test tools."""
+        self._current_screen_builder = lambda: self.show_diagnostics_dashboard(staff_user)
+        self.clear_screen()
+        theme = self.current_theme
+
+        frame = ctk.CTkFrame(self.content_holder, fg_color=theme["bg"])
+        frame.place(relx=0, rely=0, relwidth=1, relheight=1, anchor="nw")
+
+        header = ctk.CTkFrame(frame, fg_color=theme["bg"])
+        header.pack(fill=tk.X, padx=20, pady=(16, 12))
+
+        ctk.CTkLabel(
+            header,
+            text="Diagnostics Dashboard",
+            font=(UI_FONT, 20, "bold"),
+            text_color=theme["fg"],
+        ).pack(side=tk.LEFT)
+
+        ctk.CTkLabel(
+            header,
+            text="Run hardware tests and monitor sensor status",
+            font=UI_FONT_SMALL,
+            text_color=theme.get("muted", theme["fg"]),
+        ).pack(side=tk.LEFT, padx=(16, 0))
+
+        # Tabbed interface using CTkSegmentedButton for tab selection
+        tab_var = tk.StringVar(value="Stepper Motor")
+        tab_container = ctk.CTkFrame(frame, fg_color=theme["bg"])
+        tab_container.pack(fill=tk.X, padx=20, pady=(0, 12))
+
+        tab_options = ["Stepper Motor", "GPIO", "MCP LEDs", "MCP Stepper", "History"]
+        ctk.CTkSegmentedButton(
+            tab_container,
+            values=tab_options,
+            variable=tab_var,
+            font=(UI_FONT, 11, "bold"),
+            fg_color=theme.get("card_bg", "#f1f5f9"),
+            selected_color=theme.get("accent", "#22c55e"),
+            selected_hover_color=theme.get("accent_hover", "#16a34a"),
+            unselected_color=theme.get("button_bg", "#ffffff"),
+            corner_radius=8,
+        ).pack(fill=tk.X)
+
+        content_frame = ctk.CTkFrame(frame, fg_color=theme["bg"])
+        content_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 12))
+
+        # Import test tool UI builders
+        try:
+            from test_tools import build_stepper_tab, build_gpio_tab, build_mcp_led_tab, build_stepper_mcp_tab
+        except ImportError:
+            build_stepper_tab = build_gpio_tab = build_mcp_led_tab = build_stepper_mcp_tab = None
+
+        # Create tabs with embedded test UIs
+        stepper_tab = ctk.CTkFrame(content_frame, fg_color=theme["bg"])
+        if build_stepper_tab:
+            build_stepper_tab(stepper_tab, theme)
+
+        gpio_tab = ctk.CTkFrame(content_frame, fg_color=theme["bg"])
+        if build_gpio_tab:
+            build_gpio_tab(gpio_tab, theme)
+
+        mcp_led_tab = ctk.CTkFrame(content_frame, fg_color=theme["bg"])
+        if build_mcp_led_tab:
+            build_mcp_led_tab(mcp_led_tab, theme)
+
+        mcp_stepper_tab = ctk.CTkFrame(content_frame, fg_color=theme["bg"])
+        if build_stepper_mcp_tab:
+            build_stepper_mcp_tab(mcp_stepper_tab, theme)
+
+        # History tab
+        history_tab = ctk.CTkFrame(content_frame, fg_color=theme["bg"])
+        history_inner = ctk.CTkFrame(
+            history_tab,
+            fg_color=theme.get("card_bg", theme["button_bg"]),
+            corner_radius=10,
+            border_width=1,
+            border_color=theme.get("card_border", "#d1d1d6"),
+        )
+        history_inner.pack(fill=tk.BOTH, expand=True)
+
+        history_label = ctk.CTkLabel(
+            history_inner,
+            text="Test Results History\n\nRun tests to populate history",
+            font=UI_FONT_BODY,
+            text_color=theme.get("muted", theme["fg"]),
+        )
+        history_label.pack(fill=tk.BOTH, expand=True, padx=14, pady=14)
+
+        tabs = {
+            "Stepper Motor": stepper_tab,
+            "GPIO": gpio_tab,
+            "MCP LEDs": mcp_led_tab,
+            "MCP Stepper": mcp_stepper_tab,
+            "History": history_tab,
+        }
+
+        # Tab switching
+        def on_tab_change(*args):
+            for tab_name, tab_frame in tabs.items():
+                if tab_name == tab_var.get():
+                    tab_frame.pack(fill=tk.BOTH, expand=True)
+                else:
+                    tab_frame.pack_forget()
+
+        tab_var.trace("w", on_tab_change)
+        on_tab_change()  # Show first tab
+
+        # Bottom action bar
+        action_bar = ctk.CTkFrame(frame, fg_color=theme["bg"], corner_radius=0)
+        action_bar.pack(side=tk.BOTTOM, fill=tk.X, pady=(8, 52))
+
+        button_row = ctk.CTkFrame(action_bar, fg_color=theme["bg"], corner_radius=0)
+        button_row.pack(fill=tk.X, padx=8)
+
+        ctk.CTkButton(
+            button_row,
+            text="Back To Troubleshooting",
+            font=(UI_FONT, 12, "bold"),
+            command=lambda: self.show_troubleshooting_screen(staff_user),
+            fg_color=theme.get("button_bg", "#ffffff"),
+            hover_color=theme.get("card_border", "#d1d1d6"),
+            text_color=theme.get("button_fg", "#1c1c1e"),
+            corner_radius=980,
+            height=40,
+            border_width=1,
+            border_color=theme.get("card_border", "#d1d1d6"),
+        ).pack(side=tk.LEFT, expand=True, fill=tk.X)
+
+        self._slide_in(frame)
+        self.add_theme_toggle_footer()
         max_add = product_row["capacity"] - product_row["current_stock"]
         if max_add <= 0:
             messagebox.showinfo("Full", "This tray is already full.")
