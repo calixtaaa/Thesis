@@ -702,6 +702,78 @@ class AdminMixin:
         metric_card(metrics_frame, "Active Customers", str(stats["active_customers"]))
         metric_card(metrics_frame, "Low-stock Products", str(stats["low_stock"]))
 
+        door_card = ctk.CTkFrame(
+            main,
+            fg_color=self.current_theme.get("card_bg", self.current_theme["button_bg"]),
+            corner_radius=10,
+            border_width=1,
+            border_color=self.current_theme.get("card_border", "#e2e8f0"),
+        )
+        door_card.pack(fill=tk.X, pady=(0, 12))
+
+        door_inner = ctk.CTkFrame(door_card, fg_color=self.current_theme.get("card_bg", self.current_theme["button_bg"]))
+        door_inner.pack(fill=tk.X, padx=14, pady=12)
+
+        ctk.CTkLabel(
+            door_inner,
+            text="Door Reopen Controls",
+            font=(UI_FONT, 12, "bold"),
+            text_color=self.current_theme["fg"],
+        ).pack(anchor="w")
+
+        ctk.CTkLabel(
+            door_inner,
+            text="Use these buttons to manually re-open the solenoid locks for testing or recovery.",
+            font=UI_FONT_SMALL,
+            text_color=self.current_theme.get("muted", self.current_theme["fg"]),
+            wraplength=560,
+            justify="left",
+        ).pack(anchor="w", pady=(2, 10))
+
+        door_btn_row = ctk.CTkFrame(door_inner, fg_color=self.current_theme.get("card_bg", self.current_theme["button_bg"]))
+        door_btn_row.pack(anchor="w", fill=tk.X)
+
+        def make_door_unlock_cmd(door: str, label: str):
+            def _cmd():
+                if not messagebox.askyesno(
+                    "Unlock Door",
+                    f"Unlock the {label.lower()} now?\n\nThis will energize the solenoid for the configured unlock time.",
+                ):
+                    return
+                try:
+                    self.unlock_access_door(door)
+                except Exception as exc:
+                    messagebox.showerror("Unlock Failed", str(exc))
+                    return
+                messagebox.showinfo("Door Unlocked", f"{label} door reopened successfully.")
+            return _cmd
+
+        ctk.CTkButton(
+            door_btn_row,
+            text="Reopen Restock Door",
+            font=(UI_FONT, 11, "bold"),
+            command=make_door_unlock_cmd("restock", "Restock"),
+            fg_color=self.current_theme.get("accent", "#10b981"),
+            hover_color=self.current_theme.get("accent_hover", "#059669"),
+            text_color="#ffffff",
+            corner_radius=8,
+            height=38,
+        ).pack(side=tk.LEFT, padx=(0, 8))
+
+        ctk.CTkButton(
+            door_btn_row,
+            text="Reopen Troubleshoot Door",
+            font=(UI_FONT, 11, "bold"),
+            command=make_door_unlock_cmd("troubleshoot", "Troubleshoot"),
+            fg_color=self.current_theme.get("button_bg", "#ffffff"),
+            hover_color=self.current_theme.get("card_border", "#d1d5db"),
+            text_color=self.current_theme["button_fg"],
+            corner_radius=8,
+            height=38,
+            border_width=1,
+            border_color=self.current_theme.get("card_border", "#d1d5db"),
+        ).pack(side=tk.LEFT)
+
         body = ctk.CTkScrollableFrame(main, fg_color=self.current_theme["bg"])
         body.pack(fill=tk.BOTH, expand=True, padx=20, pady=(5, 20))
 

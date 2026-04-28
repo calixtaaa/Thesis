@@ -114,14 +114,10 @@ class StaffMixin:
         def resolve_door_from_user(user):
             role = str(user_value(user, "role", "")).strip().lower()
 
-            if role == "admin":
-                choose_troubleshoot = messagebox.askyesno(
-                    "Admin Door Selection",
-                    "Open troubleshoot door?\n\nChoose 'No' to open restock door.",
-                )
-                return "troubleshoot" if choose_troubleshoot else "restock"
             if role == "restocker":
                 return "restock"
+            if role == "admin":
+                return "admin"
             return None
 
         def handle_uid(uid: str):
@@ -139,6 +135,20 @@ class StaffMixin:
                 return
 
             role = str(user_value(user, "role", "")).strip().lower() or "unknown"
+            if selected_door == "admin":
+                auth_status_var.set(f"Last accepted: UID {uid} | role {role} | doors restock + troubleshoot")
+                scan_hint.configure(text=f"RFID {uid} accepted. Unlocking restock and troubleshoot doors...")
+                error_lbl.configure(text="")
+                try:
+                    self.unlock_access_door("restock")
+                    self.unlock_access_door("troubleshoot")
+                except Exception as exc:
+                    error_lbl.configure(text=f"Failed to unlock admin doors: {exc}")
+                    scan_hint.configure(text="Waiting for RFID tap...")
+                    return
+                self.show_troubleshooting_screen(user)
+                return
+
             auth_status_var.set(f"Last accepted: UID {uid} | role {role} | door {selected_door}")
             scan_hint.configure(text=f"RFID {uid} accepted. Unlocking {selected_door} door...")
             error_lbl.configure(text="")
@@ -203,6 +213,17 @@ class StaffMixin:
         frame.place(relx=start, rely=0, relwidth=1, relheight=1, anchor="nw")
         frame.after(step_ms, lambda: step(0))
 
+    def _make_door_reopen_command(self, door: str, label: str):
+        def _cmd():
+            try:
+                self.unlock_access_door(door)
+            except Exception as exc:
+                messagebox.showerror("Unlock Failed", str(exc))
+                return
+            messagebox.showinfo("Door Unlocked", f"{label} door reopened successfully.")
+
+        return _cmd
+
     def show_restock_screen(self, staff_user):
         self._current_screen_builder = lambda: self.show_restock_screen(staff_user)
         self.clear_screen()
@@ -228,11 +249,14 @@ class StaffMixin:
         action_bar = ctk.CTkFrame(inner, fg_color=theme["bg"], corner_radius=0)
         # Keep this above the global footer/theme bar on compact displays.
         action_bar.pack(side=tk.BOTTOM, fill=tk.X, pady=(8, 52))
+        button_row = ctk.CTkFrame(action_bar, fg_color=theme["bg"], corner_radius=0)
+        button_row.pack(fill=tk.X, padx=8)
+
         ctk.CTkButton(
-            action_bar,
+            button_row,
             text="Exit Restock Mode",
             font=(UI_FONT, 13, "bold"),
-            command=self.build_main_menu,
+            command=self.enter_restock_mode,
             fg_color=theme.get("button_bg", "#ffffff"),
             hover_color=theme.get("card_border", "#d1d1d6"),
             text_color=theme.get("button_fg", "#1c1c1e"),
@@ -240,7 +264,7 @@ class StaffMixin:
             height=40,
             border_width=1,
             border_color=theme.get("card_border", "#d1d1d6"),
-        ).pack(fill=tk.X, padx=8)
+        ).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(0, 6))
 
         list_frame = ctk.CTkScrollableFrame(inner, fg_color=theme["bg"])
         list_frame.pack(expand=True, fill=tk.BOTH)
@@ -275,6 +299,18 @@ class StaffMixin:
                 corner_radius=980,
                 width=100,
             ).pack(side=tk.RIGHT, padx=12, pady=8)
+
+        ctk.CTkButton(
+            button_row,
+            text="Reopen Restock Door",
+            font=(UI_FONT, 13, "bold"),
+            command=self._make_door_reopen_command("restock", "Restock"),
+            fg_color=accent,
+            hover_color=theme.get("accent_hover", "#16a34a"),
+            text_color=theme.get("on_accent", "#ffffff"),
+            corner_radius=980,
+            height=40,
+        ).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(6, 0))
 
         self._slide_in(frame)
         self.add_theme_toggle_footer()
@@ -354,8 +390,11 @@ class StaffMixin:
         action_bar = ctk.CTkFrame(inner, fg_color=theme["bg"], corner_radius=0)
         action_bar.pack(side=tk.BOTTOM, fill=tk.X, pady=(8, 52))
 
+        button_row = ctk.CTkFrame(action_bar, fg_color=theme["bg"], corner_radius=0)
+        button_row.pack(fill=tk.X, padx=8)
+
         ctk.CTkButton(
-            action_bar,
+            button_row,
             text="Back To Staff Login",
             font=(UI_FONT, 12, "bold"),
             command=self.enter_restock_mode,
@@ -366,19 +405,33 @@ class StaffMixin:
             height=40,
             border_width=1,
             border_color=theme.get("card_border", "#d1d1d6"),
-        ).pack(side=tk.LEFT, padx=(8, 10))
+        ).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(0, 6))
 
         ctk.CTkButton(
-            action_bar,
-            text="Exit To Main Menu",
+            button_row,
+            text="Reopen Restock Door",
             font=(UI_FONT, 12, "bold"),
-            command=self.build_main_menu,
-            fg_color=theme.get("nav_bg", "#1c1c1e"),
-            hover_color=theme.get("nav_hover", "#333333"),
-            text_color=theme.get("nav_fg", "#ffffff"),
+            command=self._make_door_reopen_command("restock", "Restock"),
+            fg_color=theme.get("accent", "#22c55e"),
+            hover_color=theme.get("accent_hover", "#16a34a"),
+            text_color=theme.get("on_accent", "#ffffff"),
             corner_radius=980,
             height=40,
-        ).pack(side=tk.LEFT)
+        ).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(6, 6))
+
+        ctk.CTkButton(
+            button_row,
+            text="Reopen Troubleshoot Door",
+            font=(UI_FONT, 12, "bold"),
+            command=self._make_door_reopen_command("troubleshoot", "Troubleshoot"),
+            fg_color=theme.get("button_bg", "#ffffff"),
+            hover_color=theme.get("card_border", "#d1d1d6"),
+            text_color=theme.get("button_fg", "#1c1c1e"),
+            corner_radius=980,
+            height=40,
+            border_width=1,
+            border_color=theme.get("card_border", "#d1d1d6"),
+        ).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(6, 0))
 
         self._slide_in(frame)
         self.add_theme_toggle_footer()
