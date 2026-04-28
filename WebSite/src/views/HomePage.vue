@@ -126,6 +126,30 @@
               Our Smart Hygiene Vending Machine integrates IoT technology, real-time monitoring, and intelligent inventory management to provide a modern, efficient solution for dispensing hygiene products in public spaces.
             </p>
 
+            <!-- Email signup (stored in Supabase `emails`; shown on admin dashboard) -->
+            <div class="mt-10 pt-8 border-t border-surface-800/50">
+              <h3 class="text-lg font-bold font-display text-surface-100 mb-2">Project updates</h3>
+              <p class="text-sm text-surface-500 mb-4">Leave your email — it appears in the admin dashboard for your team.</p>
+              <form class="flex flex-col sm:flex-row gap-3 max-w-lg" @submit.prevent="submitSignup">
+                <input
+                  v-model="signupEmail"
+                  type="email"
+                  required
+                  autocomplete="email"
+                  placeholder="you@school.edu.ph"
+                  class="flex-1 px-4 py-3 rounded-xl bg-surface-900/40 border border-surface-700/50 text-surface-100 text-sm placeholder:text-surface-600 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/30"
+                />
+                <button
+                  type="submit"
+                  :disabled="signupLoading"
+                  class="px-6 py-3 rounded-xl text-sm font-bold bg-brand-600 text-white hover:bg-brand-500 disabled:opacity-50 disabled:pointer-events-none transition-colors shrink-0"
+                >
+                  {{ signupLoading ? 'Sending…' : 'Notify me' }}
+                </button>
+              </form>
+              <p v-if="signupMsg" class="text-xs mt-3" :class="signupOk ? 'text-emerald-400' : 'text-amber-400'">{{ signupMsg }}</p>
+            </div>
+
             <!-- Stats -->
             <div class="grid grid-cols-3 gap-6 mt-10 pt-8 border-t border-surface-800/50">
               <div v-for="stat in stats" :key="stat.label" class="text-center">
@@ -141,6 +165,38 @@
 </template>
 
 <script setup>
+import { ref } from 'vue'
+import { supabase } from '../lib/supabaseClient'
+
+const signupEmail = ref('')
+const signupMsg = ref('')
+const signupOk = ref(false)
+const signupLoading = ref(false)
+
+async function submitSignup() {
+  signupMsg.value = ''
+  signupOk.value = false
+  const email = signupEmail.value.trim()
+  if (!email) return
+  signupLoading.value = true
+  const { error } = await supabase.from('emails').insert({ email })
+  signupLoading.value = false
+  if (error) {
+    signupOk.value = false
+    if (/relation|does not exist|not find/i.test(error.message)) {
+      signupMsg.value = 'Database is not ready: create the emails table in Supabase (see WebSite/supabase/emails_table.sql).'
+    } else if (error.code === '23505' || /duplicate key|unique constraint/i.test(error.message || '')) {
+      signupMsg.value = 'That email is already on the list.'
+    } else {
+      signupMsg.value = error.message
+    }
+    return
+  }
+  signupOk.value = true
+  signupMsg.value = 'Saved. Your admin dashboard will list this address.'
+  signupEmail.value = ''
+}
+
 const cards = [
   {
     title: 'Our Team',

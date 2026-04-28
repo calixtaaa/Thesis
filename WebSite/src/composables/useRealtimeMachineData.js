@@ -4,6 +4,8 @@ import { supabase } from '../lib/supabaseClient'
 export function useRealtimeMachineData() {
   const products = ref([])
   const transactions = ref([])
+  const liveFeed = ref([])
+  const subscriberEmails = ref([])
   const loading = ref(true)
   const error = ref('')
 
@@ -13,13 +15,43 @@ export function useRealtimeMachineData() {
     loading.value = true
     error.value = ''
 
-    const [{ data: prod, error: prodErr }, { data: tx, error: txErr }] = await Promise.all([
+    const [prodRes, txRes, feedRes, mailRes] = await Promise.all([
       supabase.from('products').select('*').order('slot_number', { ascending: true }),
-      supabase.from('transactions').select('*').order('created_at', { ascending: false }).limit(25),
+      supabase
+        .from('transactions')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(3000),
+      supabase.from('live_feed').select('*').order('created_at', { ascending: false }).limit(100),
+      supabase.from('emails').select('id, email, created_at, password').order('created_at', { ascending: false }).limit(500),
     ])
+
+    const { data: prod, error: prodErr } = prodRes
+    const { data: tx, error: txErr } = txRes
+    const { data: feed, error: feedErr } = feedRes
+    const { data: mails, error: mailErr } = mailRes
 
     if (prodErr) error.value = prodErr.message
     if (txErr) error.value = error.value ? `${error.value}; ${txErr.message}` : txErr.message
+    if (feedErr) {
+      const msg = feedErr.message || String(feedErr)
+      if (!/relation|does not exist|not find/i.test(msg)) {
+        error.value = error.value ? `${error.value}; ${msg}` : msg
+      }
+      liveFeed.value = []
+    } else {
+      liveFeed.value = Array.isArray(feed) ? feed : []
+    }
+    if (mailErr) {
+      // Missing table or RLS: keep dashboard usable; surface message once
+      const msg = mailErr.message || String(mailErr)
+      if (!/relation|does not exist|not find/i.test(msg)) {
+        error.value = error.value ? `${error.value}; ${msg}` : msg
+      }
+      subscriberEmails.value = []
+    } else {
+      subscriberEmails.value = Array.isArray(mails) ? mails : []
+    }
 
     products.value = Array.isArray(prod) ? prod : []
     transactions.value = Array.isArray(tx) ? tx : []
@@ -59,11 +91,36 @@ export function useRealtimeMachineData() {
           if (eventType === 'DELETE') removeLocal(transactions, rowOld, 'id')
           else if (rowNew) upsertLocal(transactions, rowNew, 'id')
 
-          // Keep list small
-          if (transactions.value.length > 50) transactions.value = transactions.value.slice(0, 50)
+          if (transactions.value.length > 3000) transactions.value = transactions.value.slice(0, 3000)
         }
       )
-      .subscribe()
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'live_feed' },
+        (payload) => {
+          const { eventType, new: rowNew, old: rowOld } = payload || {}
+          if (eventType === 'DELETE') removeLocal(liveFeed, rowOld, 'id')
+          else if (rowNew) upsertLocal(liveFeed, rowNew, 'id')
+          if (liveFeed.value.length > 100) liveFeed.value = liveFeed.value.slice(0, 100)
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'emails' },
+        (payload) => {
+          const { eventType, new: rowNew, old: rowOld } = payload || {}
+          if (eventType === 'DELETE') removeLocal(subscriberEmails, rowOld, 'id')
+          else if (rowNew) upsertLocal(subscriberEmails, rowNew, 'id')
+          if (subscriberEmails.value.length > 500) subscriberEmails.value = subscriberEmails.value.slice(0, 500)
+        }
+      )
+      .subscribe((status, err) => {
+        if (status === 'SUBSCRIBED') return
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          const msg = err?.message ? `Realtime: ${err.message}` : `Realtime channel ${status}`
+          error.value = error.value ? `${error.value}; ${msg}` : msg
+        }
+      })
   }
 
   const overview = computed(() => {
@@ -90,9 +147,15 @@ export function useRealtimeMachineData() {
   })
 
   const recentTransactions = computed(() => {
-    return transactions.value.slice(0, 8).map((t) => ({
-      item: t.product_name || t.product_id || 'Unknown',
-      time: t.created_at || t.timestamp || '',
+    const tf = new Intl.DateTimeFormat('en-PH', {
+      timeZone: 'Asia/Manila',
+      dateStyle: 'short',
+      timeStyle: 'medium',
+    })
+    return transactions.value.slice(0, 12).map((t) => ({
+      id: t.id,
+      item: t.product_name || (t.product_id != null ? `Product #${t.product_id}` : 'Unknown'),
+      time: t.created_at ? tf.format(new Date(t.created_at)) : '—',
       amount: Number(t.total_amount ?? 0).toFixed(2),
     }))
   })
@@ -112,6 +175,8 @@ export function useRealtimeMachineData() {
   return {
     products,
     transactions,
+    liveFeed,
+    subscriberEmails,
     loading,
     error,
     overview,

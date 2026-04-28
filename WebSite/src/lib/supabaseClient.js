@@ -1,10 +1,21 @@
 import { createClient } from '@supabase/supabase-js'
 
-const url = import.meta.env.VITE_SUPABASE_URL
+/**
+ * Project URL from Supabase → Settings → API → "Project URL".
+ * Use only the root, e.g. https://xxxx.supabase.co — not .../emails (that is a table name in code, not part of the URL).
+ * The real "API key" is the anon public key in the same screen (VITE_SUPABASE_PUBLISHABLE_KEY).
+ */
+function normalizeProjectUrl(raw) {
+  if (!raw || typeof raw !== 'string') return raw
+  let u = raw.trim().replace(/\/+$/, '')
+  if (/\/emails$/i.test(u)) u = u.replace(/\/emails$/i, '')
+  return u
+}
+
+const url = normalizeProjectUrl(import.meta.env.VITE_SUPABASE_URL)
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
 
 if (!url || !key) {
-  // Fail fast in dev; production build should also include these.
   throw new Error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_PUBLISHABLE_KEY')
 }
 

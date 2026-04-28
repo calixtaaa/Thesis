@@ -142,6 +142,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { rafThrottle } from '../utils/timing'
 import { useTheme } from '../composables/useTheme'
 
 const { theme } = useTheme()
@@ -227,12 +228,15 @@ function handleKeydown(e) {
   }
 }
 
+// Keep the card stack animation smooth if the user holds a key down.
+const handleKeydownRaf = rafThrottle(handleKeydown)
+
 onMounted(() => {
-  window.addEventListener('keydown', handleKeydown)
+  window.addEventListener('keydown', handleKeydownRaf)
 })
 
 onUnmounted(() => {
-  window.removeEventListener('keydown', handleKeydown)
+  window.removeEventListener('keydown', handleKeydownRaf)
 })
 
 function getCardStyle(index) {

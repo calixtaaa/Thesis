@@ -534,7 +534,9 @@ def build_main_menu_products(app, parent, products):
     app._cart_selected_bg = app.current_theme.get("selected_bg", "#D5F5E3")
     app._cart_selected_border = app.current_theme.get("selected_border", app.current_theme.get("accent", "#50C878"))
     app._product_placeholder_bg = "#F0EFF4" if app.current_theme_name == "light" else "#242440"
-    app._product_placeholder_size = 160
+    scale = float(getattr(app, "_lcd_scale", 1.0) or 1.0)
+    # Larger image area on 7-inch LCD for readability.
+    app._product_placeholder_size = int(190 * scale)
     app._product_card_refs = {}
 
     for idx, product in enumerate(products):
@@ -608,13 +610,17 @@ def build_product_card(app, grid, product, idx):
             lbl.bind("<Button-1>", _on_card_tap)
 
     # ── Product name ──
+    scale = float(getattr(app, "_lcd_scale", 1.0) or 1.0)
+    name_font = (app._ui_font_name, int(14 * scale), "bold")
+    price_font = (app._ui_font_name, int(15 * scale), "bold")
+    stock_font = (app._ui_font_name, int(11 * scale))
     name_text = product["name"]
     if len(name_text) > 20:
         name_text = name_text[:20] + "…"
     name_label = ctk.CTkLabel(
         card,
         text=name_text,
-        font=(app._ui_font_name, 13, "bold"),
+        font=name_font,
         text_color=app.current_theme["fg"],
         wraplength=app._product_placeholder_size + 40,
         justify="center",
@@ -626,7 +632,7 @@ def build_product_card(app, grid, product, idx):
     price_label = ctk.CTkLabel(
         card,
         text=f"₱{product['price']:.2f}",
-        font=(app._ui_font_name, 14, "bold"),
+        font=price_font,
         text_color=app.current_theme.get("price_color", "#8E4585"),
     )
     price_label.pack(pady=(0, 6))
@@ -637,7 +643,7 @@ def build_product_card(app, grid, product, idx):
         ctk.CTkLabel(
             card,
             text="Out of Stock",
-            font=(app._ui_font_name, 10),
+            font=stock_font,
             text_color=app.current_theme.get("status_error", "#E74C3C"),
         ).pack(pady=(0, 4))
 
@@ -653,16 +659,20 @@ def build_product_card(app, grid, product, idx):
 
 
 def build_product_card_button(app, card, product, in_cart):
+    scale = float(getattr(app, "_lcd_scale", 1.0) or 1.0)
+    btn_font = (app._ui_font_name, int(13 * scale), "bold")
+    btn_w = int(112 * scale)
+    btn_h = int(40 * scale)
     if in_cart:
         return ctk.CTkButton(
             card,
             text="✕  Remove",
-            font=(app._ui_font_name, 12, "bold"),
+            font=btn_font,
             text_color="#ffffff",
             fg_color=app.current_theme.get("btn_remove", "#E74C3C"),
             hover_color=app.current_theme.get("btn_remove_hover", "#C0392B"),
-            width=100,
-            height=36,
+            width=btn_w,
+            height=btn_h,
             corner_radius=980,
             command=lambda prod=product: app._remove_product_from_cart(prod),
         )
@@ -670,12 +680,12 @@ def build_product_card_button(app, card, product, in_cart):
     action_btn = ctk.CTkButton(
         card,
         text="＋  Add",
-        font=(app._ui_font_name, 12, "bold"),
+        font=btn_font,
         text_color="#ffffff",
         fg_color=app.current_theme.get("btn_add", "#50C878"),
         hover_color=app.current_theme.get("btn_add_hover", "#3DA863"),
-        width=100,
-        height=36,
+        width=btn_w,
+        height=btn_h,
         corner_radius=980,
         state=tk.NORMAL if product["current_stock"] > 0 else tk.DISABLED,
         command=lambda prod=product: app._add_product_to_cart(prod),

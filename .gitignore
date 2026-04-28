@@ -8,6 +8,9 @@ __pycache__/
 
 supabase.env
 
+# SQLite → Supabase bridge progress (machine-specific)
+sync/.supabase_last_tx_id
+
 # Environment / API keys
 .env
 .env.*
