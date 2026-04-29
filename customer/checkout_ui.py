@@ -234,15 +234,12 @@ def build_cash_payment_content(app, parent, total_amount: float):
 
     amount_var = tk.DoubleVar(value=0.0)
     remaining_var = tk.DoubleVar(value=total_amount)
-    change_var = tk.DoubleVar(value=0.0)
     amount_display_var = tk.StringVar(value="₱0.00")
     remaining_display_var = tk.StringVar(value=f"₱{total_amount:.2f}")
-    change_display_var = tk.StringVar(value="₱0.00")
 
     def _sync_cash_display():
         amount_display_var.set(f"₱{amount_var.get():.2f}")
         remaining_display_var.set(f"₱{remaining_var.get():.2f}")
-        change_display_var.set(f"₱{change_var.get():.2f}")
 
     def _refresh_pulse_debug():
         helper_var.set(
@@ -255,14 +252,19 @@ def build_cash_payment_content(app, parent, total_amount: float):
     tk.Label(card, textvariable=amount_display_var, font=(app._ui_font_name, 22, "bold"), bg=app.current_theme["button_bg"], fg=app.current_theme["button_fg"]).pack()
     ctk.CTkLabel(card, text="Remaining:", font=app._ui_font_body, text_color=app.current_theme["button_fg"]).pack(pady=(10, 4), padx=20)
     tk.Label(card, textvariable=remaining_display_var, font=(app._ui_font_name, 22, "bold"), bg=app.current_theme["button_bg"], fg=app.current_theme["button_fg"]).pack()
-    ctk.CTkLabel(card, text="Overpay amount:", font=app._ui_font_body, text_color=app.current_theme["button_fg"]).pack(pady=(10, 4), padx=20)
-    tk.Label(card, textvariable=change_display_var, font=(app._ui_font_name, 22, "bold"), bg=app.current_theme["button_bg"], fg=app.current_theme.get("accent", app.current_theme["button_fg"])).pack()
 
     def finish_if_enough():
         current = app.cash_session.get_amount()
-        if current < total_amount:
+        # Exact-amount only: we do not provide change in this build.
+        current_rounded = round(float(current), 2)
+        total_rounded = round(float(total_amount), 2)
+        if current_rounded < total_rounded:
             from tkinter import messagebox
             messagebox.showwarning("Not enough", "Please insert more coins.")
+            return
+        if current_rounded > total_rounded:
+            from tkinter import messagebox
+            messagebox.showwarning("Exact amount only", "Please insert the exact amount (no overpay).")
             return
         app.complete_purchase_cash(total_amount, current)
 
@@ -273,4 +275,5 @@ def build_cash_payment_content(app, parent, total_amount: float):
         _sync_cash_display()
         _refresh_pulse_debug()
 
-    app.start_cash_pulse_monitor(amount_var, remaining_var, total_amount, change_var=change_var, on_update=_on_cash_update)
+    # No change tracking/UI because we require exact amount.
+    app.start_cash_pulse_monitor(amount_var, remaining_var, total_amount, on_update=_on_cash_update)

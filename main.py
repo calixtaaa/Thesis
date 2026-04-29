@@ -1923,7 +1923,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         ).pack(side=tk.LEFT, padx=4)
         ctk.CTkButton(
             top_row,
-            text="✕",
+            text="×",
             width=32,
             height=32,
             font=(UI_FONT, 14, "bold"),
@@ -2175,7 +2175,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             try:
                 ref["card"].configure(fg_color=self._cart_selected_bg, border_color=self._cart_selected_border)
                 ref["btn"].configure(
-                    text="✕",
+                    text="×  Remove",
                     fg_color=self.current_theme.get("btn_remove", "#ef4444"),
                     hover_color=self.current_theme.get("btn_remove_hover", "#dc2626"),
                     command=lambda prod=product: self._remove_product_from_cart(prod),
@@ -2283,6 +2283,9 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                 text_color=self.current_theme.get("nav_fg", "#ffffff"),
                 fg_color=panel_bg,
                 hover_color=self.current_theme.get("nav_hover", "#4f46e5"),
+                # Ensure the qty buttons still read as "buttons" on both themes.
+                border_width=1,
+                border_color=self.current_theme.get("button_fg", self.current_theme.get("nav_fg", "#ffffff")),
                 width=32,
                 height=28,
                 corner_radius=6,
@@ -2296,6 +2299,8 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                 text_color=self.current_theme.get("nav_fg", "#ffffff"),
                 fg_color=panel_bg,
                 hover_color=self.current_theme.get("nav_hover", "#4f46e5"),
+                border_width=1,
+                border_color=self.current_theme.get("button_fg", self.current_theme.get("nav_fg", "#ffffff")),
                 width=32,
                 height=28,
                 corner_radius=6,
@@ -2328,9 +2333,15 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             if entry["product"]["id"] != product_id:
                 continue
             old_qty = int(entry["quantity"] if entry["quantity"] is not None else 1)
-            max_stock = int(entry["product"].get("current_stock") or old_qty)
+            # `entry["product"]` is typically a sqlite3.Row; use indexing (not `.get`)
+            # so clicks work consistently in both light/dark themes.
+            prod = entry["product"]
             try:
-                cap = int(entry["product"].get("capacity") or 0)
+                max_stock = int(prod["current_stock"]) if prod["current_stock"] is not None else old_qty
+            except Exception:
+                max_stock = old_qty
+            try:
+                cap = int(prod["capacity"]) if prod["capacity"] is not None else 0
                 if cap > 0:
                     max_stock = min(max_stock, cap)
             except Exception:

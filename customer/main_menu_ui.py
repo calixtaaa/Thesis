@@ -458,7 +458,7 @@ def _show_product_detail_modal(app, product):
     if in_cart:
         ctk.CTkButton(
             btn_row,
-            text="✕  Remove from Cart",
+            text="×  Remove from Cart",
             font=(app._ui_font_name, 15, "bold"),
             fg_color=app.current_theme.get("btn_remove", "#E74C3C"),
             hover_color=app.current_theme.get("btn_remove_hover", "#C0392B"),
@@ -666,7 +666,7 @@ def build_product_card_button(app, card, product, in_cart):
     if in_cart:
         return ctk.CTkButton(
             card,
-            text="✕  Remove",
+            text="×  Remove",
             font=btn_font,
             text_color="#ffffff",
             fg_color=app.current_theme.get("btn_remove", "#E74C3C"),
