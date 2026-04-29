@@ -17,6 +17,35 @@ from admin.reports import get_reports_dir
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "vending.db"
 
+# Canonical machine stock capacities (source of truth)
+_CAPACITY_RULES = {
+    "alcohol": 3,
+    "soap": 7,
+    "deodorant": 9,
+    "deo": 9,
+    "mouthwash": 7,
+    "mouth wash": 7,
+    "wet wipes": 3,
+    "wetwipes": 3,
+    "wipes": 3,
+    "tissue": 3,
+    "tissues": 3,
+    "panty liner": 8,
+    "panty liners": 8,
+    "pantyliners": 8,
+    "panti liner": 8,
+    "all night pads": 6,
+    "all-night pads": 6,
+    "regular with wings": 7,
+    "regular w/ wings pads": 7,
+    "regular with wings pads": 7,
+    "non wings pad": 7,
+    "non wing pad": 7,
+    "non-wing pads": 7,
+    "non wing pads": 7,
+    "non-wing pad": 7,
+}
+
 # ── SHA-256 HMAC salt (shared with server.py) ──────────────────────
 _SALT_FILE = BASE_DIR / ".secret_salt"
 if _SALT_FILE.exists():
@@ -167,6 +196,24 @@ def init_db():
             VALUES (?, ?, ?, ?, ?, ?)
             """,
             sample_products,
+        )
+        conn.commit()
+    else:
+        # Keep capacities aligned with the latest machine layout even on existing DBs.
+        for raw_name, cap in _CAPACITY_RULES.items():
+            cur.execute(
+                "UPDATE products SET capacity = ? WHERE lower(name) = ?",
+                (int(cap), raw_name),
+            )
+        conn.commit()
+
+        # Defensive: prevent impossible over-cap stock values (e.g., old 10-cap rows).
+        cur.execute(
+            """
+            UPDATE products
+            SET current_stock = capacity
+            WHERE current_stock > capacity
+            """
         )
         conn.commit()
 

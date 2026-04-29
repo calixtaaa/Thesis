@@ -17,6 +17,16 @@ sync/.supabase_last_tx_id
 *.env
 *.env.*
 WebSite/.env.local
+WebSite/.env.production
+WebSite/.env.development
+*.key
+*.pem
+*.p12
+*.pfx
+*secret*
+*token*
+*apikey*
+*api_key*
 
 vending.db
 

@@ -288,6 +288,62 @@ export function useAuth() {
     return { success: true }
   }
 
+  async function updateCurrentUserPassword(newPassword) {
+    const key = String(currentUser.value?.username || '').trim().toLowerCase()
+    const nextPwd = String(newPassword || '')
+    if (!key) return { success: false, message: 'No logged in user.' }
+    if (!isTupSchoolEmail(key)) return { success: false, message: 'Current user email is invalid.' }
+    if (!nextPwd) return { success: false, message: 'Password is required.' }
+
+    let role = currentUser.value?.role === 'admin' ? 'admin' : 'staff'
+
+    // Update local cached users so this browser keeps working offline-first.
+    const idx = users.value.findIndex((u) => String(u.username || '').trim().toLowerCase() === key)
+    if (idx >= 0) {
+      users.value[idx] = { ...users.value[idx], password: nextPwd }
+      role = users.value[idx].role || role
+    } else {
+      users.value.push({ username: key, password: nextPwd, role })
+    }
+    saveUsers(users.value)
+
+    // Ensure Supabase mirrors the new password too (cross-browser login).
+    try {
+      const { data, error: selErr } = await supabase
+        .from('emails')
+        .select('id, email, role')
+        .eq('email', key)
+        .limit(1)
+      if (selErr) {
+        if (import.meta.env.DEV) console.warn('[credentials select]', selErr.message)
+      }
+      const row = Array.isArray(data) ? data[0] : null
+      if (row?.id) {
+        const { error: upErr } = await supabase
+          .from('emails')
+          .update({ password: nextPwd, role })
+          .eq('id', row.id)
+        if (upErr) {
+          if (import.meta.env.DEV) console.warn('[credentials update]', upErr.message)
+          return { success: false, message: 'Local password updated, but Supabase update failed.' }
+        }
+      } else {
+        const { error: insErr } = await supabase
+          .from('emails')
+          .insert({ email: key, password: nextPwd, role })
+        if (insErr) {
+          if (import.meta.env.DEV) console.warn('[credentials insert]', insErr.message)
+          return { success: false, message: 'Local password updated, but Supabase insert failed.' }
+        }
+      }
+    } catch (e) {
+      if (import.meta.env.DEV) console.warn('[credentials sync]', e)
+      return { success: false, message: 'Local password updated, but Supabase sync failed.' }
+    }
+
+    return { success: true, message: 'Password updated in website + Supabase.' }
+  }
+
   return {
     currentUser,
     isLoggedIn,
@@ -297,5 +353,6 @@ export function useAuth() {
     createUser,
     getUsers,
     deleteUser,
+    updateCurrentUserPassword,
   }
 }
