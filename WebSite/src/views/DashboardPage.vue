@@ -41,6 +41,15 @@
           >
             <span v-html="item.icon" class="absolute left-4 w-5 h-5 shrink-0 transition-opacity" :class="activeSection === item.id ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'"></span>
             <span class="w-full text-center leading-[1.25] text-[14.5px] font-display pr-1 pl-6" :class="activeSection === item.id ? 'font-bold' : 'font-medium'">{{ item.label }}</span>
+            <span
+              v-if="item.id === 'machine-feed' && activeSection !== 'machine-feed' && liveFeedBadgeCount > 0"
+              class="absolute right-3 inline-flex items-center justify-center min-w-[1.6rem] h-5 px-1.5 rounded-full text-[11px] font-extrabold border"
+              :class="activeSection === item.id
+                ? 'bg-white/15 text-white border-white/10'
+                : 'bg-surface-900/50 text-surface-200 border-surface-800/40 group-hover:bg-surface-800/50'"
+            >
+              {{ liveFeedBadgeText }}
+            </span>
           </button>
         </nav>
       </div>
@@ -249,7 +258,7 @@
                   <td class="hidden sm:table-cell py-2 text-right text-surface-300 text-xs whitespace-nowrap">{{ row.totalAmount != null ? `₱${row.totalAmount}` : '—' }}</td>
                 </tr>
                 <tr v-if="liveFeedPreview.length === 0">
-                  <td colspan="3" class="py-10 text-center text-surface-500 text-sm">No feed rows yet — run <code class="text-surface-400">machine_live_feed.sql</code> and insert from the machine.</td>
+                  <td colspan="6" class="py-10 text-center text-surface-500 text-sm">No feed rows yet — run <code class="text-surface-400">machine_live_feed.sql</code> and insert from the machine.</td>
                 </tr>
               </tbody>
               <tfoot v-if="!isCompactUi && liveFeedPreview.length > 0" class="sticky bottom-0 bg-surface-950/95 light:bg-surface-100/95 border-t border-surface-800/40">
@@ -703,7 +712,7 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="row in liveFeedRowsForSelectedDay" :key="row.id" class="border-b border-surface-800/20">
+                <tr v-for="row in liveFeedRowsForSelectedDay" :key="row.key" class="border-b border-surface-800/20">
                   <td class="py-3 px-4 text-surface-500 text-xs whitespace-nowrap">{{ row.time }}</td>
                   <td class="py-3 px-4 text-brand-400 text-xs font-medium">{{ row.type }}</td>
                   <td class="py-3 px-4 text-surface-200">{{ row.message }}</td>
@@ -2311,7 +2320,7 @@ const liveFeedRowsAll = computed(() => {
     timeStyle: 'medium',
   })
   const tx = Array.isArray(machine.transactions.value) ? machine.transactions.value : []
-  const rows = tx.map((t) => {
+  const saleRows = tx.map((t) => {
     const name = resolveProductName(t)
     const slotTxt = t?.slot_number != null ? `slot ${t.slot_number}` : 'slot ?'
     const amt = Number.isFinite(Number(t?.total_amount)) ? Number(t.total_amount) : 0
@@ -2327,8 +2336,53 @@ const liveFeedRowsAll = computed(() => {
       _createdAt: t?.created_at ?? null,
     }
   })
-  // If Supabase has duplicate transaction rows, collapse by source_tx_id first.
-  return dedupeKeepFirst(rows, (r) => r.key)
+
+  // Also include rows from `public.live_feed` (non-sale events, plus any sales that don't exist in `transactions` yet).
+  const txKeys = new Set(saleRows.map((r) => r.key))
+  const feedRaw = Array.isArray(machine.liveFeed.value) ? machine.liveFeed.value : []
+  const feedRows = feedRaw
+    .map((r, i) => {
+      const payload = coerceObject(r?.payload)
+      const stable = payload?.source_tx_id ?? payload?.transaction_id
+      const stableKey = stable != null && stable !== '' ? `tx:${stable}` : null
+      const eventType = String(r?.event_type || payload?.event_type || 'info').trim() || 'info'
+      const createdAt = r?.created_at ?? payload?.created_at ?? null
+      const qty = pickFirstFiniteNumber(r?.quantity, payload?.quantity)
+      const ir = normalizeBool(
+        r?.ir_beam_sensed ?? r?.irBeamSensed ?? payload?.ir_beam_sensed ?? payload?.irBeamSensed ?? payload?.ir
+      )
+      const total = pickFirstFiniteNumber(r?.total_amount, payload?.total_amount, payload?.amount, payload?.total)
+      let msg = String(r?.message || payload?.message || '').trim()
+      if (!msg) msg = eventType === 'sale' ? 'Sale event' : 'Machine event'
+
+      // If this is a sale and we already have the matching transaction, skip to avoid duplicates.
+      if (eventType === 'sale' && stableKey && txKeys.has(stableKey)) return null
+
+      const identity = stableLiveFeedIdentity(r)
+      const key = stableKey && !txKeys.has(stableKey)
+        ? stableKey
+        : `lf:${identity || r?.id || i}`
+
+      return {
+        id: r?.id ?? null,
+        key,
+        time: createdAt ? tf.format(new Date(createdAt)) : '—',
+        type: eventType,
+        message: msg,
+        quantity: qty ?? null,
+        irBeamSensed: ir ?? null,
+        totalAmount: total ?? null,
+        _createdAt: createdAt,
+      }
+    })
+    .filter(Boolean)
+
+  const merged = [...saleRows, ...feedRows]
+    .filter((r) => r && r._createdAt)
+    .sort((a, b) => new Date(b._createdAt || 0) - new Date(a._createdAt || 0))
+
+  // If Supabase has duplicates, collapse by key first.
+  return dedupeKeepFirst(merged, (r) => r.key)
 })
 
 const liveFeedRows = computed(() => {
@@ -2337,6 +2391,34 @@ const liveFeedRows = computed(() => {
 })
 
 const liveFeedPreview = computed(() => liveFeedRows.value.slice(0, 10))
+
+// "Unread" badge: clears when you open the Live feed section, reappears only for newer events.
+const liveFeedLastSeenAt = ref(Date.now())
+watch(activeSection, (next) => {
+  if (next === 'machine-feed') liveFeedLastSeenAt.value = Date.now()
+})
+
+function toMsSafe(iso) {
+  if (!iso) return 0
+  try {
+    const ms = Date.parse(String(iso))
+    return Number.isNaN(ms) ? 0 : ms
+  } catch (_) {
+    return 0
+  }
+}
+
+const liveFeedBadgeCount = computed(() => {
+  const lastSeen = Number(liveFeedLastSeenAt.value || 0)
+  const rows = Array.isArray(liveFeedRows.value) ? liveFeedRows.value : []
+  let n = 0
+  for (const r of rows) {
+    const ms = toMsSafe(r?._createdAt)
+    if (ms > lastSeen) n += 1
+  }
+  return n
+})
+const liveFeedBadgeText = computed(() => (liveFeedBadgeCount.value > 99 ? '99+' : String(liveFeedBadgeCount.value)))
 
 const liveFeedRowsForSelectedDay = computed(() => {
   const key = feedSelectedYmd.value
