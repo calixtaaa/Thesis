@@ -20,6 +20,12 @@ def build_checkout_back_bar(app, parent, text, command):
 
 
 def build_order_review_content(app, parent, items, total, accent, accent_hover):
+    # Product image loader (same logic as product cards: Pillow when available, else tk.PhotoImage).
+    try:
+        import customer.main_menu_ui as mm  # type: ignore
+    except Exception:  # pragma: no cover
+        mm = None
+
     nav_bar = ctk.CTkFrame(parent, fg_color=app.current_theme["bg"], corner_radius=0)
     nav_bar.pack(side=tk.BOTTOM, fill=tk.X, pady=(0, 6))
 
@@ -79,13 +85,54 @@ def build_order_review_content(app, parent, items, total, accent, accent_hover):
         scrollbar_button_hover_color=app.current_theme.get("accent", "#10b981"),
     )
     list_frame.pack(fill=tk.BOTH, expand=False, padx=30, pady=(22, 0))
-    for col in range(3):
-        list_frame.grid_columnconfigure(col, weight=1 if col == 0 else 0)
+    # Columns: [img] [name] [qty] [price]
+    list_frame.grid_columnconfigure(0, weight=0)
+    list_frame.grid_columnconfigure(1, weight=1)
+    list_frame.grid_columnconfigure(2, weight=0)
+    list_frame.grid_columnconfigure(3, weight=0)
 
     for row_index, item in enumerate(items):
         product = item["product"]
         quantity = int(item["quantity"])
         line_total = float(product["price"]) * quantity
+
+        # Thumbnail (optional)
+        placed = False
+        try:
+            name = str(product["name"])
+        except Exception:
+            name = str(getattr(product, "name", "") or "")
+        if mm is not None and getattr(mm, "_HAS_PIL", False):
+            try:
+                img_path = mm._resolve_product_image_path(name)
+                if img_path:
+                    pil_img = mm.Image.open(str(img_path)).convert("RGBA")
+                    ctk_img = mm._pil_square_rgba_to_ctk(pil_img, 42)
+                    img_lbl = ctk.CTkLabel(list_frame, text="", image=ctk_img, fg_color="transparent")
+                    img_lbl._ctk_img_ref = ctk_img
+                    img_lbl.grid(row=row_index, column=0, sticky="w", pady=4, padx=(0, 10))
+                    placed = True
+            except Exception:
+                placed = False
+        if not placed and mm is not None:
+            try:
+                tkph = mm._load_product_image_tk(name, 42)
+            except Exception:
+                tkph = None
+            if tkph is not None:
+                lbl = tk.Label(
+                    list_frame,
+                    image=tkph,
+                    bd=0,
+                    bg=card_bg_color,
+                    highlightthickness=0,
+                )
+                lbl.tk_img_ref = tkph
+                lbl.grid(row=row_index, column=0, sticky="w", pady=4, padx=(0, 10))
+                placed = True
+        if not placed:
+            ctk.CTkLabel(list_frame, text="", width=42).grid(row=row_index, column=0, sticky="w", pady=4, padx=(0, 10))
+
         ctk.CTkLabel(
             list_frame,
             text=product["name"],
@@ -94,21 +141,21 @@ def build_order_review_content(app, parent, items, total, accent, accent_hover):
             anchor="w",
             wraplength=420,
             justify="left",
-        ).grid(row=row_index, column=0, sticky="w", pady=4)
+        ).grid(row=row_index, column=1, sticky="w", pady=4)
         ctk.CTkLabel(
             list_frame,
             text=f"x{quantity}",
             font=(app._ui_font_name, 12, "bold"),
             text_color=app.current_theme.get("muted", app.current_theme["button_fg"]),
             anchor="e",
-        ).grid(row=row_index, column=1, sticky="e", padx=(10, 0))
+        ).grid(row=row_index, column=2, sticky="e", padx=(10, 0))
         ctk.CTkLabel(
             list_frame,
             text=f"₱{line_total:.2f}",
             font=(app._ui_font_name, 12, "bold"),
             text_color=app.current_theme["button_fg"],
             anchor="e",
-        ).grid(row=row_index, column=2, sticky="e", padx=(18, 0))
+        ).grid(row=row_index, column=3, sticky="e", padx=(18, 0))
 
     ctk.CTkLabel(
         card,
@@ -196,8 +243,48 @@ def build_payment_method_content(app, parent, items, total):
     card = ctk.CTkFrame(parent, fg_color=app.current_theme["button_bg"], border_width=1, border_color=app.current_theme.get("card_border", "#e2e8f0"), corner_radius=12)
     card.pack(padx=24, pady=10)
 
+    # Show a product image when buying a single item (single-item flow skips Order Summary).
+    try:
+        import customer.main_menu_ui as mm  # type: ignore
+    except Exception:  # pragma: no cover
+        mm = None
+
+    if len(items) == 1:
+        p = items[0]["product"]
+        try:
+            name = str(p["name"])
+        except Exception:
+            name = str(getattr(p, "name", "") or "")
+        placed = False
+        holder = ctk.CTkFrame(card, fg_color="transparent")
+        holder.pack(pady=(16, 6), padx=20)
+        if mm is not None and getattr(mm, "_HAS_PIL", False):
+            try:
+                img_path = mm._resolve_product_image_path(name)
+                if img_path:
+                    pil_img = mm.Image.open(str(img_path)).convert("RGBA")
+                    ctk_img = mm._pil_square_rgba_to_ctk(pil_img, 110)
+                    img_lbl = ctk.CTkLabel(holder, text="", image=ctk_img, fg_color="transparent")
+                    img_lbl._ctk_img_ref = ctk_img
+                    img_lbl.pack()
+                    placed = True
+            except Exception:
+                placed = False
+        if not placed and mm is not None:
+            try:
+                tkph = mm._load_product_image_tk(name, 110)
+            except Exception:
+                tkph = None
+            if tkph is not None:
+                lbl = tk.Label(holder, image=tkph, bd=0, bg=app.current_theme["button_bg"], highlightthickness=0)
+                lbl.tk_img_ref = tkph
+                lbl.pack()
+                placed = True
+        if not placed:
+            ctk.CTkLabel(holder, text="", width=110, height=110).pack()
+
     summary_text = "\n".join(f"{item['product']['name']} x{int(item['quantity'])}" for item in items)
-    ctk.CTkLabel(card, text=summary_text, font=app._ui_font_body, text_color=app.current_theme["button_fg"], wraplength=360, justify="center").pack(pady=(20, 8), padx=20)
+    ctk.CTkLabel(card, text=summary_text, font=app._ui_font_body, text_color=app.current_theme["button_fg"], wraplength=360, justify="center").pack(pady=(10, 8), padx=20)
     ctk.CTkLabel(card, text=f"Total: ₱{total:.2f}", font=app._ui_font_title, text_color=app.current_theme["button_fg"]).pack(pady=(0, 16), padx=20)
 
     ctk.CTkButton(card, text="Pay with Coins\nCoin acceptor only", font=app._ui_font_button, fg_color=app.current_theme.get("accent", "#1A948E"), hover_color=app.current_theme.get("accent_hover", "#15857B"), text_color=app.current_theme.get("on_accent", "#ffffff"), corner_radius=10, height=60, command=lambda: app.cash_payment_flow(total)).pack(pady=8, padx=20, fill=tk.X)

@@ -7,16 +7,105 @@ export function useRealtimeMachineData() {
   const liveFeed = ref([])
   const lowStockProducts = ref([])
   const subscriberEmails = ref([])
+  const bugReports = ref([])
   const loading = ref(true)
   const error = ref('')
 
   let channel = null
 
+  // Batch expensive normalize work to avoid UI stutter on frequent realtime updates.
+  let txNormalizeQueued = false
+  let feedNormalizeQueued = false
+  function queueMicrotaskSafe(fn) {
+    try {
+      if (typeof queueMicrotask === 'function') return queueMicrotask(fn)
+    } catch (_) {
+      // ignore
+    }
+    return Promise.resolve().then(fn)
+  }
+  function scheduleTxNormalize() {
+    if (txNormalizeQueued) return
+    txNormalizeQueued = true
+    queueMicrotaskSafe(() => {
+      txNormalizeQueued = false
+      transactions.value = dedupeBy(transactions.value, txKey)
+      if (transactions.value.length > 3000) transactions.value = transactions.value.slice(0, 3000)
+    })
+  }
+  function scheduleFeedNormalize() {
+    if (feedNormalizeQueued) return
+    feedNormalizeQueued = true
+    queueMicrotaskSafe(() => {
+      feedNormalizeQueued = false
+      liveFeed.value = dedupeBy(liveFeed.value, feedKey)
+      if (liveFeed.value.length > 1000) liveFeed.value = liveFeed.value.slice(0, 1000)
+    })
+  }
+
+  function txKey(row) {
+    return row?.source_tx_id ?? row?.id
+  }
+
+  function feedKey(row) {
+    const payload = row?.payload || {}
+    const stable = payload?.source_tx_id ?? payload?.transaction_id
+    if (stable != null && stable !== '') return `tx:${stable}`
+
+    // Normalize created_at to seconds (different string formats can represent same moment)
+    const rawCa = row?.created_at ?? ''
+    let sec = ''
+    try {
+      const ms = Date.parse(rawCa)
+      if (!Number.isNaN(ms)) sec = String(Math.floor(ms / 1000))
+      else if (typeof rawCa === 'string') sec = rawCa.slice(0, 19) // 'YYYY-MM-DDTHH:MM:SS'
+    } catch (_) {
+      // ignore
+    }
+
+    const et = String(row?.event_type ?? '')
+
+    // For sale events: dedupe by what the UI cares about (time-second + slot/product + qty + amount).
+    if (et === 'sale') {
+      const slot = payload?.slot_number ?? payload?.slot ?? ''
+      const pid = payload?.product_id ?? ''
+      const qty = payload?.quantity ?? row?.quantity ?? ''
+      const amtNum = Number.isFinite(Number(payload?.total_amount ?? row?.total_amount))
+        ? Number(payload?.total_amount ?? row?.total_amount)
+        : 0
+      const amtCents = Math.round(amtNum * 100)
+      return `sale:${sec}|${pid}|${slot}|${qty}|${amtCents}`
+    }
+
+    // Other events: fallback fingerprint (keep message to avoid collapsing distinct events).
+    const msg = String(row?.message ?? '')
+    const qty2 = String(row?.quantity ?? '')
+    const amt2 = String(row?.total_amount ?? '')
+    const fp = `${sec}|${et}|${msg}|${qty2}|${amt2}`
+    return fp !== '||||' ? fp : row?.id
+  }
+
+  function dedupeBy(list, keyFn) {
+    const seen = new Set()
+    const out = []
+    for (const item of Array.isArray(list) ? list : []) {
+      const k = keyFn(item)
+      if (k === undefined || k === null) {
+        out.push(item)
+        continue
+      }
+      if (seen.has(k)) continue
+      seen.add(k)
+      out.push(item)
+    }
+    return out
+  }
+
   async function loadInitial() {
     loading.value = true
     error.value = ''
 
-    const [prodRes, txRes, feedRes, lowRes, mailRes] = await Promise.all([
+    const [prodRes, txRes, feedRes, lowRes, mailRes, bugRes] = await Promise.all([
       supabase.from('products').select('*').order('slot_number', { ascending: true }),
       supabase
         .from('transactions')
@@ -26,6 +115,7 @@ export function useRealtimeMachineData() {
       supabase.from('live_feed').select('*').order('created_at', { ascending: false }).limit(1000),
       supabase.from('low_stock_products').select('*').order('slot_number', { ascending: true }).limit(200),
       supabase.from('emails').select('id, email, created_at, password').order('created_at', { ascending: false }).limit(500),
+      supabase.from('bug_reports').select('*').order('created_at', { ascending: false }).limit(500),
     ])
 
     const { data: prod, error: prodErr } = prodRes
@@ -33,6 +123,7 @@ export function useRealtimeMachineData() {
     const { data: feed, error: feedErr } = feedRes
     const { data: low, error: lowErr } = lowRes
     const { data: mails, error: mailErr } = mailRes
+    const { data: bugs, error: bugErr } = bugRes
 
     if (prodErr) error.value = prodErr.message
     if (txErr) error.value = error.value ? `${error.value}; ${txErr.message}` : txErr.message
@@ -43,7 +134,7 @@ export function useRealtimeMachineData() {
       }
       liveFeed.value = []
     } else {
-      liveFeed.value = Array.isArray(feed) ? feed : []
+      liveFeed.value = dedupeBy(Array.isArray(feed) ? feed : [], feedKey)
     }
 
     if (lowErr) {
@@ -66,8 +157,18 @@ export function useRealtimeMachineData() {
       subscriberEmails.value = Array.isArray(mails) ? mails : []
     }
 
+    if (bugErr) {
+      const msg = bugErr.message || String(bugErr)
+      if (!/relation|does not exist|not find/i.test(msg)) {
+        error.value = error.value ? `${error.value}; ${msg}` : msg
+      }
+      bugReports.value = []
+    } else {
+      bugReports.value = Array.isArray(bugs) ? bugs : []
+    }
+
     products.value = Array.isArray(prod) ? prod : []
-    transactions.value = Array.isArray(tx) ? tx : []
+    transactions.value = dedupeBy(Array.isArray(tx) ? tx : [], txKey)
     loading.value = false
   }
 
@@ -101,10 +202,14 @@ export function useRealtimeMachineData() {
         { event: '*', schema: 'public', table: 'transactions' },
         (payload) => {
           const { eventType, new: rowNew, old: rowOld } = payload || {}
-          if (eventType === 'DELETE') removeLocal(transactions, rowOld, 'id')
-          else if (rowNew) upsertLocal(transactions, rowNew, 'id')
-
-          if (transactions.value.length > 3000) transactions.value = transactions.value.slice(0, 3000)
+          if (eventType === 'DELETE') {
+            removeLocal(transactions, rowOld, rowOld?.source_tx_id != null ? 'source_tx_id' : 'id')
+          } else if (rowNew) {
+            upsertLocal(transactions, rowNew, rowNew?.source_tx_id != null ? 'source_tx_id' : 'id')
+          }
+          // Defensive: dedupe to avoid repeated rows if the backend replays.
+          // Batched to keep UI responsive on mobile.
+          scheduleTxNormalize()
         }
       )
       .on(
@@ -114,7 +219,7 @@ export function useRealtimeMachineData() {
           const { eventType, new: rowNew, old: rowOld } = payload || {}
           if (eventType === 'DELETE') removeLocal(liveFeed, rowOld, 'id')
           else if (rowNew) upsertLocal(liveFeed, rowNew, 'id')
-          if (liveFeed.value.length > 1000) liveFeed.value = liveFeed.value.slice(0, 1000)
+          scheduleFeedNormalize()
         }
       )
       .on(
@@ -138,6 +243,16 @@ export function useRealtimeMachineData() {
           if (subscriberEmails.value.length > 500) subscriberEmails.value = subscriberEmails.value.slice(0, 500)
         }
       )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'bug_reports' },
+        (payload) => {
+          const { eventType, new: rowNew, old: rowOld } = payload || {}
+          if (eventType === 'DELETE') removeLocal(bugReports, rowOld, 'id')
+          else if (rowNew) upsertLocal(bugReports, rowNew, 'id')
+          if (bugReports.value.length > 500) bugReports.value = bugReports.value.slice(0, 500)
+        }
+      )
       .subscribe((status, err) => {
         if (status === 'SUBSCRIBED') return
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
@@ -148,7 +263,22 @@ export function useRealtimeMachineData() {
   }
 
   const overview = computed(() => {
-    const lowStock = lowStockProducts.value.length
+    // Prefer server-side low_stock_products when available; otherwise compute from products.
+    const computedLow = products.value
+      .map((p) => {
+        const name = String(p?.name ?? '').trim().toLowerCase()
+        const stock = Number(p?.current_stock ?? 0)
+        const threshold = (() => {
+          if (name === 'alcohol') return 1
+          if (name === 'wipes' || name === 'wet wipes' || name === 'wetwipes') return 1
+          if (name === 'tissue' || name === 'tissues') return 1
+          if (name === 'all night pads' || name === 'all-night pads') return 2
+          return 3
+        })()
+        return stock <= threshold ? 1 : 0
+      })
+      .reduce((s, v) => s + v, 0)
+    const lowStock = lowStockProducts.value.length > 0 ? lowStockProducts.value.length : computedLow
     const totalSales = transactions.value.reduce((sum, t) => sum + Number(t.total_amount ?? 0), 0)
     const orders = transactions.value.length
     const activeCustomers = new Set(
@@ -216,6 +346,7 @@ export function useRealtimeMachineData() {
     liveFeed,
     lowStockProducts,
     subscriberEmails,
+    bugReports,
     loading,
     error,
     overview,

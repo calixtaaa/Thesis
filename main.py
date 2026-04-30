@@ -6,6 +6,7 @@ import time
 import json
 import math
 import datetime
+import threading
 from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox, simpledialog
@@ -719,6 +720,9 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         self.light_theme_icon = None
         self.dark_theme_icon = None
 
+        # Small thumbnail cache (reduces UI lag on receipt/order summary renders)
+        self._thumb_cache = {}
+
         # Staff icon
         try:
             for name in ("staff.png", "staff_icon.png"):
@@ -808,6 +812,8 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         self.theme_animating = False
         self._pending_theme_apply_id = None
         self._current_screen_builder = None  # callable to rebuild the active screen
+
+        # Receipt screen only (no QR/download)
 
         # Prediction Analysis cache (run once per session unless forced)
         self._prediction_results = None
@@ -2539,7 +2545,8 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             return
         change = max(0.0, inserted - total_amount)
         self._show_dispensing_screen()
-        self.after(50, lambda: self._do_dispense_cash(items, change))
+        # Run the blocking dispense + DB writes off the UI thread (keeps UI responsive).
+        threading.Thread(target=self._do_dispense_cash, args=(items, change), daemon=True).start()
 
     def _do_dispense_cash(self, items, change):
         try:
@@ -2559,15 +2566,20 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                     f"\n\nInserted above total: Php{change:.2f}. "
                     "Automatic coin change hopper is disabled in this build."
                 )
-            self.show_success_screen(
-                "Thank you!",
-                f"Please take your products.{change_note}",
-                on_ok=lambda: (self._reset_checkout_state(), self.build_main_menu()),
+            total = self._get_checkout_total(items)
+            footer = "Please take your products." + change_note
+            self.after(
+                0,
+                lambda: self.show_receipt_screen(
+                    items,
+                    total=total,
+                    payment_method="cash",
+                    footer_note=footer,
+                ),
             )
         except Exception as e:
-            messagebox.showerror("Error", str(e))
-            self._reset_checkout_state()
-            self.build_main_menu()
+            self.after(0, lambda: messagebox.showerror("Error", str(e)))
+            self.after(0, lambda: (self._reset_checkout_state(), self.build_main_menu()))
 
     # ---------- Utility Screens ----------
 
@@ -2619,15 +2631,20 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                     rfid_user_id=rfid_user_id,
                     ir_confirmed=ir_ok,
                 )
-            self.show_success_screen(
-                "Thank you!",
-                f"Payment successful.\n\nRemaining balance: ₱{new_balance:.2f}\nPlease take your products.",
-                on_ok=lambda: (self._reset_checkout_state(), self.build_main_menu()),
+            total = self._get_checkout_total(items)
+            footer = f"Remaining balance: ₱{new_balance:.2f}\nPlease take your products."
+            self.after(
+                0,
+                lambda: self.show_receipt_screen(
+                    items,
+                    total=total,
+                    payment_method="RFID",
+                    footer_note=footer,
+                ),
             )
         except Exception as e:
-            messagebox.showerror("Error", str(e))
-            self._reset_checkout_state()
-            self.build_main_menu()
+            self.after(0, lambda: messagebox.showerror("Error", str(e)))
+            self.after(0, lambda: (self._reset_checkout_state(), self.build_main_menu()))
 
     def show_success_screen(self, title: str, message: str, on_ok=None):
         """In-app success screen (no messagebox pop-up)."""
@@ -2643,6 +2660,160 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
     def _build_success_screen_content(self, title: str, message: str, on_ok=None):
         """Centered success/result card with OK action."""
         status_ui.build_success_screen_content(self, title, message, on_ok)
+
+    # ---------- Receipt (after dispensing) ----------
+
+    def show_receipt_screen(self, items, total: float, *, payment_method: str, footer_note: str = ""):
+        """Receipt view shown after dispensing. Includes optional QR download of a receipt image."""
+        self._current_screen_builder = lambda: self.show_receipt_screen(items, total, payment_method=payment_method, footer_note=footer_note)
+        if self.sidebar_holder is not None and self.sidebar_holder.winfo_exists():
+            self.sidebar_holder.destroy()
+            self.sidebar_holder = None
+        self.clear_screen()
+        self._build_receipt_screen_content(items, total, payment_method=payment_method, footer_note=footer_note)
+        self.add_theme_toggle_footer()
+
+    def _build_receipt_screen_content(self, items, total: float, *, payment_method: str, footer_note: str = ""):
+        theme = self.current_theme
+        frame = ctk.CTkFrame(self.content_holder, fg_color=theme["bg"], corner_radius=0)
+        frame.pack(expand=True, fill=tk.BOTH)
+
+        card = ctk.CTkFrame(
+            frame,
+            fg_color=theme.get("card_bg", theme["button_bg"]),
+            border_width=2,
+            border_color=theme.get("accent", "#1A948E"),
+            corner_radius=16,
+        )
+        card.place(relx=0.5, rely=0.5, anchor="center")
+
+        inner = ctk.CTkFrame(card, fg_color=theme.get("card_bg", theme["button_bg"]))
+        inner.pack(padx=32, pady=24)
+
+        ts = datetime.datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
+        ctk.CTkLabel(inner, text="Receipt", font=self._ui_font_title, text_color=theme.get("accent", "#1A948E")).pack(pady=(0, 4))
+        ctk.CTkLabel(inner, text=ts, font=self._ui_font_small, text_color=theme.get("muted", theme["fg"])).pack(pady=(0, 12))
+
+        list_frame = ctk.CTkScrollableFrame(
+            inner,
+            fg_color=theme.get("card_bg", theme["button_bg"]),
+            corner_radius=0,
+            height=170,
+            scrollbar_button_color=theme.get("search_border", "#cbd5e1"),
+            scrollbar_button_hover_color=theme.get("accent", "#10b981"),
+        )
+        list_frame.pack(fill=tk.BOTH, expand=False, padx=6, pady=(0, 10))
+        list_frame.grid_columnconfigure(0, weight=0)
+        list_frame.grid_columnconfigure(1, weight=1)
+        list_frame.grid_columnconfigure(2, weight=0)
+        list_frame.grid_columnconfigure(3, weight=0)
+
+        # Use same image loader as product cards/order summary
+        try:
+            import customer.main_menu_ui as mm  # type: ignore
+        except Exception:
+            mm = None
+
+        for r, it in enumerate(items):
+            p = it["product"]
+            q = int(it.get("quantity", 1) or 1)
+            try:
+                name = str(p["name"])
+            except Exception:
+                name = str(getattr(p, "name", "") or "")
+            try:
+                price = float(p["price"])
+            except Exception:
+                price = float(getattr(p, "price", 0) or 0)
+            line_total = price * q
+
+            placed = False
+            thumb_key = (name, 40)
+            if thumb_key in self._thumb_cache:
+                try:
+                    cached = self._thumb_cache.get(thumb_key)
+                    if cached is not None:
+                        # Cached can be CTkImage or tk.PhotoImage, depending on loader.
+                        if isinstance(cached, ctk.CTkImage):
+                            img_lbl = ctk.CTkLabel(list_frame, text="", image=cached, fg_color="transparent")
+                            img_lbl._ctk_img_ref = cached
+                            img_lbl.grid(row=r, column=0, sticky="w", pady=4, padx=(0, 10))
+                            placed = True
+                        else:
+                            lbl = tk.Label(
+                                list_frame,
+                                image=cached,
+                                bd=0,
+                                bg=theme.get("card_bg", theme["button_bg"]),
+                                highlightthickness=0,
+                            )
+                            lbl.tk_img_ref = cached
+                            lbl.grid(row=r, column=0, sticky="w", pady=4, padx=(0, 10))
+                            placed = True
+                except Exception:
+                    placed = False
+
+            if not placed and mm is not None and getattr(mm, "_HAS_PIL", False):
+                try:
+                    # Prefer the shared cached loader when available.
+                    if hasattr(mm, "_load_uniform_image"):
+                        # returns a cached Tk image (ImageTk.PhotoImage)
+                        tk_img = mm._load_uniform_image(name, size=40)
+                        if tk_img is not None:
+                            lbl = tk.Label(list_frame, image=tk_img, bd=0, bg=theme.get("card_bg", theme["button_bg"]), highlightthickness=0)
+                            lbl.tk_img_ref = tk_img
+                            lbl.grid(row=r, column=0, sticky="w", pady=4, padx=(0, 10))
+                            self._thumb_cache[thumb_key] = tk_img
+                            placed = True
+                    if not placed:
+                        img_path = mm._resolve_product_image_path(name)
+                        if img_path:
+                            pil_img = mm.Image.open(str(img_path)).convert("RGBA")
+                            ctk_img = mm._pil_square_rgba_to_ctk(pil_img, 40)
+                        img_lbl = ctk.CTkLabel(list_frame, text="", image=ctk_img, fg_color="transparent")
+                        img_lbl._ctk_img_ref = ctk_img
+                        img_lbl.grid(row=r, column=0, sticky="w", pady=4, padx=(0, 10))
+                        self._thumb_cache[thumb_key] = ctk_img
+                        placed = True
+                except Exception:
+                    placed = False
+            if not placed and mm is not None:
+                try:
+                    tkph = mm._load_product_image_tk(name, 40)
+                except Exception:
+                    tkph = None
+                if tkph is not None:
+                    lbl = tk.Label(list_frame, image=tkph, bd=0, bg=theme.get("card_bg", theme["button_bg"]), highlightthickness=0)
+                    lbl.tk_img_ref = tkph
+                    lbl.grid(row=r, column=0, sticky="w", pady=4, padx=(0, 10))
+                    self._thumb_cache[thumb_key] = tkph
+                    placed = True
+            if not placed:
+                ctk.CTkLabel(list_frame, text="", width=40).grid(row=r, column=0, sticky="w", pady=4, padx=(0, 10))
+
+            ctk.CTkLabel(list_frame, text=name, font=self._ui_font_body, text_color=theme["button_fg"], anchor="w", wraplength=360).grid(row=r, column=1, sticky="w", pady=4)
+            ctk.CTkLabel(list_frame, text=f"x{q}", font=(self._ui_font_name, 12, "bold"), text_color=theme.get("muted", theme["button_fg"])).grid(row=r, column=2, sticky="e", padx=(10, 0))
+            ctk.CTkLabel(list_frame, text=f"₱{line_total:.2f}", font=(self._ui_font_name, 12, "bold"), text_color=theme["button_fg"]).grid(row=r, column=3, sticky="e", padx=(16, 0))
+
+        ctk.CTkLabel(inner, text=f"Total: ₱{total:.2f}", font=(self._ui_font_name, 16, "bold"), text_color=theme["button_fg"]).pack(pady=(2, 2))
+        ctk.CTkLabel(inner, text=f"Paid via: {payment_method}", font=self._ui_font_small, text_color=theme.get("muted", theme["fg"])).pack(pady=(0, 8))
+        if footer_note:
+            ctk.CTkLabel(inner, text=footer_note, font=self._ui_font_small, text_color=theme.get("muted", theme["fg"]), wraplength=520, justify="center").pack(pady=(0, 10))
+
+        btn_row = ctk.CTkFrame(inner, fg_color="transparent")
+        btn_row.pack(fill=tk.X, pady=(6, 0))
+
+        ctk.CTkButton(
+            btn_row,
+            text="Done",
+            font=self._ui_font_button,
+            fg_color=theme.get("accent", "#1A948E"),
+            hover_color=theme.get("accent_hover", "#15857B"),
+            text_color=theme.get("on_accent", "#ffffff"),
+            corner_radius=10,
+            height=40,
+            command=lambda: (self._reset_checkout_state(), self.build_main_menu()),
+        ).pack(side=tk.LEFT, expand=True, fill=tk.X)
 
     # ---------- RFID Card Purchase ----------
 
@@ -3011,14 +3182,20 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
 
     def export_sales_report_ui(self):
         """Generate an Excel file with transaction, daily, and monthly sales."""
-        try:
-            path = export_sales_report()
-            messagebox.showinfo(
-                "Export Complete",
-                f"Sales report saved as:\n{path}"
-            )
-        except Exception as e:
-            messagebox.showerror("Export Failed", str(e))
+        def _run():
+            try:
+                path = export_sales_report()
+                self.after(
+                    0,
+                    lambda: messagebox.showinfo(
+                        "Export Complete",
+                        f"Sales report saved as:\n{path}",
+                    ),
+                )
+            except Exception as e:
+                self.after(0, lambda: messagebox.showerror("Export Failed", str(e)))
+
+        threading.Thread(target=_run, daemon=True).start()
 
 
 # ======================

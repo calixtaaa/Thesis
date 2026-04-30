@@ -15,7 +15,8 @@ def get_downloads_dir() -> Path:
 
 def get_reports_dir() -> Path:
     """Return the folder where generated Excel reports are stored."""
-    reports_dir = get_downloads_dir() / "Hygiene Vending Reports"
+    # Keep reports inside the project folder (avoid writing to user Downloads on the machine).
+    reports_dir = BASE_DIR / "reports"
     reports_dir.mkdir(parents=True, exist_ok=True)
     return reports_dir
 

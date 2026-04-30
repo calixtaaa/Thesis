@@ -1,2 +1,7 @@
 {"timestamp": 1773058441168, "version": "v.0.03", "theme": "dark", "category": "Buttons / navigation issue", "details": ""}
 {"timestamp": 1773383720793, "version": "v.0.03", "theme": "light", "category": "UI not responding / Freeze", "details": ""}
+{"timestamp": 1777524826176, "version": "v1.0.3", "theme": "light", "category": "UI not responding / Freeze", "details": "test"}
+{"timestamp": 1777525041311, "version": "v1.0.3", "theme": "light", "category": "UI not responding / Freeze", "details": "test"}
+{"timestamp": 1777525079848, "version": "v1.0.3", "theme": "light", "category": "Theme / colors wrong", "details": "test"}
+{"timestamp": 1777525155895, "version": "v1.0.3", "theme": "light", "category": "RFID / payment issue", "details": "test"}
+{"timestamp": 1777526004119, "version": "v1.0.3", "theme": "light", "category": "Data not updating (stock, reports, etc.)", "details": "test"}

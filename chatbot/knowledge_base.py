@@ -170,6 +170,16 @@ HYGIENE_TIPS = [
     "Avoid touching your face, especially your eyes, nose, and mouth, with unwashed hands.",
     "Use a clean towel or air-dry your hands after washing—wet hands transfer germs more easily.",
     "Floss daily! Brushing alone only cleans about 60% of your tooth surfaces.",
+    "If you have a small cut, clean it with water first, then apply alcohol around (not deep inside) and cover with a clean bandage.",
+    "Don’t share towels, deodorant, or toothbrushes—this helps prevent skin infections and germs spreading.",
+    "After using wet wipes, still wash with soap when you can—wipes are a quick clean, not a full wash.",
+    "Mouthwash is a helper, not a replacement—brush 2 minutes and floss, then mouthwash after.",
+    "Change pads/liners regularly to avoid irritation and odor—especially during heavy flow or hot days.",
+    "Wear breathable underwear and change after sweating to reduce odor and skin irritation.",
+    "If you’re sick, dispose tissues properly and sanitize your hands after coughing/sneezing.",
+    "Tagalog: Maghugas ng kamay ng 20 segundo gamit ang sabon bago kumain at pagkatapos mag-CR.",
+    "Tagalog: Iwasang hawakan ang mukha (mata, ilong, bibig) kapag hindi pa naghuhugas ng kamay.",
+    "Tagalog: Magpalit ng napkin/liner nang regular para iwas amoy at iritasyon.",
 ]
 
 # ──────────────────────────────────────────────
