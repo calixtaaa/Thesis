@@ -42,7 +42,7 @@
             :class="isFlipped ? 'opacity-0 scale-95 pointer-events-none' : 'opacity-100 scale-100 group-hover:opacity-0 group-hover:scale-95 group-hover:pointer-events-none'"
           >
             <div class="w-44 h-44 sm:w-52 sm:h-52 rounded-full overflow-hidden border-[3px] border-surface-800 light:border-surface-200 mb-6 shadow-xl transition-transform duration-500 group-hover:scale-105 mt-2">
-              <img src="../assets/members/ProfBelga.png" alt="Prof. Gemma Belga" class="w-full h-full object-cover object-top" />
+              <img :src="adviserPhotoSrc" alt="Prof. Gemma Belga" class="w-full h-full object-cover object-top" />
             </div>
             
             <h3 class="text-2xl sm:text-3xl font-display font-bold text-surface-100 pb-1 text-center">
@@ -110,13 +110,19 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue'
+import { useTheme } from '../composables/useTheme'
+import belgaLight from '../assets/members/ProfBelga.png'
+import belgaDark from '../assets/members/Prof_Belga.png'
 
-const isFlipped = ref(false);
+const { theme } = useTheme()
+const adviserPhotoSrc = computed(() => (theme.value === 'dark' ? belgaDark : belgaLight))
+
+const isFlipped = ref(false)
 
 const toggleCard = () => {
-  isFlipped.value = !isFlipped.value;
-};
+  isFlipped.value = !isFlipped.value
+}
 </script>
 
 <style scoped>

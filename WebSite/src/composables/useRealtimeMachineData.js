@@ -5,6 +5,7 @@ export function useRealtimeMachineData() {
   const products = ref([])
   const transactions = ref([])
   const liveFeed = ref([])
+  const lowStockProducts = ref([])
   const subscriberEmails = ref([])
   const loading = ref(true)
   const error = ref('')
@@ -15,20 +16,22 @@ export function useRealtimeMachineData() {
     loading.value = true
     error.value = ''
 
-    const [prodRes, txRes, feedRes, mailRes] = await Promise.all([
+    const [prodRes, txRes, feedRes, lowRes, mailRes] = await Promise.all([
       supabase.from('products').select('*').order('slot_number', { ascending: true }),
       supabase
         .from('transactions')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(3000),
-      supabase.from('live_feed').select('*').order('created_at', { ascending: false }).limit(100),
+      supabase.from('live_feed').select('*').order('created_at', { ascending: false }).limit(1000),
+      supabase.from('low_stock_products').select('*').order('slot_number', { ascending: true }).limit(200),
       supabase.from('emails').select('id, email, created_at, password').order('created_at', { ascending: false }).limit(500),
     ])
 
     const { data: prod, error: prodErr } = prodRes
     const { data: tx, error: txErr } = txRes
     const { data: feed, error: feedErr } = feedRes
+    const { data: low, error: lowErr } = lowRes
     const { data: mails, error: mailErr } = mailRes
 
     if (prodErr) error.value = prodErr.message
@@ -41,6 +44,16 @@ export function useRealtimeMachineData() {
       liveFeed.value = []
     } else {
       liveFeed.value = Array.isArray(feed) ? feed : []
+    }
+
+    if (lowErr) {
+      const msg = lowErr.message || String(lowErr)
+      if (!/relation|does not exist|not find/i.test(msg)) {
+        error.value = error.value ? `${error.value}; ${msg}` : msg
+      }
+      lowStockProducts.value = []
+    } else {
+      lowStockProducts.value = Array.isArray(low) ? low : []
     }
     if (mailErr) {
       // Missing table or RLS: keep dashboard usable; surface message once
@@ -101,7 +114,18 @@ export function useRealtimeMachineData() {
           const { eventType, new: rowNew, old: rowOld } = payload || {}
           if (eventType === 'DELETE') removeLocal(liveFeed, rowOld, 'id')
           else if (rowNew) upsertLocal(liveFeed, rowNew, 'id')
-          if (liveFeed.value.length > 100) liveFeed.value = liveFeed.value.slice(0, 100)
+          if (liveFeed.value.length > 1000) liveFeed.value = liveFeed.value.slice(0, 1000)
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'low_stock_products' },
+        (payload) => {
+          const { eventType, new: rowNew, old: rowOld } = payload || {}
+          if (eventType === 'DELETE') removeLocal(lowStockProducts, rowOld, 'product_id')
+          else if (rowNew) upsertLocal(lowStockProducts, rowNew, 'product_id')
+          // keep small; table only contains low/empty rows
+          if (lowStockProducts.value.length > 500) lowStockProducts.value = lowStockProducts.value.slice(0, 500)
         }
       )
       .on(
@@ -124,23 +148,7 @@ export function useRealtimeMachineData() {
   }
 
   const overview = computed(() => {
-    const lowStock = products.value.filter((p) => {
-      const stock = Number(p.current_stock ?? 0)
-      const name = String(p.name ?? '').trim().toLowerCase()
-      const threshold =
-        name === 'alcohol' ? 1
-          : (name === 'wipes' || name === 'wet wipes' || name === 'wetwipes') ? 1
-            : (name === 'tissue' || name === 'tissues') ? 1
-              : (name === 'all night pads' || name === 'all-night pads') ? 2
-                : (name === 'deo' || name === 'deodorant') ? 3
-                  : (name === 'soap') ? 3
-                    : (name === 'mouth wash' || name === 'mouthwash') ? 3
-                      : (name === 'panty liner' || name === 'panty liners' || name === 'pantyliners' || name === 'panti liner') ? 3
-                        : (name === 'regular with wings' || name === 'regular w/ wings pads' || name === 'regular with wings pads') ? 3
-                          : (name === 'non wing pad' || name === 'non-wing pads' || name === 'non wing pads' || name === 'non-wing pad') ? 3
-                            : 3
-      return stock <= threshold
-    }).length
+    const lowStock = lowStockProducts.value.length
     const totalSales = transactions.value.reduce((sum, t) => sum + Number(t.total_amount ?? 0), 0)
     const orders = transactions.value.length
     const activeCustomers = new Set(
@@ -206,6 +214,7 @@ export function useRealtimeMachineData() {
     products,
     transactions,
     liveFeed,
+    lowStockProducts,
     subscriberEmails,
     loading,
     error,
