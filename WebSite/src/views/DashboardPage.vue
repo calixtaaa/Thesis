@@ -50,6 +50,15 @@
             >
               {{ liveFeedBadgeText }}
             </span>
+            <span
+              v-if="item.id === 'reports' && activeSection !== 'reports' && reportsBadgeCount > 0"
+              class="absolute right-3 inline-flex items-center justify-center min-w-[1.6rem] h-5 px-1.5 rounded-full text-[11px] font-extrabold border"
+              :class="activeSection === item.id
+                ? 'bg-white/15 text-white border-white/10'
+                : 'bg-surface-900/50 text-surface-200 border-surface-800/40 group-hover:bg-surface-800/50'"
+            >
+              {{ reportsBadgeText }}
+            </span>
           </button>
         </nav>
       </div>
@@ -1620,6 +1629,7 @@ const bugReportRows = computed(() => {
     .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
     .map((r) => ({
       id: r.id,
+      createdAt: r.created_at || null,
       timePh: r.created_at ? tf.format(new Date(r.created_at)) : '—',
       machineId: r.machine_id || '—',
       category: r.category || '—',
@@ -1894,6 +1904,24 @@ async function downloadSalesReportXlsx() {
 
 const activeSection = ref('overview')
 const sidebarOpen = ref(false)
+
+// "Unread" badge for Reports: clears when you open Reports, reappears for newer OPEN reports.
+const reportsLastSeenAt = ref(Date.now())
+watch(activeSection, (next) => {
+  if (next === 'reports') reportsLastSeenAt.value = Date.now()
+})
+
+const reportsBadgeCount = computed(() => {
+  const lastSeen = Number(reportsLastSeenAt.value || 0)
+  const rows = Array.isArray(bugReportsOpen.value) ? bugReportsOpen.value : []
+  let n = 0
+  for (const r of rows) {
+    const ms = toMsSafe(r?.createdAt)
+    if (ms > lastSeen) n += 1
+  }
+  return n
+})
+const reportsBadgeText = computed(() => (reportsBadgeCount.value > 99 ? '99+' : String(reportsBadgeCount.value)))
 
 // === TOTAL SALES (clickable categories) ===
 const totalSalesMode = ref('overall') // day | week | month | overall

@@ -34,8 +34,11 @@ export function useRealtimeMachineData() {
     txNormalizeQueued = true
     queueMicrotaskSafe(() => {
       txNormalizeQueued = false
-      transactions.value = dedupeBy(transactions.value, txKey)
-      if (transactions.value.length > 3000) transactions.value = transactions.value.slice(0, 3000)
+      // Keep most-recent-first so UI widgets (Recent Transactions, charts) always show the latest.
+      const normalized = dedupeBy(transactions.value, txKey)
+        .slice()
+        .sort((a, b) => txTimeMs(b) - txTimeMs(a))
+      transactions.value = normalized.slice(0, 3000)
     })
   }
   function scheduleFeedNormalize() {
@@ -50,6 +53,17 @@ export function useRealtimeMachineData() {
 
   function txKey(row) {
     return row?.source_tx_id ?? row?.id
+  }
+
+  function txTimeMs(row) {
+    const raw = row?.created_at ?? row?.timestamp ?? null
+    if (!raw) return 0
+    try {
+      const ms = Date.parse(String(raw))
+      return Number.isNaN(ms) ? 0 : ms
+    } catch (_) {
+      return 0
+    }
   }
 
   function feedKey(row) {
@@ -410,12 +424,31 @@ export function useRealtimeMachineData() {
       dateStyle: 'short',
       timeStyle: 'medium',
     })
-    return transactions.value.slice(0, 12).map((t) => ({
-      id: t.id,
-      item: t.product_name || (t.product_id != null ? `Product #${t.product_id}` : 'Unknown'),
-      time: t.created_at ? tf.format(new Date(t.created_at)) : '—',
-      amount: Number(t.total_amount ?? 0).toFixed(2),
-    }))
+    const productNameById = new Map(
+      (Array.isArray(products.value) ? products.value : [])
+        .map((p) => [p?.id, p?.name])
+        .filter(([id, name]) => id != null && String(name || '').trim() !== '')
+    )
+
+    const latest = (Array.isArray(transactions.value) ? transactions.value : [])
+      .slice()
+      .sort((a, b) => txTimeMs(b) - txTimeMs(a))
+      .slice(0, 12)
+
+    return latest.map((t) => {
+      const pid = t?.product_id
+      const resolvedName =
+        t?.product_name ||
+        (pid != null ? productNameById.get(pid) : null) ||
+        (pid != null ? `Product #${pid}` : 'Unknown')
+      const ts = t?.created_at ?? t?.timestamp ?? null
+      return {
+        id: t?.id ?? t?.source_tx_id ?? `${pid ?? 'na'}:${ts ?? ''}`,
+        item: resolvedName,
+        time: ts ? tf.format(new Date(ts)) : '—',
+        amount: Number(t?.total_amount ?? 0).toFixed(2),
+      }
+    })
   })
 
   onMounted(async () => {
