@@ -26,8 +26,8 @@ class HygieneHeroBot:
     AI assistant built into an automated personal hygiene vending machine.
     Your goal is to assist users with their health and hygiene needs.
 
-    Context: Running on a Raspberry Pi 5. The machine sells soap, toothpaste,
-    napkins, alcohol, and face masks.
+    Context: Running on a Raspberry Pi 5. The machine sells hygiene essentials like
+    alcohol, soap, deodorant, mouthwash, wet wipes, tissues, and pads/liners.
 
     Constraints:
     - Be Concise: Keep responses under 3 sentences.
@@ -40,8 +40,8 @@ class HygieneHeroBot:
         "You are the 'Hygiene Hero,' a helpful, friendly, and professional AI assistant "
         "built into an automated personal hygiene vending machine. Your goal is to assist "
         "users with their health and hygiene needs.\n\n"
-        "Context: You are running on a Raspberry Pi 5. The machine sells items like soap, "
-        "toothpaste, napkins, alcohol, and face masks.\n\n"
+        "Context: You are running on a Raspberry Pi 5. The machine sells hygiene essentials like "
+        "alcohol, soap, deodorant, mouthwash, wet wipes, tissues, and pads/liners.\n\n"
         "Constraints:\n"
         "- Be Concise: Users are standing in front of a vending machine; keep responses under 3 sentences.\n"
         "- Offline: Focus on the data provided in the local database.\n"
@@ -285,7 +285,15 @@ class HygieneHeroBot:
             if key in text:
                 return f"{answer}"
 
-        if "paano gamitin" in text or "how to use this machine" in text or "how to used this machine" in text:
+        # Explicit "how to use" phrasing (covers the UI button: "How do I use the machine?")
+        if (
+            "paano gamitin" in text
+            or "how to use this machine" in text
+            or "how to used this machine" in text
+            or "how to use the machine" in text
+            or "how do i use the machine" in text
+            or re.search(r"\bhow\s+do\s+i\s+use\b", text)
+        ):
             return f"{TROUBLESHOOTING['how to use']}"
 
         # Broader troubleshooting triggers
@@ -312,7 +320,21 @@ class HygieneHeroBot:
     def _check_hygiene_tip_request(self, text: str) -> str | None:
         """User asks for a random hygiene tip."""
         # IMPORTANT: Keep this narrow. "hygiene" alone appears in many messages and caused noisy matches.
-        trigger_words = ["hygiene tip", "health tip", "give me a tip", "another tip", "random tip", "payo", "advice", "suggest", "recommend"]
+        trigger_words = [
+            "hygiene tip",
+            "hygiene tips",
+            "health tip",
+            "give me a hygiene tip",
+            "give me a tip",
+            "another hygiene tip",
+            "another tip",
+            "random tip",
+            "payo",
+            "payong pangkalinisan",
+            "advice",
+            "suggest",
+            "recommend",
+        ]
         if any(w in text for w in trigger_words) or re.search(r"\\btip\\b", text):
             tip = HYGIENE_TIPS[self._tip_index % len(HYGIENE_TIPS)]
             self._tip_index += 1
@@ -325,11 +347,16 @@ class HygieneHeroBot:
         if any(t in text for t in triggers):
             return (
                 "We sell the following hygiene products:\n"
+                "• Alcohol (70%)\n"
                 "• Antibacterial Soap\n"
-                "• Fluoride Toothpaste\n"
-                "• Tissues / Napkins\n"
-                "• Rubbing Alcohol (70%)\n"
-                "• Disposable Face Masks\n\n"
+                "• Deodorant\n"
+                "• Mouthwash\n"
+                "• Wet Wipes\n"
+                "• Tissues\n"
+                "• All Night Pads\n"
+                "• Panty Liners\n"
+                "• Regular Pads (With Wings)\n"
+                "• Non-wing Pads\n\n"
                 "Ask me about any product for more details!"
             )
         return None

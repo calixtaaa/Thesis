@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import json
+import os
+import platform
 import time
 from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox
 import customtkinter as ctk
+from urllib.request import Request, urlopen
+from urllib.error import HTTPError, URLError
 
 
 def _default_reports_path(base_dir: Path) -> Path:
@@ -34,6 +38,55 @@ def save_bug_report(
     with open(path, "a", encoding="utf-8") as fh:
         fh.write(json.dumps(payload, ensure_ascii=True) + "\n")
     return path
+
+
+def _load_env_file(path: Path) -> dict[str, str]:
+    out: dict[str, str] = {}
+    if not path.exists():
+        return out
+    try:
+        for raw in path.read_text(encoding="utf-8").splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            out[k.strip()] = v.strip()
+    except Exception:
+        return out
+    return out
+
+
+def push_bug_report_to_supabase(*, base_dir: Path, report_payload: dict) -> bool:
+    """
+    Best-effort: push bug report to Supabase so the website dashboard can see it in realtime.
+    Uses supabase.env (service_role) when present. Safe to call offline (returns False).
+    """
+    env_path = base_dir / "supabase.env"
+    env = _load_env_file(env_path)
+    supabase_url = (env.get("SUPABASE_URL") or "").rstrip("/")
+    service_key = (env.get("SUPABASE_SERVICE_ROLE_KEY") or "").strip()
+    if not supabase_url or not service_key:
+        return False
+
+    endpoint = f"{supabase_url}/rest/v1/bug_reports"
+    # Strip nulls so NOT NULL defaults (created_at) can apply.
+    payload = {k: v for k, v in dict(report_payload).items() if v is not None}
+    payload.setdefault("machine_id", platform.node() or os.getenv("COMPUTERNAME") or "machine")
+
+    data = json.dumps(payload).encode("utf-8")
+    headers = {
+        "Content-Type": "application/json",
+        "apikey": service_key,
+        "Authorization": f"Bearer {service_key}",
+        "Prefer": "return=minimal",
+    }
+    req = Request(endpoint, data=data, headers=headers, method="POST")
+    try:
+        with urlopen(req, timeout=8) as resp:
+            _ = resp.read()
+        return True
+    except (HTTPError, URLError, OSError, ValueError):
+        return False
 
 
 def show_bug_report_screen(app, *, version: str, hover_scale_btn):
@@ -153,6 +206,7 @@ def show_bug_report_screen(app, *, version: str, hover_scale_btn):
     def submit():
         details = txt.get("1.0", "end").strip()
         category = selected.get() or "Other"
+        base_dir = Path(getattr(app, "BASE_DIR", Path(__file__).resolve().parent))
         path = save_bug_report(
             base_dir=Path(getattr(app, "BASE_DIR", Path(__file__).resolve().parent)),
             version=version,
@@ -160,7 +214,21 @@ def show_bug_report_screen(app, *, version: str, hover_scale_btn):
             category=category,
             details=details,
         )
-        messagebox.showinfo("Report", f"Thank you! Your report was saved.\n\n{path}")
+        # Also push to Supabase when configured (so website dashboard sees it live).
+        pushed = push_bug_report_to_supabase(
+            base_dir=base_dir,
+            report_payload={
+                "timestamp_ms": int(time.time() * 1000),
+                "version": version,
+                "theme": getattr(app, "current_theme_name", ""),
+                "category": category,
+                "details": (details or "").strip(),
+                "status": "open",
+            },
+        )
+        # Keep UX simple: do not show sync status to the user.
+        _ = pushed
+        messagebox.showinfo("Report", "Thank you! Your report was submitted.")
         app.build_main_menu()
 
     ctk.CTkButton(

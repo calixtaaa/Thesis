@@ -15,13 +15,9 @@ const theme = ref(getInitialTheme())
 
 function applyTheme(t) {
   const root = document.documentElement
-  if (t === 'light') {
-    root.classList.add('light')
-    root.classList.remove('dark')
-  } else {
-    root.classList.remove('light')
-    root.classList.add('dark')
-  }
+  // Ensure we never end up with both classes at once.
+  root.classList.remove('light', 'dark')
+  root.classList.add(t === 'light' ? 'light' : 'dark')
 }
 
 // Apply on load

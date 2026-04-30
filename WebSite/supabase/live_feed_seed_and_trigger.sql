@@ -22,11 +22,35 @@ set search_path = public
 as $$
 declare
   msg text;
+  p_name text;
+  p_slot bigint;
 begin
+  -- Best-effort product lookup so the feed doesn't show "Product #?" / "slot ?"
+  p_name := null;
+  p_slot := null;
+  if new.product_id is not null then
+    select p.name, p.slot_number
+      into p_name, p_slot
+    from public.products p
+    where p.id = new.product_id
+    limit 1;
+  end if;
+  if (p_name is null or btrim(p_name) = '') and new.slot_number is not null then
+    select p.name, p.slot_number
+      into p_name, p_slot
+    from public.products p
+    where p.slot_number = new.slot_number
+    limit 1;
+  end if;
+
   msg :=
     'Sale: ' ||
-    coalesce(nullif(trim(new.product_name::text), ''), 'Product #' || coalesce(new.product_id::text, '?')) ||
-    ' · slot ' || coalesce(new.slot_number::text, '?') ||
+    coalesce(
+      nullif(trim(new.product_name::text), ''),
+      nullif(trim(p_name), ''),
+      'Product #' || coalesce(new.product_id::text, '?')
+    ) ||
+    ' · slot ' || coalesce(new.slot_number::text, p_slot::text, '?') ||
     ' · ₱' || coalesce(new.total_amount::text, '0');
 
   insert into public.live_feed (event_type, message, quantity, total_amount, payload)
@@ -37,10 +61,12 @@ begin
     new.total_amount,
     jsonb_strip_nulls(
       jsonb_build_object(
+        -- Keep both ids: Supabase row id + stable machine id (if installed).
         'transaction_id', new.id,
+        'source_tx_id', new.source_tx_id,
         'product_id', new.product_id,
-        'product_name', new.product_name,
-        'slot_number', new.slot_number,
+        'product_name', coalesce(nullif(trim(new.product_name::text), ''), nullif(trim(p_name), '')),
+        'slot_number', coalesce(new.slot_number, p_slot),
         'quantity', new.quantity,
         'total_amount', new.total_amount
       )

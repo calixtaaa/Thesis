@@ -13,10 +13,17 @@ function normalizeProjectUrl(raw) {
 }
 
 const url = normalizeProjectUrl(import.meta.env.VITE_SUPABASE_URL)
-const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
+// Allow common env var aliases so deploys don't silently break.
+// Preferred: VITE_SUPABASE_PUBLISHABLE_KEY (Supabase "anon/public" key).
+const key =
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+  import.meta.env.VITE_SUPABASE_ANON_KEY ||
+  import.meta.env.VITE_SUPABASE_ANON_PUBLIC_KEY
 
 if (!url || !key) {
-  throw new Error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_PUBLISHABLE_KEY')
+  throw new Error(
+    'Missing VITE_SUPABASE_URL or Supabase anon key (VITE_SUPABASE_PUBLISHABLE_KEY / VITE_SUPABASE_ANON_KEY)'
+  )
 }
 
 export const supabase = createClient(url, key)

@@ -7,7 +7,7 @@ from datetime import datetime
 
 
 # App version (bump when releasing; shown in title, footers, and patch notes)
-VERSION = "v1.0.2"
+VERSION = "v1.0.3"
 
 
 # ---------------------------------------------------------------------------
@@ -192,8 +192,31 @@ PATCH_v1_0_2 = {
     ],
 }
 
+# v1.0.3 – Realtime dashboard dedupe + receipt screen + checkout thumbnails + responsiveness
+PATCH_v1_0_3 = {
+    "version": "v1.0.3",
+    "added": [
+        "Receipt screen after dispensing: shows items, quantities, line totals, and payment method.",
+        "Order Summary: product thumbnails shown next to each item (uses same image mapping as product cards).",
+        "Payment Method (single item): product image preview shown even when Order Summary is skipped.",
+    ],
+    "improved": [
+        "Machine UI responsiveness: dispensing + DB writes run off the UI thread to prevent freezes.",
+        "Website realtime dashboard: stronger client-side deduplication for live feed and selected-day machine events.",
+        "Machine events on selected date: aligned calendar selection and newest-first sorting for clarity.",
+    ],
+    "bugs_fixed": [
+        "Checkout UI: fixed sqlite3.Row compatibility (no .get() usage) for product image rendering.",
+        "Website dashboard: removed repeating sale rows by treating transactions as the single source of truth for sales feed.",
+    ],
+    "future": [
+        "Optional: add printable receipt (thermal printer) integration if hardware is added.",
+        "Optional: server-side cleanup scripts to purge legacy duplicates from Supabase tables.",
+    ],
+}
+
 # All versions in order (oldest first)
-PATCH_HISTORY = [PATCH_v0_01, PATCH_v0_02, PATCH_v0_03, PATCH_v1_0_0, PATCH_v1_0_1, PATCH_v1_0_2]
+PATCH_HISTORY = [PATCH_v0_01, PATCH_v0_02, PATCH_v0_03, PATCH_v1_0_0, PATCH_v1_0_1, PATCH_v1_0_2, PATCH_v1_0_3]
 
 
 def get_patch_notes_text() -> str:

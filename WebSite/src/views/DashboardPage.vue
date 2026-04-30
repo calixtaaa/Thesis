@@ -240,7 +240,7 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="row in liveFeedPreview" :key="row.id" class="border-b border-surface-800/20">
+                <tr v-for="row in liveFeedPreview" :key="row.key" class="border-b border-surface-800/20">
                   <td class="py-2 pr-3 text-surface-500 text-xs whitespace-nowrap">{{ row.time }}</td>
                   <td class="py-2 pr-3 text-brand-400 text-xs">{{ row.type }}</td>
                   <td class="py-2 text-surface-200 text-xs">{{ row.message }}</td>
@@ -358,9 +358,9 @@
                   <th class="text-left text-xs text-surface-400 uppercase py-3 px-4 font-semibold">Time (PH)</th>
                   <th class="text-left text-xs text-surface-400 uppercase py-3 px-4 font-semibold">Type</th>
                   <th class="text-left text-xs text-surface-400 uppercase py-3 px-4 font-semibold">Message</th>
-                  <th class="text-right text-xs text-surface-400 uppercase py-3 px-4 font-semibold whitespace-nowrap">Quantity</th>
-                  <th class="text-left text-xs text-surface-400 uppercase py-3 px-4 font-semibold whitespace-nowrap">IR - Beam Sensed</th>
-                  <th class="text-right text-xs text-surface-400 uppercase py-3 px-4 font-semibold whitespace-nowrap">Total</th>
+                  <th class="hidden sm:table-cell text-right text-xs text-surface-400 uppercase py-3 px-4 font-semibold whitespace-nowrap">Quantity</th>
+                  <th class="hidden sm:table-cell text-left text-xs text-surface-400 uppercase py-3 px-4 font-semibold whitespace-nowrap">IR - Beam Sensed</th>
+                  <th class="hidden sm:table-cell text-right text-xs text-surface-400 uppercase py-3 px-4 font-semibold whitespace-nowrap">Total</th>
                 </tr>
               </thead>
               <tbody>
@@ -368,9 +368,9 @@
                   <td class="py-3 px-4 text-surface-500 text-xs whitespace-nowrap">{{ row.time }}</td>
                   <td class="py-3 px-4 text-brand-400 text-xs font-medium">{{ row.type }}</td>
                   <td class="py-3 px-4 text-surface-200">{{ row.message }}</td>
-                  <td class="py-3 px-4 text-right text-surface-300 text-xs whitespace-nowrap">{{ row.quantity }}</td>
-                  <td class="py-3 px-4 text-surface-300 text-xs whitespace-nowrap">{{ row.irBeamSensed }}</td>
-                  <td class="py-3 px-4 text-right text-surface-300 text-xs whitespace-nowrap">{{ row.totalAmount != null ? `₱${row.totalAmount}` : '—' }}</td>
+                  <td class="hidden sm:table-cell py-3 px-4 text-right text-surface-300 text-xs whitespace-nowrap">{{ row.quantity }}</td>
+                  <td class="hidden sm:table-cell py-3 px-4 text-surface-300 text-xs whitespace-nowrap">{{ row.irBeamSensed }}</td>
+                  <td class="hidden sm:table-cell py-3 px-4 text-right text-surface-300 text-xs whitespace-nowrap">{{ row.totalAmount != null ? `₱${row.totalAmount}` : '—' }}</td>
                 </tr>
                 <tr v-if="liveFeedForSelectedDayRows.length === 0">
                   <td colspan="6" class="py-10 text-center text-surface-500 text-sm">
@@ -384,11 +384,11 @@
                     <span class="text-xs font-bold text-surface-300">Total</span>
                     <span class="text-xs text-surface-500 ml-2">{{ liveFeedForSelectedDayTotals.count }} row(s)</span>
                   </td>
-                  <td class="py-3 px-4 text-right text-surface-200 text-xs font-bold whitespace-nowrap">{{ liveFeedForSelectedDayTotals.totalQty }}</td>
-                  <td class="py-3 px-4 text-surface-400 text-xs whitespace-nowrap">
+                  <td class="hidden sm:table-cell py-3 px-4 text-right text-surface-200 text-xs font-bold whitespace-nowrap">{{ liveFeedForSelectedDayTotals.totalQty }}</td>
+                  <td class="hidden sm:table-cell py-3 px-4 text-surface-400 text-xs whitespace-nowrap">
                     Yes: <span class="text-surface-200 font-semibold">{{ liveFeedForSelectedDayTotals.irYes }}</span>
                   </td>
-                  <td class="py-3 px-4 text-right text-surface-200 text-xs font-bold whitespace-nowrap">₱{{ liveFeedForSelectedDayTotals.totalAmount }}</td>
+                  <td class="hidden sm:table-cell py-3 px-4 text-right text-surface-200 text-xs font-bold whitespace-nowrap">₱{{ liveFeedForSelectedDayTotals.totalAmount }}</td>
                 </tr>
               </tfoot>
             </table>
@@ -517,8 +517,8 @@
                     <th class="text-left text-[11px] text-surface-400 uppercase tracking-wider py-3 px-3 font-semibold whitespace-nowrap">Slot#</th>
                     <th class="text-left text-[11px] text-surface-400 uppercase tracking-wider py-3 px-3 font-semibold">Product</th>
                     <th class="text-right text-[11px] text-surface-400 uppercase tracking-wider py-3 px-3 font-semibold whitespace-nowrap">Price</th>
-                    <th class="text-right text-[11px] text-surface-400 uppercase tracking-wider py-3 px-3 font-semibold whitespace-nowrap">Ratio</th>
-                    <th class="text-left text-[11px] text-surface-400 uppercase tracking-wider py-3 px-3 font-semibold whitespace-nowrap">Status</th>
+                    <th class="hidden sm:table-cell text-right text-[11px] text-surface-400 uppercase tracking-wider py-3 px-3 font-semibold whitespace-nowrap">Ratio</th>
+                    <th class="hidden sm:table-cell text-left text-[11px] text-surface-400 uppercase tracking-wider py-3 px-3 font-semibold whitespace-nowrap">Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -530,8 +530,8 @@
                     <td class="py-2.5 px-3 text-surface-300 font-mono text-xs whitespace-nowrap">{{ row.slot }}</td>
                     <td class="py-2.5 px-3 text-surface-200 font-medium truncate max-w-[14rem]">{{ row.product }}</td>
                     <td class="py-2.5 px-3 text-right text-surface-300 whitespace-nowrap">₱{{ row.price }}</td>
-                    <td class="py-2.5 px-3 text-right text-surface-400 font-semibold whitespace-nowrap">{{ row.ratio }}</td>
-                    <td class="py-2.5 px-3">
+                    <td class="hidden sm:table-cell py-2.5 px-3 text-right text-surface-400 font-semibold whitespace-nowrap">{{ row.ratio }}</td>
+                    <td class="hidden sm:table-cell py-2.5 px-3">
                       <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold border"
                         :class="row.statusClass"
                       >
@@ -558,7 +558,7 @@
               <thead>
                 <tr class="border-b border-surface-800/40">
                   <th class="text-left text-xs text-surface-500 uppercase tracking-wider pb-3 pr-4">Item</th>
-                  <th class="text-left text-xs text-surface-500 uppercase tracking-wider pb-3 pr-4">Time</th>
+                  <th class="hidden sm:table-cell text-left text-xs text-surface-500 uppercase tracking-wider pb-3 pr-4">Time</th>
                   <th class="text-right text-xs text-surface-500 uppercase tracking-wider pb-3">Amount</th>
                 </tr>
               </thead>
@@ -571,7 +571,7 @@
                 <template v-else>
                   <tr v-for="tx in recentTransactions" :key="tx.id ?? tx.time" class="border-b border-surface-800/20 last:border-0">
                     <td class="py-3 pr-4 text-surface-200">{{ tx.item }}</td>
-                    <td class="py-3 pr-4 text-surface-500 text-xs">{{ tx.time }}</td>
+                    <td class="hidden sm:table-cell py-3 pr-4 text-surface-500 text-xs">{{ tx.time }}</td>
                     <td class="py-3 text-right font-semibold text-emerald-400">₱{{ tx.amount }}</td>
                   </tr>
                 </template>
@@ -697,9 +697,9 @@
                   <th class="text-left text-xs text-surface-400 uppercase py-3 px-4 font-semibold">Time (PH)</th>
                   <th class="text-left text-xs text-surface-400 uppercase py-3 px-4 font-semibold">Type</th>
                   <th class="text-left text-xs text-surface-400 uppercase py-3 px-4 font-semibold">Message</th>
-                  <th class="text-right text-xs text-surface-400 uppercase py-3 px-4 font-semibold whitespace-nowrap">Quantity</th>
-                  <th class="text-left text-xs text-surface-400 uppercase py-3 px-4 font-semibold whitespace-nowrap">IR - Beam Sensed</th>
-                  <th class="text-right text-xs text-surface-400 uppercase py-3 px-4 font-semibold whitespace-nowrap">Total</th>
+                  <th class="hidden sm:table-cell text-right text-xs text-surface-400 uppercase py-3 px-4 font-semibold whitespace-nowrap">Quantity</th>
+                  <th class="hidden sm:table-cell text-left text-xs text-surface-400 uppercase py-3 px-4 font-semibold whitespace-nowrap">IR - Beam Sensed</th>
+                  <th class="hidden sm:table-cell text-right text-xs text-surface-400 uppercase py-3 px-4 font-semibold whitespace-nowrap">Total</th>
                 </tr>
               </thead>
               <tbody>
@@ -707,9 +707,9 @@
                   <td class="py-3 px-4 text-surface-500 text-xs whitespace-nowrap">{{ row.time }}</td>
                   <td class="py-3 px-4 text-brand-400 text-xs font-medium">{{ row.type }}</td>
                   <td class="py-3 px-4 text-surface-200">{{ row.message }}</td>
-                  <td class="py-3 px-4 text-right text-surface-300 text-xs whitespace-nowrap">{{ row.quantity ?? '—' }}</td>
-                  <td class="py-3 px-4 text-surface-300 text-xs whitespace-nowrap">{{ row.irBeamSensed ?? '—' }}</td>
-                  <td class="py-3 px-4 text-right text-surface-300 text-xs whitespace-nowrap">{{ row.totalAmount != null ? `₱${row.totalAmount}` : '—' }}</td>
+                  <td class="hidden sm:table-cell py-3 px-4 text-right text-surface-300 text-xs whitespace-nowrap">{{ row.quantity ?? '—' }}</td>
+                  <td class="hidden sm:table-cell py-3 px-4 text-surface-300 text-xs whitespace-nowrap">{{ row.irBeamSensed ?? '—' }}</td>
+                  <td class="hidden sm:table-cell py-3 px-4 text-right text-surface-300 text-xs whitespace-nowrap">{{ row.totalAmount != null ? `₱${row.totalAmount}` : '—' }}</td>
                 </tr>
                 <tr v-if="liveFeedRowsForSelectedDay.length === 0">
                   <td colspan="6" class="py-16 text-center text-surface-500">
@@ -723,11 +723,11 @@
                     <span class="text-xs font-bold text-surface-300">Total</span>
                     <span class="text-xs text-surface-500 ml-2">{{ liveFeedSelectedTotals.count }} row(s)</span>
                   </td>
-                  <td class="py-3 px-4 text-right text-surface-200 text-xs font-bold whitespace-nowrap">{{ liveFeedSelectedTotals.totalQty }}</td>
-                  <td class="py-3 px-4 text-surface-400 text-xs whitespace-nowrap">
+                  <td class="hidden sm:table-cell py-3 px-4 text-right text-surface-200 text-xs font-bold whitespace-nowrap">{{ liveFeedSelectedTotals.totalQty }}</td>
+                  <td class="hidden sm:table-cell py-3 px-4 text-surface-400 text-xs whitespace-nowrap">
                     Yes: <span class="text-surface-200 font-semibold">{{ liveFeedSelectedTotals.irYes }}</span>
                   </td>
-                  <td class="py-3 px-4 text-right text-surface-200 text-xs font-bold whitespace-nowrap">₱{{ liveFeedSelectedTotals.totalAmount }}</td>
+                  <td class="hidden sm:table-cell py-3 px-4 text-right text-surface-200 text-xs font-bold whitespace-nowrap">₱{{ liveFeedSelectedTotals.totalAmount }}</td>
                 </tr>
               </tfoot>
             </table>
@@ -912,6 +912,146 @@
         </div>
       </div>
 
+      <!-- REPORTS SECTION -->
+      <div v-else-if="activeSection === 'reports'">
+        <!-- Reports: default dark styling + light-mode palette overrides (only affects light mode) -->
+        <div class="rounded-2xl p-4 sm:p-6 bg-surface-950 text-surface-100 border border-surface-800/40 shadow-sm light:bg-[#F0D8A1] light:text-slate-900 light:border-[#DD9E59]/40">
+          <div class="flex items-center gap-3 mb-6">
+            <div
+              class="w-10 h-10 rounded-xl bg-amber-400/15 flex items-center justify-center border border-transparent light:bg-[#DD9E59]/25 light:border-[#DD9E59]/35"
+            >
+              <svg class="w-5 h-5 text-amber-300 light:text-[#7A4A1C]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h10M7 11h10M7 15h6M6 3h9l3 3v15a2 2 0 01-2 2H6a2 2 0 01-2-2V5a2 2 0 012-2z" />
+              </svg>
+            </div>
+            <div class="flex-1">
+              <h3 class="text-lg font-extrabold text-surface-100 light:!text-slate-900">Reports</h3>
+              <p class="text-xs text-surface-500 light:!text-slate-700">Bug reports submitted from the machine (realtime)</p>
+            </div>
+            <div class="text-right">
+              <p class="text-xs text-surface-500 light:!text-slate-700">Total</p>
+              <p class="text-sm font-extrabold text-surface-100 light:!text-slate-900">{{ bugReportRows.length }}</p>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2 mb-4">
+            <button
+              type="button"
+              class="px-3 py-2 rounded-xl text-xs font-extrabold border shadow-sm transition-colors"
+              :class="
+                bugReportTab === 'open'
+                  ? 'bg-amber-400/20 text-amber-200 border-amber-400/30 hover:bg-amber-400/28 light:bg-[#DD9E59] light:text-white light:border-[#DD9E59]/60 light:hover:bg-[#D08E43]'
+                  : 'bg-surface-900/30 text-surface-400 border-surface-800/40 hover:text-surface-200 hover:bg-surface-800/30 light:bg-[#F0D8A1]/70 light:text-slate-900 light:border-[#DD9E59]/35 light:hover:bg-[#F0D8A1]'
+              "
+              @click="bugReportTab = 'open'"
+            >
+              Open ({{ bugReportsOpen.length }})
+            </button>
+            <button
+              type="button"
+              class="px-3 py-2 rounded-xl text-xs font-extrabold border shadow-sm transition-colors"
+              :class="
+                bugReportTab === 'fixed'
+                  ? 'bg-emerald-400/15 text-emerald-200 border-emerald-400/30 hover:bg-emerald-400/22 light:bg-[#DCF0C3] light:text-slate-900 light:border-[#DCF0C3]/80 light:hover:bg-[#CBE9AA]'
+                  : 'bg-surface-900/30 text-surface-400 border-surface-800/40 hover:text-surface-200 hover:bg-surface-800/30 light:bg-[#F0D8A1]/70 light:text-slate-900 light:border-[#DD9E59]/35 light:hover:bg-[#F0D8A1]'
+              "
+              @click="bugReportTab = 'fixed'"
+            >
+              Fixed ({{ bugReportsFixed.length }})
+            </button>
+          </div>
+
+          <div
+            class="overflow-x-auto max-h-[60vh] overflow-y-auto rounded-xl border border-surface-800/30 bg-surface-950/40 shadow-sm light:border-[#DD9E59]/35 light:bg-white/60"
+          >
+            <table class="w-full text-sm">
+              <thead class="sticky top-0 bg-surface-950/95 light:bg-[#DD9E59] z-10 border-b border-surface-800/40 light:border-[#DD9E59]/70">
+                <tr>
+                  <th class="text-left text-xs text-surface-400 light:text-white uppercase py-3 px-4 font-bold whitespace-nowrap">Time (PH)</th>
+                  <th class="hidden sm:table-cell text-left text-xs text-surface-400 light:text-white uppercase py-3 px-4 font-bold whitespace-nowrap">Machine</th>
+                  <th class="text-left text-xs text-surface-400 light:text-white uppercase py-3 px-4 font-bold whitespace-nowrap">Category</th>
+                  <th class="text-left text-xs text-surface-400 light:text-white uppercase py-3 px-4 font-bold">Details</th>
+                  <th class="hidden md:table-cell text-left text-xs text-surface-400 light:text-white uppercase py-3 px-4 font-bold whitespace-nowrap">Version</th>
+                  <th class="hidden md:table-cell text-left text-xs text-surface-400 light:text-white uppercase py-3 px-4 font-bold whitespace-nowrap">Theme</th>
+                  <th class="text-right text-xs text-surface-400 light:text-white uppercase py-3 px-4 font-bold whitespace-nowrap">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="r in (bugReportTab === 'fixed' ? bugReportsFixed : bugReportsOpen)"
+                  :key="r.id"
+                  class="border-b border-surface-800/20 hover:bg-surface-900/25 transition-colors light:border-[#DD9E59]/25 light:hover:bg-[#F0D8A1]/45"
+                >
+                  <td class="py-3 px-4 text-surface-500 light:text-slate-700 text-xs whitespace-nowrap">{{ r.timePh }}</td>
+                  <td class="hidden sm:table-cell py-3 px-4 text-surface-200 light:text-slate-900 text-xs whitespace-nowrap">{{ r.machineId }}</td>
+                  <td class="py-3 px-4 text-amber-300 light:text-[#7A4A1C] text-xs font-extrabold whitespace-nowrap">{{ r.category }}</td>
+                  <td class="py-3 px-4 text-surface-200 light:text-slate-900 text-xs whitespace-pre-wrap">{{ r.details }}</td>
+                  <td class="hidden md:table-cell py-3 px-4 text-surface-300 light:text-slate-800 text-xs whitespace-nowrap">{{ r.version }}</td>
+                  <td class="hidden md:table-cell py-3 px-4 text-surface-300 light:text-slate-800 text-xs whitespace-nowrap">{{ r.theme }}</td>
+                  <td class="py-3 px-4 text-right whitespace-nowrap">
+                    <button
+                      v-if="r.status !== 'fixed'"
+                      type="button"
+                      class="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-500/15 text-emerald-200 border border-emerald-500/20 hover:bg-emerald-500/25 transition-colors light:bg-[#DCF0C3] light:text-slate-900 light:border-[#DCF0C3]/80 light:hover:bg-[#CBE9AA]"
+                      @click="openFixModal(r)"
+                    >
+                      Fix
+                    </button>
+                    <span v-else class="text-xs text-surface-500 light:text-slate-700">
+                      Fixed
+                    </span>
+                  </td>
+                </tr>
+                <tr v-if="(bugReportTab === 'fixed' ? bugReportsFixed.length : bugReportsOpen.length) === 0">
+                  <td colspan="7" class="py-10 text-center text-surface-500 light:text-slate-700 text-sm">No reports yet.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Fix modal -->
+          <div v-if="fixingReport" class="fixed inset-0 z-[90]">
+            <div class="absolute inset-0 bg-black/30 dark:bg-surface-950/70 backdrop-blur-sm" @click="closeFixModal" />
+            <div class="absolute left-0 right-0 top-24 px-4">
+              <div class="mx-auto max-w-lg rounded-2xl border border-surface-200/80 dark:border-surface-800/50 bg-white/95 dark:bg-surface-950/95 p-5 shadow-2xl">
+                <h4 class="text-sm font-extrabold text-surface-950 dark:text-surface-100">Mark as fixed</h4>
+                <p class="text-xs text-surface-700 dark:text-surface-400 mt-1">
+                  Category: <span class="text-surface-950 dark:text-surface-200 font-semibold">{{ fixingReport.category }}</span>
+                </p>
+                <p class="text-xs text-surface-700 dark:text-surface-400 mt-1">
+                  Details: <span class="text-surface-950 dark:text-surface-200">{{ fixingReport.details }}</span>
+                </p>
+
+                <label class="mt-4 flex items-center gap-2 text-xs text-surface-900 dark:text-surface-200">
+                  <input type="checkbox" v-model="fixConfirmed" class="accent-emerald-500" />
+                  I confirm this issue is fixed.
+                </label>
+
+                <p v-if="fixMsg" class="text-xs text-red-400 mt-2">{{ fixMsg }}</p>
+
+                <div class="mt-5 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    class="px-4 py-2 rounded-xl text-xs font-bold bg-surface-100 text-surface-900 border border-surface-200 hover:bg-surface-200 dark:bg-surface-800/50 dark:text-surface-200 dark:border-surface-700/40 dark:hover:bg-surface-700/60 transition-colors"
+                    @click="closeFixModal"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    class="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-500 text-white hover:bg-emerald-400 disabled:opacity-60 disabled:cursor-not-allowed"
+                    :disabled="!fixConfirmed || fixBusy"
+                    @click="confirmFix"
+                  >
+                    {{ fixBusy ? 'Fixing…' : 'Confirm fix' }}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- USER MANAGEMENT SECTION -->
       <div v-else-if="activeSection === 'users'">
         <div class="ios-card rounded-2xl p-4 sm:p-6">
@@ -1072,6 +1212,7 @@ import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
 import { useRealtimeMachineData } from '../composables/useRealtimeMachineData'
+import { supabase } from '../lib/supabaseClient'
 let Chart = null
 let registerables = null
 import { debounce } from '../utils/timing'
@@ -1247,6 +1388,12 @@ function selectCalendarDay(ymd) {
   const [y, m] = ymd.split('-').map(Number)
   calYear.value = y
   calMonth.value = m
+
+  // UX: keep machine-events selection in sync with sales selection
+  // so the "Machine events on selected date" table shows data immediately.
+  feedSelectedYmd.value = ymd
+  feedCalYear.value = y
+  feedCalMonth.value = m
 }
 
 const salesForSelectedDay = computed(() => {
@@ -1260,7 +1407,8 @@ const salesForSelectedDay = computed(() => {
 })
 
 const liveFeedForSelectedDay = computed(() => {
-  const key = selectedYmd.value
+  // IMPORTANT: This table uses the Machine Events calendar selection, not the Sales calendar.
+  const key = feedSelectedYmd.value
   if (!key) return []
   return machine.liveFeed.value.filter((r) => {
     if (!r?.created_at) return false
@@ -1274,11 +1422,73 @@ const liveFeedForSelectedDayRows = computed(() => {
     dateStyle: 'short',
     timeStyle: 'medium',
   })
-  return liveFeedForSelectedDay.value
-    .slice()
+  const key = feedSelectedYmd.value
+  if (!key) return []
+
+  // Build sale events from `transactions` so the list is always latest + 1 row per transaction.
+  // Note: Supabase may still contain legacy duplicates; we dedupe by a sale fingerprint that matches
+  // what the UI displays (time-second + slot + product + qty + amount).
+  const txSource = (Array.isArray(machine.transactions.value) ? machine.transactions.value : [])
+    .filter((t) => {
+      const ts = t?.created_at || t?.timestamp
+      if (!ts) return false
+      return toManilaYmd(ts) === key
+    })
+  const tx = txSource
+    .map((t, i) => {
+      const ts = t?.created_at || t?.timestamp
+      const sec = ts ? Math.floor(new Date(ts).getTime() / 1000) : 0
+      const pid = t?.product_id ?? ''
+      const slot = t?.slot_number ?? ''
+      const qty = t?.quantity ?? ''
+      const amtNum = Number.isFinite(Number(t?.total_amount)) ? Number(t.total_amount) : 0
+      const amtCents = Math.round(amtNum * 100)
+      const slotTxt = t?.slot_number != null ? `slot ${t.slot_number}` : 'slot ?'
+
+      // Primary: stable machine id. Fallback: sale fingerprint that matches visible UI fields.
+      const stableKey =
+        t?.source_tx_id != null
+          ? `tx:${t.source_tx_id}`
+          : `sale:${sec}|${pid}|${slot}|${qty}|${amtCents}`
+
+      return {
+        key: stableKey,
+        time: ts ? tf.format(new Date(ts)) : '—',
+        type: 'sale',
+        message: `Sale: ${resolveProductName(t)} · ${slotTxt} · ₱${amtNum}`,
+        quantity: t?.quantity ?? '—',
+        irBeamSensed: '—',
+        totalAmount: amtNum,
+        _sortAt: ts ? new Date(ts).getTime() : 0,
+        _dedupeKey: `sale:${sec}|${pid}|${slot}|${qty}|${amtCents}`,
+      }
+    })
+
+  // Collapse legacy duplicates even when they have different Supabase ids.
+  const txDeduped = dedupeKeepFirst(tx, (r) => r.key || r._dedupeKey)
+
+  const txKeys = new Set(txDeduped.map((r) => r.key))
+
+  // Also include non-sale or non-transaction events from `live_feed` (deduped).
+  const feedRaw = liveFeedForSelectedDay.value.slice()
     .sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0))
+  const feedDeduped = dedupeKeepFirst(feedRaw, (r) => {
+    const payload = coerceObject(r?.payload)
+    const stable = payload?.source_tx_id ?? payload?.transaction_id ?? ''
+    if (stable !== '') return `${r?.event_type || 'info'}:tx:${stable}`
+    return `${r?.event_type || 'info'}:id:${r?.id ?? ''}:${r?.created_at ?? ''}:${r?.message ?? ''}`
+  })
+  const feedRows = feedDeduped
     .map((r, i) => {
       const payload = coerceObject(r?.payload)
+      const stable = payload?.source_tx_id ?? payload?.transaction_id ?? null
+      const key2 = stable != null && stable !== '' ? `tx:${stable}` : `feed:${r?.id ?? i}:${r?.created_at ?? ''}`
+      if (stable != null && stable !== '' && txKeys.has(`tx:${stable}`)) return null
+
+      // IMPORTANT: Sales are sourced from `transactions` above (1 row per sale).
+      // If we also include sale rows from live_feed, you will see duplicates.
+      if ((r?.event_type || payload?.event_type) === 'sale') return null
+
       const qty = pickFirstFiniteNumber(
         r.quantity, r.qty, r.dispensed_qty, r.dispensedQuantity, r.dispense_qty, r.qty_dispensed,
         payload.quantity, payload.qty, payload.dispensed_qty, payload.dispensedQuantity, payload.dispense_qty, payload.qty_dispensed
@@ -1293,16 +1503,25 @@ const liveFeedForSelectedDayRows = computed(() => {
         r.total_amount, r.totalAmount,
         payload.total_amount, payload.totalAmount, payload.amount, payload.total
       )
+
+      let message = r.message || ''
+      if (!message.trim()) message = '—'
+
       return {
-        key: `${r.id ?? i}-${r.created_at ?? ''}`,
+        key: key2,
         time: r.created_at ? tf.format(new Date(r.created_at)) : '—',
         type: r.event_type || 'info',
-        message: r.message || '—',
+        message,
         quantity: qty ?? '—',
         irBeamSensed: ir ?? '—',
         totalAmount: total != null ? Number(total) : null,
+        _sortAt: r.created_at ? new Date(r.created_at).getTime() : 0,
       }
     })
+    .filter(Boolean)
+
+  // Newest first (so the "latest" sale shows at the top)
+  return [...txDeduped, ...feedRows].sort((a, b) => (b._sortAt || 0) - (a._sortAt || 0))
 })
 
 const liveFeedForSelectedDayTotals = computed(() => {
@@ -1325,6 +1544,36 @@ const manilaTimeOnlyFmt = new Intl.DateTimeFormat('en-PH', {
   hour12: true,
 })
 
+const productNameById = computed(() => {
+  const map = {}
+  const products = Array.isArray(machine.products.value) ? machine.products.value : []
+  for (const p of products) {
+    if (p?.id == null) continue
+    const name = String(p?.name ?? p?.product_name ?? '').trim()
+    if (name) map[String(p.id)] = name
+  }
+  return map
+})
+
+const productBySlot = computed(() => {
+  const map = {}
+  const products = Array.isArray(machine.products.value) ? machine.products.value : []
+  for (const p of products) {
+    const slot = p?.slot_number
+    if (slot == null) continue
+    map[String(slot)] = p
+  }
+  return map
+})
+
+function resolveProductName(t) {
+  const direct = String(t?.product_name ?? '').trim()
+  if (direct) return direct
+  const id = t?.product_id
+  if (id != null) return productNameById.value[String(id)] || `Product #${id}`
+  return 'Product'
+}
+
 const salesForSelectedDayRows = computed(() => {
   return salesForSelectedDay.value
     .slice()
@@ -1333,7 +1582,7 @@ const salesForSelectedDayRows = computed(() => {
     const ts = t.created_at || t.timestamp
     return {
       key: `${t.id ?? i}-${ts}`,
-      item: t.product_name || t.product_id || 'Unknown',
+      item: resolveProductName(t),
       timePh: ts ? manilaTimeOnlyFmt.format(new Date(ts)) : '—',
       qty: Number(t.quantity ?? 1),
       amount: Number(t.total_amount ?? 0).toFixed(2),
@@ -1349,6 +1598,86 @@ const subscriberEmailRows = computed(() => {
     createdPh: r.created_at ? `${manilaDayFmt.format(new Date(r.created_at))} ${manilaTimeOnlyFmt.format(new Date(r.created_at))}` : '—',
   }))
 })
+
+const bugReportRows = computed(() => {
+  const tf = new Intl.DateTimeFormat('en-PH', {
+    timeZone: 'Asia/Manila',
+    dateStyle: 'short',
+    timeStyle: 'medium',
+  })
+  const rows = Array.isArray(machine.bugReports.value) ? machine.bugReports.value : []
+  return rows
+    .slice()
+    .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
+    .map((r) => ({
+      id: r.id,
+      timePh: r.created_at ? tf.format(new Date(r.created_at)) : '—',
+      machineId: r.machine_id || '—',
+      category: r.category || '—',
+      details: String(r.details || '').trim() || '—',
+      version: r.version || '—',
+      theme: r.theme || '—',
+      status: r.status || 'open',
+      fixedAt: r.fixed_at || null,
+      fixedBy: r.fixed_by || '',
+    }))
+})
+
+const bugReportTab = ref('open') // open | fixed
+const bugReportsOpen = computed(() => bugReportRows.value.filter((r) => String(r.status || 'open') !== 'fixed'))
+const bugReportsFixed = computed(() => bugReportRows.value.filter((r) => String(r.status || 'open') === 'fixed'))
+
+const fixingReport = ref(null)
+const fixConfirmed = ref(false)
+const fixBusy = ref(false)
+const fixMsg = ref('')
+
+function openFixModal(row) {
+  fixingReport.value = row
+  fixConfirmed.value = false
+  fixBusy.value = false
+  fixMsg.value = ''
+}
+
+function closeFixModal() {
+  fixingReport.value = null
+  fixConfirmed.value = false
+  fixBusy.value = false
+  fixMsg.value = ''
+}
+
+async function confirmFix() {
+  const r = fixingReport.value
+  if (!r?.id) return
+  if (!fixConfirmed.value) return
+  fixBusy.value = true
+  fixMsg.value = ''
+  try {
+    const fixedBy = currentUser?.value?.username || currentUser?.username || 'admin'
+    const fixedAtIso = new Date().toISOString()
+    let { error } = await supabase
+      .from('bug_reports')
+      .update({ status: 'fixed', fixed_at: fixedAtIso, fixed_by: fixedBy })
+      .eq('id', r.id)
+    if (error) {
+      // If the database migration was applied but PostgREST schema cache isn't refreshed yet,
+      // fall back to a minimal update that doesn't reference new columns.
+      const msg = String(error?.message || error)
+      if (/schema cache|could not find the ['"]fixed_at['"] column/i.test(msg)) {
+        ;({ error } = await supabase
+          .from('bug_reports')
+          .update({ status: 'fixed' })
+          .eq('id', r.id))
+      }
+      if (error) throw error
+    }
+    closeFixModal()
+  } catch (e) {
+    fixMsg.value = String(e?.message || e)
+  } finally {
+    fixBusy.value = false
+  }
+}
 
 const passHashToast = ref('')
 let passHashToastTimer = null
@@ -1393,7 +1722,7 @@ function salesReportRows() {
       return {
         date_ph: dateObj ? manilaDayFmt.format(dateObj) : '',
         time_ph: dateObj ? manilaTimeOnlyFmt.format(dateObj) : '',
-        product: t.product_name || t.product_id || 'Unknown',
+        product: resolveProductName(t),
         quantity: Number(t.quantity ?? 1),
         total_amount: Number(t.total_amount ?? 0).toFixed(2),
         payment_method: t.payment_method ?? '',
@@ -1709,6 +2038,7 @@ const sidebarItems = [
   { id: 'overview', label: 'Overview', icon: '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" /></svg>' },
   { id: 'machine-feed', label: 'Live feed', icon: '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>' },
   { id: 'sales-reports', label: 'Sales Reports', icon: '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>' },
+  { id: 'reports', label: 'Reports', icon: '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 3h9l3 3v15a2 2 0 01-2 2H6a2 2 0 01-2-2V5a2 2 0 012-2zM7 7h10M7 11h10M7 15h6" /></svg>' },
   { id: 'prediction', label: 'Prediction Analysis', icon: '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>' },
   { id: 'users', label: 'Manage Users', icon: '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>' },
   { id: 'credentials', label: 'Change Credentials', icon: '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>' },
@@ -1917,6 +2247,47 @@ const liveFeedRangeOptions = [
   { id: 'month', label: 'Month' },
 ]
 
+function toEpochSeconds(iso) {
+  if (!iso) return null
+  try {
+    const ms = Date.parse(String(iso))
+    if (!Number.isNaN(ms)) return Math.floor(ms / 1000)
+  } catch (_) {
+    // ignore
+  }
+  return null
+}
+
+function stableLiveFeedIdentity(raw) {
+  const payload = coerceObject(raw?.payload)
+  const stable = payload?.source_tx_id ?? payload?.transaction_id ?? raw?.source_tx_id
+  if (stable != null && stable !== '') return `tx:${stable}`
+
+  const sec = toEpochSeconds(raw?.created_at) ?? 'na'
+  const qty = pickFirstFiniteNumber(raw?.quantity, payload?.quantity) ?? ''
+  const amt = pickFirstFiniteNumber(raw?.total_amount, payload?.total_amount, payload?.amount, payload?.total) ?? ''
+  const type = raw?.event_type || ''
+
+  // Avoid using the full message (it can vary by whitespace/format); extract slot + product when possible.
+  const msg = String(raw?.message || payload?.message || '')
+  const slot = (msg.match(/slot\s*([0-9]+)/i) || [])[1] || ''
+  const product = (msg.match(/^Sale:\s*(.*?)\s*[•\-|]/i) || [])[1] || ''
+
+  return `fp:${sec}|${type}|${slot}|${product}|${qty}|${amt}`
+}
+
+function dedupeKeepFirst(list, keyFn) {
+  const seen = new Set()
+  const out = []
+  for (const item of Array.isArray(list) ? list : []) {
+    const k = keyFn(item)
+    if (seen.has(k)) continue
+    seen.add(k)
+    out.push(item)
+  }
+  return out
+}
+
 function liveFeedInRange(iso, range) {
   if (!iso) return false
   const d = new Date(iso)
@@ -1929,39 +2300,33 @@ function liveFeedInRange(iso, range) {
   return deltaMs <= 31 * dayMs
 }
 
+// IMPORTANT: For "1 row per transaction", build the sale feed from `transactions`
+// (which has stable ids via `source_tx_id`), not from `live_feed` (append-only and may contain duplicates).
 const liveFeedRowsAll = computed(() => {
   const tf = new Intl.DateTimeFormat('en-PH', {
     timeZone: 'Asia/Manila',
     dateStyle: 'short',
     timeStyle: 'medium',
   })
-  return machine.liveFeed.value.map((r) => {
-    const payload = coerceObject(r?.payload)
-    const qty = pickFirstFiniteNumber(
-      r.quantity, r.qty, r.dispensed_qty, r.dispensedQuantity, r.dispense_qty, r.qty_dispensed,
-      payload.quantity, payload.qty, payload.dispensed_qty, payload.dispensedQuantity, payload.dispense_qty, payload.qty_dispensed
-    )
-    const ir = normalizeBool(
-      r.ir_beam_sensed ?? r.irBeamSensed ?? r.beam_sensed ?? r.beamSensed ??
-      r.ir_beam ?? r.irBeam ?? r.ir ??
-      payload.ir_beam_sensed ?? payload.irBeamSensed ?? payload.beam_sensed ?? payload.beamSensed ??
-      payload.ir_beam ?? payload.irBeam ?? payload.ir
-    )
-    const total = pickFirstFiniteNumber(
-      r.total_amount, r.totalAmount,
-      payload.total_amount, payload.totalAmount, payload.amount, payload.total
-    )
+  const tx = Array.isArray(machine.transactions.value) ? machine.transactions.value : []
+  const rows = tx.map((t) => {
+    const name = resolveProductName(t)
+    const slotTxt = t?.slot_number != null ? `slot ${t.slot_number}` : 'slot ?'
+    const amt = Number.isFinite(Number(t?.total_amount)) ? Number(t.total_amount) : 0
     return {
-      id: r.id,
-      time: r.created_at ? tf.format(new Date(r.created_at)) : '—',
-      type: r.event_type || 'info',
-      message: r.message || '—',
-      quantity: qty,
-      irBeamSensed: ir,
-      totalAmount: total,
-      _createdAt: r.created_at ?? null,
+      id: t?.id,
+      key: `tx:${t?.source_tx_id ?? t?.id}`,
+      time: t?.created_at ? tf.format(new Date(t.created_at)) : '—',
+      type: 'sale',
+      message: `Sale: ${name} · ${slotTxt} · ₱${amt}`,
+      quantity: t?.quantity ?? null,
+      irBeamSensed: null,
+      totalAmount: amt,
+      _createdAt: t?.created_at ?? null,
     }
   })
+  // If Supabase has duplicate transaction rows, collapse by source_tx_id first.
+  return dedupeKeepFirst(rows, (r) => r.key)
 })
 
 const liveFeedRows = computed(() => {
@@ -2096,6 +2461,41 @@ function buildMonthlyTrend(transactions, months) {
   return { labels, data: keys.map((k) => Number(sums[k].toFixed(2))) }
 }
 
+function buildCurrentMonthDailySales(transactions) {
+  // 1-month view: show totals per day for the CURRENT month (all days, even if zero).
+  const now = new Date()
+  // Anchor in Manila to avoid month rollover issues.
+  const manilaNow = new Date(
+    new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Manila',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(now) + 'T12:00:00+08:00'
+  )
+  const y = manilaNow.getFullYear()
+  const m = manilaNow.getMonth() + 1
+  const daysInMonth = new Date(y, m, 0).getDate()
+
+  const labels = []
+  const keys = []
+  for (let day = 1; day <= daysInMonth; day++) {
+    const iso = `${y}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}T12:00:00+08:00`
+    const d = new Date(iso)
+    keys.push(manilaDayFmt.format(d))
+    labels.push(String(day))
+  }
+
+  const sums = Object.fromEntries(keys.map((k) => [k, 0]))
+  for (const t of transactions) {
+    const ts = t.created_at || t.timestamp
+    if (!ts) continue
+    const k = manilaDayFmt.format(new Date(ts))
+    if (sums[k] !== undefined) sums[k] += Number(t.total_amount ?? 0)
+  }
+  return { labels, data: keys.map((k) => Number(sums[k].toFixed(2))) }
+}
+
 function buildSalesByCreated(transactions, mode) {
   if (mode === '7d') return buildDailyTrend(transactions, 7)
   if (mode === '15d') return buildDailyTrend(transactions, 15)
@@ -2105,9 +2505,20 @@ function buildSalesByCreated(transactions, mode) {
 }
 
 function buildTopProductsFromTx(transactions, products) {
+  const byId = {}
+  const bySlot = {}
+  for (const p of Array.isArray(products) ? products : []) {
+    if (p?.id != null) byId[String(p.id)] = String(p.name ?? p.product_name ?? '').trim()
+    if (p?.slot_number != null) bySlot[String(p.slot_number)] = String(p.name ?? p.product_name ?? '').trim()
+  }
+
   const qtyBy = {}
   for (const t of transactions) {
-    const name = (t.product_name && String(t.product_name).trim()) || 'Unknown'
+    let name = (t.product_name && String(t.product_name).trim()) || ''
+    if (!name && t.product_id != null) name = byId[String(t.product_id)] || ''
+    if (!name && t.slot_number != null) name = bySlot[String(t.slot_number)] || ''
+    if (!name && t.product_id != null) name = `Product #${t.product_id}`
+    if (!name) name = 'Product'
     qtyBy[name] = (qtyBy[name] || 0) + Number(t.quantity ?? 1)
   }
   const entries = Object.entries(qtyBy).sort((a, b) => b[1] - a[1])
@@ -2153,8 +2564,10 @@ function updateChartsFromMachine() {
   const tx = machine.transactions.value
   const prod = machine.products.value
   const trend = buildSalesByCreated(tx, salesTrendRange.value)
-  const monthsCount = monthlyRange.value === '1m' ? 1 : monthlyRange.value === '3m' ? 3 : 6
-  const monthly = buildMonthlyTrend(tx, monthsCount)
+  const monthly =
+    monthlyRange.value === '1m'
+      ? buildCurrentMonthDailySales(tx)
+      : buildMonthlyTrend(tx, monthlyRange.value === '3m' ? 3 : 6)
   const topP = buildTopProductsFromTx(tx, prod)
 
   if (!Chart) return
@@ -2211,7 +2624,7 @@ function updateChartsFromMachine() {
           backgroundColor: barGrad,
           borderRadius: 10,
           borderSkipped: false,
-          maxBarThickness: 48,
+          maxBarThickness: monthlyRange.value === '1m' ? 18 : 48,
         }],
       },
       options: {
