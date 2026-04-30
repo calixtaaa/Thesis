@@ -2328,25 +2328,27 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             self._build_order_panel(self._main_row)
 
     def _change_cart_quantity(self, product_id: int, delta: int):
-        """Update a single cart item's quantity and its on-screen label in place."""
+        """Update a single cart item's quantity, removing it when it reaches zero."""
         for entry in self.cart:
             if entry["product"]["id"] != product_id:
                 continue
             old_qty = int(entry["quantity"] if entry["quantity"] is not None else 1)
-            # `entry["product"]` is typically a sqlite3.Row; use indexing (not `.get`)
-            # so clicks work consistently in both light/dark themes.
-            prod = entry["product"]
+            product = entry["product"]
+            # `product` is typically a sqlite3.Row; use indexing (not `.get`) and guard None.
             try:
-                max_stock = int(prod["current_stock"]) if prod["current_stock"] is not None else old_qty
+                max_stock = int(product["current_stock"]) if product["current_stock"] is not None else old_qty
             except Exception:
                 max_stock = old_qty
             try:
-                cap = int(prod["capacity"]) if prod["capacity"] is not None else 0
+                cap = int(product["capacity"]) if product["capacity"] is not None else 0
                 if cap > 0:
                     max_stock = min(max_stock, cap)
             except Exception:
                 pass
-            new_qty = max(1, min(max_stock, old_qty + int(delta)))
+            new_qty = min(max_stock, old_qty + int(delta))
+            if new_qty <= 0:
+                self._remove_product_from_cart(product)
+                return
             if new_qty == old_qty:
                 return
             entry["quantity"] = new_qty
