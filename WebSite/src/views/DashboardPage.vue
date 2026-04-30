@@ -2237,7 +2237,9 @@ const machineSummaryLine = computed(() => {
   const p = machine.products.value.length
   const t = machine.transactions.value.length
   const f = machine.liveFeed.value.length
-  return `Synced from Supabase: ${p} product row(s) · ${t} transaction row(s) loaded · ${f} live_feed event(s). Charts update automatically.`
+  const rs = machine.realtimeStatus?.value || 'UNKNOWN'
+  const rsTxt = rs === 'SUBSCRIBED' ? 'Realtime: connected' : `Realtime: ${rs} (fallback refresh active)`
+  return `Synced from Supabase: ${p} product row(s) · ${t} transaction row(s) loaded · ${f} live_feed event(s). ${rsTxt}.`
 })
 
 const liveFeedRange = ref('day') // day | week | month (overview preview only)

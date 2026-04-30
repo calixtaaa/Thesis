@@ -10,8 +10,13 @@ export function useRealtimeMachineData() {
   const bugReports = ref([])
   const loading = ref(true)
   const error = ref('')
+  const realtimeStatus = ref('INIT') // INIT | SUBSCRIBED | CLOSED | TIMED_OUT | CHANNEL_ERROR
+  const lastRealtimeEventAt = ref(0)
 
   let channel = null
+  let reconnectTimer = null
+  let pollTimer = null
+  let reconnectAttempt = 0
 
   // Batch expensive normalize work to avoid UI stutter on frequent realtime updates.
   let txNormalizeQueued = false
@@ -172,6 +177,38 @@ export function useRealtimeMachineData() {
     loading.value = false
   }
 
+  async function refreshLatest() {
+    // Lightweight refresh in case Realtime is unavailable/misconfigured.
+    // Keep it defensive: do not overwrite with nulls on errors.
+    const [prodRes, txRes, feedRes, lowRes, bugRes] = await Promise.all([
+      supabase.from('products').select('*').order('slot_number', { ascending: true }),
+      supabase
+        .from('transactions')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(3000),
+      supabase.from('live_feed').select('*').order('created_at', { ascending: false }).limit(1000),
+      supabase.from('low_stock_products').select('*').order('slot_number', { ascending: true }).limit(200),
+      supabase.from('bug_reports').select('*').order('created_at', { ascending: false }).limit(500),
+    ])
+
+    if (!prodRes.error && Array.isArray(prodRes.data)) {
+      products.value = prodRes.data
+    }
+    if (!txRes.error && Array.isArray(txRes.data)) {
+      transactions.value = dedupeBy(txRes.data, txKey)
+    }
+    if (!feedRes.error && Array.isArray(feedRes.data)) {
+      liveFeed.value = dedupeBy(feedRes.data, feedKey)
+    }
+    if (!lowRes.error && Array.isArray(lowRes.data)) {
+      lowStockProducts.value = lowRes.data
+    }
+    if (!bugRes.error && Array.isArray(bugRes.data)) {
+      bugReports.value = bugRes.data
+    }
+  }
+
   function upsertLocal(listRef, row, key = 'id') {
     const idx = listRef.value.findIndex((r) => r?.[key] === row?.[key])
     if (idx >= 0) listRef.value.splice(idx, 1, row)
@@ -183,6 +220,47 @@ export function useRealtimeMachineData() {
     if (idx >= 0) listRef.value.splice(idx, 1)
   }
 
+  function noteRealtimeEvent() {
+    lastRealtimeEventAt.value = Date.now()
+  }
+
+  function clearReconnectTimer() {
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer)
+      reconnectTimer = null
+    }
+  }
+
+  function teardownChannel() {
+    clearReconnectTimer()
+    if (channel) {
+      try {
+        supabase.removeChannel(channel)
+      } catch (_) {
+        // ignore
+      }
+      channel = null
+    }
+  }
+
+  function scheduleReconnect(reason) {
+    // Exponential backoff, capped. Also triggers a refresh so UI stays current.
+    teardownChannel()
+    reconnectAttempt += 1
+    const delayMs = Math.min(30_000, 800 * Math.pow(2, Math.min(6, reconnectAttempt)))
+    const msg = reason ? `Realtime reconnect scheduled (${reason})` : 'Realtime reconnect scheduled'
+    error.value = error.value ? `${error.value}; ${msg}` : msg
+    clearReconnectTimer()
+    reconnectTimer = setTimeout(async () => {
+      try {
+        await refreshLatest()
+      } catch (_) {
+        // ignore refresh errors; subscription may still succeed
+      }
+      subscribeRealtime()
+    }, delayMs)
+  }
+
   function subscribeRealtime() {
     if (channel) return
 
@@ -192,6 +270,7 @@ export function useRealtimeMachineData() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'products' },
         (payload) => {
+          noteRealtimeEvent()
           const { eventType, new: rowNew, old: rowOld } = payload || {}
           if (eventType === 'DELETE') removeLocal(products, rowOld, 'id')
           else if (rowNew) upsertLocal(products, rowNew, 'id')
@@ -201,6 +280,7 @@ export function useRealtimeMachineData() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'transactions' },
         (payload) => {
+          noteRealtimeEvent()
           const { eventType, new: rowNew, old: rowOld } = payload || {}
           if (eventType === 'DELETE') {
             removeLocal(transactions, rowOld, rowOld?.source_tx_id != null ? 'source_tx_id' : 'id')
@@ -216,6 +296,7 @@ export function useRealtimeMachineData() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'live_feed' },
         (payload) => {
+          noteRealtimeEvent()
           const { eventType, new: rowNew, old: rowOld } = payload || {}
           if (eventType === 'DELETE') removeLocal(liveFeed, rowOld, 'id')
           else if (rowNew) upsertLocal(liveFeed, rowNew, 'id')
@@ -226,6 +307,7 @@ export function useRealtimeMachineData() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'low_stock_products' },
         (payload) => {
+          noteRealtimeEvent()
           const { eventType, new: rowNew, old: rowOld } = payload || {}
           if (eventType === 'DELETE') removeLocal(lowStockProducts, rowOld, 'product_id')
           else if (rowNew) upsertLocal(lowStockProducts, rowNew, 'product_id')
@@ -237,6 +319,7 @@ export function useRealtimeMachineData() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'emails' },
         (payload) => {
+          noteRealtimeEvent()
           const { eventType, new: rowNew, old: rowOld } = payload || {}
           if (eventType === 'DELETE') removeLocal(subscriberEmails, rowOld, 'id')
           else if (rowNew) upsertLocal(subscriberEmails, rowNew, 'id')
@@ -247,6 +330,7 @@ export function useRealtimeMachineData() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'bug_reports' },
         (payload) => {
+          noteRealtimeEvent()
           const { eventType, new: rowNew, old: rowOld } = payload || {}
           if (eventType === 'DELETE') removeLocal(bugReports, rowOld, 'id')
           else if (rowNew) upsertLocal(bugReports, rowNew, 'id')
@@ -254,10 +338,16 @@ export function useRealtimeMachineData() {
         }
       )
       .subscribe((status, err) => {
-        if (status === 'SUBSCRIBED') return
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        realtimeStatus.value = status
+        if (status === 'SUBSCRIBED') {
+          reconnectAttempt = 0
+          noteRealtimeEvent()
+          return
+        }
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
           const msg = err?.message ? `Realtime: ${err.message}` : `Realtime channel ${status}`
           error.value = error.value ? `${error.value}; ${msg}` : msg
+          scheduleReconnect(status)
         }
       })
   }
@@ -331,13 +421,28 @@ export function useRealtimeMachineData() {
   onMounted(async () => {
     await loadInitial()
     subscribeRealtime()
+
+    // Poll fallback: if Realtime is misconfigured (tables not in publication) or the channel silently stalls,
+    // the UI would otherwise look frozen. Refresh periodically when stale.
+    lastRealtimeEventAt.value = Date.now()
+    pollTimer = setInterval(async () => {
+      const staleMs = Date.now() - (lastRealtimeEventAt.value || 0)
+      // If we haven't seen any realtime events recently, do a lightweight refresh.
+      if (staleMs < 20_000 && realtimeStatus.value === 'SUBSCRIBED') return
+      try {
+        await refreshLatest()
+      } catch (_) {
+        // ignore
+      }
+    }, 15_000)
   })
 
   onBeforeUnmount(() => {
-    if (channel) {
-      supabase.removeChannel(channel)
-      channel = null
+    if (pollTimer) {
+      clearInterval(pollTimer)
+      pollTimer = null
     }
+    teardownChannel()
   })
 
   return {
@@ -349,6 +454,7 @@ export function useRealtimeMachineData() {
     bugReports,
     loading,
     error,
+    realtimeStatus,
     overview,
     lowStockItems,
     recentTransactions,

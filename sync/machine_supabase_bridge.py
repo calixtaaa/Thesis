@@ -23,6 +23,7 @@ import sqlite3
 import sys
 import time
 import atexit
+import platform
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -224,6 +225,37 @@ def main() -> int:
     if not DB_PATH.exists():
         raise SystemExit(f"Database not found: {DB_PATH}")
 
+    def _pid_is_running(pid: int) -> bool:
+        """Best-effort cross-platform 'is process alive' check."""
+        if pid <= 0:
+            return False
+        # Windows: use kernel32 to query exit code without extra deps.
+        if platform.system().lower().startswith("win"):
+            try:
+                import ctypes  # stdlib
+
+                PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+                STILL_ACTIVE = 259
+                handle = ctypes.windll.kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, int(pid))
+                if not handle:
+                    return False
+                try:
+                    exit_code = ctypes.c_ulong()
+                    ok = ctypes.windll.kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code))
+                    if not ok:
+                        return False
+                    return int(exit_code.value) == STILL_ACTIVE
+                finally:
+                    ctypes.windll.kernel32.CloseHandle(handle)
+            except Exception:
+                return False
+        # POSIX: signal 0 doesn't kill, just checks.
+        try:
+            os.kill(int(pid), 0)
+            return True
+        except Exception:
+            return False
+
     # Prevent multiple bridge instances from running (would cause duplicate inserts).
     LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
     try:
@@ -231,7 +263,31 @@ def main() -> int:
         os.write(fd, str(os.getpid()).encode("utf-8", errors="ignore"))
         os.close(fd)
     except FileExistsError:
-        raise SystemExit(f"Bridge already running (lock exists): {LOCK_PATH}")
+        # Auto-heal stale locks (common after abrupt termination / power loss).
+        try:
+            raw = LOCK_PATH.read_text(encoding="utf-8", errors="ignore").strip()
+            pid = int(raw) if raw else 0
+        except Exception:
+            pid = 0
+        if pid and _pid_is_running(pid):
+            raise SystemExit(f"Bridge already running (pid {pid}; lock exists): {LOCK_PATH}")
+        try:
+            LOCK_PATH.unlink(missing_ok=True)  # py3.8+ supports missing_ok on Windows too
+        except TypeError:
+            try:
+                if LOCK_PATH.exists():
+                    LOCK_PATH.unlink()
+            except Exception:
+                pass
+        except Exception:
+            pass
+        # Retry once after removing stale lock.
+        try:
+            fd = os.open(str(LOCK_PATH), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.write(fd, str(os.getpid()).encode("utf-8", errors="ignore"))
+            os.close(fd)
+        except FileExistsError:
+            raise SystemExit(f"Bridge already running (lock exists): {LOCK_PATH}")
 
     def _cleanup_lock():
         try:

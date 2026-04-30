@@ -10,6 +10,7 @@ supabase.env
 
 # SQLite → Supabase bridge progress (machine-specific)
 sync/.supabase_last_tx_id
+sync/.supabase_bridge.lock
 
 # Environment / API keys
 .env
