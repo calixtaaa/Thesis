@@ -1905,10 +1905,30 @@ async function downloadSalesReportXlsx() {
 const activeSection = ref('overview')
 const sidebarOpen = ref(false)
 
-// "Unread" badge for Reports: clears when you open Reports, reappears for newer OPEN reports.
-const reportsLastSeenAt = ref(Date.now())
+const REPORTS_LAST_SEEN_LS = 'dashboard_reports_last_seen_ms'
+
+function readReportsLastSeenMs() {
+  if (typeof localStorage === 'undefined') return 0
+  try {
+    const v = localStorage.getItem(REPORTS_LAST_SEEN_LS)
+    if (v == null || v === '') return 0
+    const n = Number(v)
+    return Number.isFinite(n) ? n : 0
+  } catch (_) {
+    return 0
+  }
+}
+
+// Unread badge: persist last visit so reload doesn't hide counts; default 0 = show open reports until opened once.
+const reportsLastSeenAt = ref(readReportsLastSeenMs())
 watch(activeSection, (next) => {
-  if (next === 'reports') reportsLastSeenAt.value = Date.now()
+  if (next === 'reports') {
+    const now = Date.now()
+    reportsLastSeenAt.value = now
+    try {
+      localStorage.setItem(REPORTS_LAST_SEEN_LS, String(now))
+    } catch (_) {}
+  }
 })
 
 const reportsBadgeCount = computed(() => {
@@ -1918,6 +1938,8 @@ const reportsBadgeCount = computed(() => {
   for (const r of rows) {
     const ms = toMsSafe(r?.createdAt)
     if (ms > lastSeen) n += 1
+    // If Supabase row has no created_at, still surface as unread until first visit (lastSeen === 0).
+    else if (!r?.createdAt && lastSeen === 0) n += 1
   }
   return n
 })
@@ -2172,8 +2194,8 @@ function capacityByName(rawName) {
   // Total Stocks Product (capacity) provided by you
   if (key === 'alcohol') return 3
   if (key === 'soap') return 7
-  if (key === 'deodorant') return 9
-  if (key === 'mouthwash') return 7
+  if (key === 'deodorant') return 8
+  if (key === 'mouthwash') return 6
   if (key === 'wet_wipes') return 3
   if (key === 'tissue') return 3
   if (key === 'panty_liner') return 8

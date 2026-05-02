@@ -374,9 +374,15 @@ export function useRealtimeMachineData() {
         const stock = Number(p?.current_stock ?? 0)
         const threshold = (() => {
           if (name === 'alcohol') return 1
+          if (name === 'soap') return 3
+          if (name === 'deo' || name === 'deodorant') return 3
+          if (name === 'mouth wash' || name === 'mouthwash') return 3
           if (name === 'wipes' || name === 'wet wipes' || name === 'wetwipes') return 1
           if (name === 'tissue' || name === 'tissues') return 1
+          if (name === 'panty liner' || name === 'panty liners' || name === 'pantyliners' || name === 'panti liner') return 3
           if (name === 'all night pads' || name === 'all-night pads') return 2
+          if (name === 'regular with wings' || name === 'regular w/ wings pads' || name === 'regular with wings pads') return 3
+          if (name === 'non wing pad' || name === 'non-wing pads' || name === 'non wing pads' || name === 'non-wing pad') return 3
           return 3
         })()
         return stock <= threshold ? 1 : 0
