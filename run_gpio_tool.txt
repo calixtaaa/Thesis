@@ -1,5 +1,8 @@
 source venv/bin/activate
 export DISPLAY=:0
 export PYTHONNOUSERSITE=1
+# IMPORTANT: Stop the main.py program FIRST before running this test tool.
+# GPIO resources can only be claimed by one program at a time.
+# If main.py is still running, the test tool will fail to initialize shared pins like the coin acceptor relay (GPIO6).
 # GPIO pin 8 is reserved by SPI0 CS0 for the MFRC522 reader.
 venv/bin/python gpio_test_tool.py

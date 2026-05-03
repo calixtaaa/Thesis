@@ -257,7 +257,7 @@ PAYMENT_INPUT_PINS = {
 }
 
 # Coin acceptor relay control (enable when user selects cash payment)
-COIN_ACCEPTOR_RELAY_PIN = 4   # Physical pin 7
+COIN_ACCEPTOR_RELAY_PIN = 6   # Physical pin 31
 
 IR_BREAK_BEAM_PIN = 26        # Physical pin 37
 STEPS_PER_PRODUCT = 4096      # 28BYJ-48 output-shaft revolution (8-phase half-step)
@@ -266,6 +266,13 @@ SOLENOID_UNLOCK_SECONDS = 3.0
 # Most low-cost 5V relay modules are active-low (IN=LOW energizes relay).
 # Set to False if your relay board is active-high.
 SOLENOID_ACTIVE_LOW = True
+
+
+def set_coin_acceptor_relay(enabled: bool) -> None:
+    # Coin acceptor relay: HIGH = enabled (active-high logic)
+    GPIO.output(COIN_ACCEPTOR_RELAY_PIN, GPIO.HIGH if enabled else GPIO.LOW)
+
+
 COINS_PER_SECOND = {
     1: 5,                     # 1-peso hopper fallback rate when no pulse feedback
     5: 5,                     # 5-peso hopper fallback rate when no pulse feedback
@@ -501,7 +508,7 @@ def gpio_init():
 
     # Coin acceptor relay output (active-high: HIGH enables, LOW disables)
     GPIO.setup(COIN_ACCEPTOR_RELAY_PIN, GPIO.OUT)
-    GPIO.output(COIN_ACCEPTOR_RELAY_PIN, GPIO.LOW)  # Start disabled
+    set_coin_acceptor_relay(False)  # Start disabled (LOW)
 
     # Shared RFID reader reset line
     GPIO.setup(RFID_PINS["reader_rst"], GPIO.OUT)
@@ -1239,6 +1246,12 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                         on_update()
                     except Exception:
                         pass
+                if round(float(current), 2) >= round(float(total_amount), 2):
+                    try:
+                        set_coin_acceptor_relay(False)
+                        print("[HW] Coin acceptor relay disabled: amount due reached")
+                    except Exception as relay_error:
+                        print(f"[HW] Warning: Failed to disable coin acceptor relay: {relay_error}")
             self._cash_poll_after_id = self.after(120, tick)
 
         self._cash_poll_after_id = self.after(120, tick)
@@ -2487,7 +2500,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         
         # Disable coin acceptor relay when navigating back to payment method selector
         try:
-            GPIO.output(COIN_ACCEPTOR_RELAY_PIN, GPIO.LOW)
+            set_coin_acceptor_relay(False)
             print("[HW] Coin acceptor relay disabled")
         except Exception as e:
             print(f"[HW] Warning: Failed to disable coin acceptor relay: {e}")
@@ -2516,7 +2529,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         """
         # Disable coin acceptor relay when user cancels
         try:
-            GPIO.output(COIN_ACCEPTOR_RELAY_PIN, GPIO.LOW)
+            set_coin_acceptor_relay(False)
             print("[HW] Coin acceptor relay disabled")
         except Exception as e:
             print(f"[HW] Warning: Failed to disable coin acceptor relay: {e}")
@@ -2552,7 +2565,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         
         # Enable coin acceptor relay when user selects cash payment
         try:
-            GPIO.output(COIN_ACCEPTOR_RELAY_PIN, GPIO.HIGH)
+            set_coin_acceptor_relay(True)
             print("[HW] Coin acceptor relay enabled")
         except Exception as e:
             print(f"[HW] Warning: Failed to enable coin acceptor relay: {e}")
@@ -2592,7 +2605,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             
             # Disable coin acceptor relay after payment is complete
             try:
-                GPIO.output(COIN_ACCEPTOR_RELAY_PIN, GPIO.LOW)
+                set_coin_acceptor_relay(False)
                 print("[HW] Coin acceptor relay disabled after payment")
             except Exception as relay_error:
                 print(f"[HW] Warning: Failed to disable coin acceptor relay: {relay_error}")

@@ -41,9 +41,19 @@ def setup_gpiozero_output(pin):
     if GPIO_LIBRARY != "gpiozero":
         return
     try:
-        _output_devices[pin] = OutputDevice(pin)
+        # Force initial_value=0 (LOW) to prevent relay from clicking on startup
+        device = OutputDevice(pin, initial_value=0)
+        _output_devices[pin] = device
+        print(f"[GPIO] Output pin {pin} initialized to LOW (initial_value=0)")
     except Exception as e:
-        print(f"[GPIO] Failed to create output device for pin {pin}: {e}")
+        # Fallback: try without initial_value for older gpiozero versions
+        try:
+            device = OutputDevice(pin)
+            device.off()
+            _output_devices[pin] = device
+            print(f"[GPIO] Output pin {pin} initialized to LOW (fallback .off())")
+        except Exception as e2:
+            print(f"[GPIO] Failed to create output device for pin {pin}: {e2}")
 
 def setup_gpiozero_input(pin):
     """Create and store gpiozero InputDevice for a pin."""
@@ -141,6 +151,7 @@ ALL_OUTPUT_PINS = {
     "Motor bank A (slots 1,3,5,7,9) IN3 (22)": 22,
     "Motor bank A (slots 1,3,5,7,9) IN4 (23)": 23,
     "Motor bank B (slots 2,4,6,8,10) IN1 (4)": 4,
+    "Coin Acceptor Relay (6)": 6,
     "Motor bank B (slots 2,4,6,8,10) IN2 (18)": 18,
     "Motor bank B (slots 2,4,6,8,10) IN3 (15)": 15,
     "Motor bank B (slots 2,4,6,8,10) IN4 (14)": 14,
@@ -328,11 +339,45 @@ class GPIOTestTool(ctk.CTk):
                 except Exception as e:
                     print(f"[GPIO] Failed to setup input pin {pin}: {e}")
             
+            # Ensure all output pins are explicitly set to LOW on startup (gpiozero defaults may vary)
+            for pin in self.initialized_output_pins:
+                try:
+                    if GPIO_LIBRARY == "gpiozero":
+                        gpiozero_output(pin, 0)
+                    else:
+                        GPIO.output(pin, 0)
+                    # Verify it actually got set
+                    if GPIO_LIBRARY == "gpiozero":
+                        actual_state = _output_devices[pin].value if pin in _output_devices else None
+                    else:
+                        actual_state = GPIO.input(pin)
+                    pin_label = OUTPUT_PIN_TO_LABEL.get(pin, f"GPIO{pin}")
+                    print(f"[GPIO] Pin {pin} ({pin_label}) forced to LOW, verified state: {actual_state}")
+                except Exception as e:
+                    print(f"[GPIO] Error forcing pin {pin} to LOW: {e}")
+            
             print(
                 f"[GPIO Test Tool] GPIO setup complete: "
                 f"outputs={len(self.initialized_output_pins)}/{len(ALL_OUTPUT_PINS)}, "
                 f"inputs={len(self.initialized_input_pins)}/{len(ALL_INPUT_PINS)}"
             )
+            
+            # Report on any failed pins
+            failed_outputs = set(ALL_OUTPUT_PINS.values()) - self.initialized_output_pins
+            failed_inputs = set(ALL_INPUT_PINS.values()) - self.initialized_input_pins
+            
+            if failed_outputs or failed_inputs:
+                failed_msg = ""
+                if failed_outputs:
+                    failed_labels = [f"{label} (GPIO{pin})" for label, pin in ALL_OUTPUT_PINS.items() if pin in failed_outputs]
+                    failed_msg += f"Failed outputs: {', '.join(failed_labels)}\n"
+                if failed_inputs:
+                    failed_labels = [f"{label} (GPIO{pin})" for label, pin in ALL_INPUT_PINS.items() if pin in failed_inputs]
+                    failed_msg += f"Failed inputs: {', '.join(failed_labels)}\n"
+                failed_msg += "\nThis usually means another program (like main.py) is using GPIO. Stop that program first."
+                print(f"[GPIO Test Tool] WARNING: {failed_msg}")
+                messagebox.showwarning("GPIO Initialization Warning", failed_msg)
+            
             return bool(self.initialized_output_pins or self.initialized_input_pins)
         except Exception as e:
             messagebox.showerror("GPIO Setup Error", f"Failed to initialize GPIO: {e}")

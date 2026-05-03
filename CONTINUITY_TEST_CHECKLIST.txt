@@ -1,0 +1,376 @@
+================================================================================
+DIY CONTINUITY TESTER CHECKLIST
+Vending Machine Hardware - Complete Connection Verification
+================================================================================
+
+EQUIPMENT NEEDED:
+- LED + 470Ω resistor connected to Pi 3.3V (one end) and Pi GND (other end)
+- Test leads / multimeter probes
+- Power OFF the entire system before testing (to avoid false readings)
+
+TEST METHODOLOGY:
+- Connect one test lead to 3.3V side of LED circuit
+- Connect other test lead to GND side of LED circuit
+- Touch probe A and B to test points
+- LED illuminates = SHORT CIRCUIT (continuous path)
+- LED dark = OPEN CIRCUIT (no continuous path)
+
+================================================================================
+SECTION 1: POWER RAILS (Should NOT light)
+================================================================================
+Power rail isolation is critical. These should be OPEN unless there's a decoupling
+capacitor (which may show very slight glow).
+
+Test 1.1: Pi 3.3V Rail to Common GND
+├─ Test Points: Pi 3.3V (Pin 1) ↔ Pi GND (Pin 6)
+├─ Expected: LED OFF (open circuit)
+├─ Failure indicates: Short circuit in Pi power delivery or damaged capacitor
+└─ Action: Power down immediately, check for burnt components
+
+Test 1.2: Pi 5V Rail to Common GND
+├─ Test Points: Pi 5V (Pin 2 or 4) ↔ Pi GND (Pin 6)
+├─ Expected: LED OFF (open circuit)
+├─ Failure indicates: Short in 5V supply or damaged component
+└─ Action: Power down immediately, inspect for damage
+
+Test 1.3: External 12V PSU+ to PSU GND
+├─ Test Points: External 12V positive ↔ External 12V GND
+├─ Expected: LED OFF (open circuit, external supply isolated)
+├─ Failure indicates: Damage to external PSU or internal short
+└─ Action: Check external PSU separately
+
+
+================================================================================
+SECTION 2: GROUND DISTRIBUTION (Should LIGHT)
+================================================================================
+All GND pins should be electrically connected to each other through the common
+ground plane. These tests verify proper GND continuity.
+
+Test 2.1: Pi GND Pin 6 ↔ Pi GND Pin 9
+├─ Test Points: Pin 6 (GND) ↔ Pin 9 (GND)
+├─ Expected: LED ON (continuous GND plane)
+└─ Failure indicates: Broken GND trace or cold solder joint
+
+Test 2.2: Pi GND Pin 6 ↔ Pi GND Pin 14
+├─ Test Points: Pin 6 (GND) ↔ Pin 14 (GND)
+├─ Expected: LED ON (continuous GND plane)
+└─ Failure indicates: Broken GND trace or cold solder joint
+
+Test 2.3: Pi GND Pin 6 ↔ External PSU GND
+├─ Test Points: Pi GND (Pin 6) ↔ External 12V PSU GND
+├─ Expected: LED ON (common ground reference)
+├─ Failure indicates: Missing or disconnected GND jumper cable
+└─ Action: Verify "common ground" jumper wire is soldered to both
+
+Test 2.4: ULN2003 GND ↔ Pi Common GND
+├─ Test Points: ULN2003 board GND ↔ Pi GND (Pin 6)
+├─ Expected: LED ON (common ground)
+└─ Failure indicates: Missing GND wire to ULN2003
+
+
+================================================================================
+SECTION 3: I2C BUS (MCP23017 Expanders)
+================================================================================
+
+Test 3.1: MCP23017 #1 SDA ↔ MCP23017 #2 SDA
+├─ Test Points: MCP #1 SDA ↔ MCP #2 SDA
+├─ Expected: LED ON (shared I2C bus)
+└─ Note: Due to pull-up resistors, may show dim LED; that's OK
+
+Test 3.2: MCP23017 #1 SCL ↔ MCP23017 #2 SCL
+├─ Test Points: MCP #1 SCL ↔ MCP #2 SCL
+├─ Expected: LED ON (shared I2C bus)
+└─ Note: Due to pull-up resistors, may show dim LED; that's OK
+
+Test 3.3: MCP23017 All #1-3 SDA Lines Connected
+├─ Test Points: MCP #1 SDA ↔ MCP #3 SDA
+├─ Expected: LED ON (all on same bus)
+└─ Failure indicates: Broken I2C SDA trace or loose connection
+
+Test 3.4: MCP23017 All #1-3 SCL Lines Connected
+├─ Test Points: MCP #1 SCL ↔ MCP #3 SCL
+├─ Expected: LED ON (all on same bus)
+└─ Failure indicates: Broken I2C SCL trace or loose connection
+
+Test 3.5: MCP23017 VDD ↔ Pi 3.3V
+├─ Test Points: MCP VDD ↔ Pi 3.3V (Pin 1)
+├─ Expected: LED ON (all MCP chips powered from same rail)
+└─ Failure indicates: Missing 3.3V wire to MCP or broken trace
+
+Test 3.6: MCP23017 VSS ↔ Common GND
+├─ Test Points: MCP VSS ↔ Pi GND (Pin 6)
+├─ Expected: LED ON (common GND)
+└─ Failure indicates: Missing GND wire to MCP
+
+
+================================================================================
+SECTION 4: SPI BUS (RFID Reader MFRC522)
+================================================================================
+
+Test 4.1: RFID MOSI ↔ Pi GPIO10
+├─ Test Points: RFID MOSI pin ↔ Pi GPIO 10 (Pin 19)
+├─ Expected: LED ON (dedicated connection)
+└─ Failure indicates: Broken SPI MOSI trace or loose solder
+
+Test 4.2: RFID MISO ↔ Pi GPIO9
+├─ Test Points: RFID MISO pin ↔ Pi GPIO 9 (Pin 21)
+├─ Expected: LED ON (dedicated connection)
+└─ Failure indicates: Broken SPI MISO trace or loose solder
+
+Test 4.3: RFID SCK ↔ Pi GPIO11
+├─ Test Points: RFID SCK pin ↔ Pi GPIO 11 (Pin 23)
+├─ Expected: LED ON (dedicated connection)
+└─ Failure indicates: Broken SPI SCK trace or loose solder
+
+Test 4.4: RFID CS/SS ↔ Pi GPIO8
+├─ Test Points: RFID CS pin ↔ Pi GPIO 8 (Pin 24)
+├─ Expected: LED ON (dedicated chip select)
+└─ Failure indicates: Broken SPI CS trace or loose solder
+
+Test 4.5: RFID RST ↔ Pi GPIO5
+├─ Test Points: RFID RST pin ↔ Pi GPIO 5 (Pin 29)
+├─ Expected: LED ON (dedicated reset line)
+└─ Failure indicates: Broken RST trace or loose solder
+
+
+================================================================================
+SECTION 5: STEPPER MOTOR CONTROL (ULN2003 + MCP23017)
+================================================================================
+
+Test 5.1: Stepper Slot 1 IN1 ↔ MCP23017 #1 GPIO0
+├─ Test Points: ULN2003 IN1 ↔ MCP #1 GP0
+├─ Expected: LED ON (dedicated motor phase control)
+└─ Failure indicates: Broken trace between MCP and ULN2003
+
+Test 5.2: Stepper Slot 1 IN2 ↔ MCP23017 #1 GPIO1
+├─ Test Points: ULN2003 IN2 ↔ MCP #1 GP1
+├─ Expected: LED ON (dedicated motor phase control)
+└─ Failure indicates: Broken trace between MCP and ULN2003
+
+Test 5.3: Stepper Slot 1 IN3 ↔ MCP23017 #1 GPIO2
+├─ Test Points: ULN2003 IN3 ↔ MCP #1 GP2
+├─ Expected: LED ON (dedicated motor phase control)
+└─ Failure indicates: Broken trace between MCP and ULN2003
+
+Test 5.4: Stepper Slot 1 IN4 ↔ MCP23017 #1 GPIO3
+├─ Test Points: ULN2003 IN4 ↔ MCP #1 GP3
+├─ Expected: LED ON (dedicated motor phase control)
+└─ Failure indicates: Broken trace between MCP and ULN2003
+
+(Repeat Tests 5.1-5.4 for each slot, adjusting MCP address and GPIO pins per mapping)
+
+Test 5.5: Motor Power Supply ↔ External 12V PSU+
+├─ Test Points: Motor connector V+ ↔ External 12V+
+├─ Expected: LED ON (12V motor power)
+└─ Failure indicates: Broken 12V power trace to motor
+
+Test 5.6: Motor GND ↔ Common GND
+├─ Test Points: Motor connector GND ↔ Pi GND (Pin 6)
+├─ Expected: LED ON (common ground return)
+└─ Failure indicates: Missing motor GND or broken trace
+
+
+================================================================================
+SECTION 6: SOLENOID LOCK RELAYS
+================================================================================
+
+Test 6.1: Relay Restock IN1 ↔ Pi GPIO16
+├─ Test Points: Relay module IN1 ↔ Pi GPIO 16 (Pin 36)
+├─ Expected: LED ON (relay control signal)
+└─ Failure indicates: Broken GPIO16 trace or loose connection
+
+Test 6.2: Relay Troubleshoot IN2 ↔ Pi GPIO20
+├─ Test Points: Relay module IN2 ↔ Pi GPIO 20 (Pin 38)
+├─ Expected: LED ON (relay control signal)
+└─ Failure indicates: Broken GPIO20 trace or loose connection
+
+Test 6.3: Relay Module VCC ↔ Pi 5V
+├─ Test Points: Relay VCC ↔ Pi 5V (Pin 2 or 4)
+├─ Expected: LED ON (relay module power)
+└─ Failure indicates: Missing 5V power to relay module
+
+Test 6.4: Relay Module GND ↔ Common GND
+├─ Test Points: Relay GND ↔ Pi GND (Pin 6)
+├─ Expected: LED ON (relay GND return)
+└─ Failure indicates: Missing or broken relay GND connection
+
+Test 6.5: Relay Contact COM ↔ External 12V PSU+
+├─ Test Points: Relay COM pin ↔ External 12V+
+├─ Expected: LED ON (12V solenoid power routing)
+└─ Note: Test with relay de-energized (GPIO16/20 = LOW)
+
+Test 6.6: Relay Contact NO ↔ Solenoid +
+├─ Test Points: Relay NO pin ↔ Solenoid + terminal
+├─ Expected: LED ON (solenoid power path, relay closed)
+└─ Note: Test with relay energized (GPIO16/20 = HIGH)
+
+Test 6.7: Solenoid - ↔ External PSU GND
+├─ Test Points: Solenoid - terminal ↔ External 12V GND
+├─ Expected: LED ON (solenoid return path)
+└─ Failure indicates: Missing solenoid GND or broken trace
+
+
+================================================================================
+SECTION 7: COIN ACCEPTOR RELAY (NEW)
+================================================================================
+
+Test 7.1: Coin Acceptor Relay IN ↔ Pi GPIO6
+├─ Test Points: Relay IN ↔ Pi GPIO 6 (Pin 31)
+├─ Expected: LED ON (relay control signal)
+└─ Failure indicates: Broken GPIO6 trace or loose connection
+
+Test 7.2: Coin Acceptor Relay VCC ↔ Pi 3.3V or 5V
+├─ Test Points: Relay VCC ↔ Pi 3.3V (Pin 1) or 5V (Pin 2)
+├─ Expected: LED ON (relay module power, depends on relay spec)
+└─ Note: Check relay datasheet for required voltage
+
+Test 7.3: Coin Acceptor Relay GND ↔ Common GND
+├─ Test Points: Relay GND ↔ Pi GND (Pin 6)
+├─ Expected: LED ON (relay GND return)
+└─ Failure indicates: Missing or broken relay GND
+
+
+================================================================================
+SECTION 8: COIN ACCEPTOR PULSE INPUT
+================================================================================
+
+Test 8.1: Coin Acceptor Pulse OUT ↔ Pi GPIO19
+├─ Test Points: Acceptor pulse pin ↔ Pi GPIO 19 (Pin 35)
+├─ Expected: LED ON (pulse signal line)
+├─ Note: Test ONLY when acceptor is NOT running/pulsing
+└─ Failure indicates: Broken pulse line trace or loose connector
+
+Test 8.2: Coin Acceptor GND ↔ Common GND
+├─ Test Points: Acceptor GND ↔ Pi GND (Pin 6)
+├─ Expected: LED ON (common ground reference)
+└─ Failure indicates: Missing acceptor GND or broken trace
+
+
+================================================================================
+SECTION 9: IR BREAK-BEAM SENSOR
+================================================================================
+
+Test 9.1: IR Sensor OUT ↔ Pi GPIO26
+├─ Test Points: Sensor output pin ↔ Pi GPIO 26 (Pin 37)
+├─ Expected: LED ON (sensor signal line)
+├─ Note: Test ONLY when sensor is NOT active
+└─ Failure indicates: Broken sensor line trace or loose connector
+
+Test 9.2: IR Sensor VCC ↔ Pi 3.3V or 5V
+├─ Test Points: Sensor VCC ↔ Pi 3.3V (Pin 1) or Pi 5V (Pin 2)
+├─ Expected: LED ON (sensor power, check module datasheet)
+└─ Failure indicates: Missing sensor power or broken trace
+
+Test 9.3: IR Sensor GND ↔ Common GND
+├─ Test Points: Sensor GND ↔ Pi GND (Pin 6)
+├─ Expected: LED ON (common ground reference)
+└─ Failure indicates: Missing sensor GND or broken trace
+
+
+================================================================================
+SECTION 10: ISOLATION TESTS (Should NOT light)
+================================================================================
+These tests verify that different voltage domains stay isolated.
+
+Test 10.1: Pi 3.3V ↔ External 12V PSU+
+├─ Test Points: Pi 3.3V (Pin 1) ↔ External 12V+
+├─ Expected: LED OFF (isolated power domains)
+└─ Failure indicates: Accidental short between 3.3V and 12V domains (CRITICAL)
+
+Test 10.2: Pi 5V ↔ External 12V PSU+
+├─ Test Points: Pi 5V (Pin 2) ↔ External 12V+
+├─ Expected: LED OFF (isolated power domains)
+└─ Failure indicates: Accidental short between 5V and 12V domains (CRITICAL)
+
+Test 10.3: RFID MOSI ↔ RFID MISO
+├─ Test Points: RFID MOSI ↔ RFID MISO
+├─ Expected: LED OFF (separate SPI lines)
+└─ Failure indicates: Accidental short on SPI bus
+
+Test 10.4: MCP23017 SDA ↔ MCP23017 SCL
+├─ Test Points: MCP SDA ↔ MCP SCL
+├─ Expected: LED OFF (separate I2C bus lines)
+├─ Note: May show dim LED due to pull-ups; complete darkness is ideal
+└─ Failure indicates: Accidental short on I2C bus
+
+
+================================================================================
+SECTION 11: SIGNAL INTEGRITY TESTS (Should NOT light except for short pulses)
+================================================================================
+
+Test 11.1: GPIO Output Pin ↔ Different GPIO Output Pin
+├─ Test Points: GPIO16 ↔ GPIO20
+├─ Expected: LED OFF (independent GPIO pins)
+└─ Failure indicates: Accidental short between output pins
+
+Test 11.2: GPIO Input Pin ↔ Ground
+├─ Test Points: GPIO19 (Coin acceptor) ↔ Pi GND
+├─ Expected: LED ON (pulled to GND through internal pull-up and test circuit)
+├─ Note: With a high-impedance continuity tester, may show dim or no light
+└─ This is NORMAL for pull-up inputs
+
+
+================================================================================
+QUICK REFERENCE SUMMARY
+================================================================================
+
+✓ SHOULD LIGHT (LED ON) - Continuous Path Expected:
+  - All GND to GND connections
+  - All power rail to device connections (3.3V, 5V, 12V)
+  - All GPIO to target device connections
+  - All I2C/SPI bus connections within same domain
+
+✗ SHOULD NOT LIGHT (LED OFF) - Open Circuit Expected:
+  - Power rail to different power rail (3.3V to 5V, 5V to 12V, etc.)
+  - Different GPIO output pins
+  - Different signal lines (MOSI ↔ MISO, SDA ↔ SCL, etc.)
+
+⚠ AMBIGUOUS (May be Dim or Flickering):
+  - I2C bus lines (due to pull-up resistors)
+  - Input pins with internal pull-ups
+  - Weak signals through capacitors
+  (These are NORMAL; indicates resistive path, not a short)
+
+
+================================================================================
+TEST EXECUTION ORDER RECOMMENDATION
+================================================================================
+
+1. Power OFF all systems completely
+2. Start with Section 1 (Power Rails) - verify NO shorts
+3. Move to Section 2 (Ground Distribution) - verify ALL connected
+4. Test Sections 3-9 systematically (bus connectivity)
+5. Run Section 10 (Isolation) - verify domains separated
+6. Run Section 11 (Signal Integrity) - final verification
+
+Total estimated time: 30-45 minutes for complete checkout
+
+
+================================================================================
+TROUBLESHOOTING GUIDE
+================================================================================
+
+LED Too Dim (Partial Light):
+  → Likely cause: High-impedance path (pull-up resistor, capacitive coupling)
+  → Action: Normal for I2C/inputs; check resistance with multimeter if concerned
+
+LED Flickering:
+  → Likely cause: Intermittent connection, corrosion, or vibration
+  → Action: Reseat connectors, clean solder joints, check for cold solder
+
+LED Won't Light When It Should:
+  → Likely cause: Broken trace, loose connection, or cold solder joint
+  → Action: Check solder joints under magnification, trace wiring carefully
+
+Unexpected Short Found:
+  → Action: Power down, photograph circuit, inspect for bridged solder
+  → Safety: Do NOT apply power until short is isolated and fixed
+
+Multiple Failures in Same Area:
+  → Likely cause: Water damage, corrosion, or damaged IC
+  → Action: Dry thoroughly, inspect for burn marks, replace damaged components
+
+
+================================================================================
+END OF CONTINUITY TEST CHECKLIST
+================================================================================

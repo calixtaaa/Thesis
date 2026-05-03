@@ -62,11 +62,12 @@ DETAILED PIN MAPPING
      Rate: Varies by coin acceptor model (typically 1-2 pulses per coin)
      Configuration: Stored in database as "payment_pulse_edge" setting
 
-   GPIO 4  (Physical Pin 7)  → Relay Enable (NEW) [Active-High Output]
+   GPIO 6  (Physical Pin 31) → Relay Enable (NEW) [Active-High Output]
      Function: Enables coin acceptor only when user selects cash payment
-     Logic: HIGH = acceptor enabled, LOW = acceptor disabled
+      Logic: HIGH = acceptor enabled, LOW = acceptor disabled (relay module active-high)
      Activation Point: When user taps "Pay with Coins" button
      Deactivation Points:
+       - Automatically when the required amount due is reached
        - User completes cash payment
        - User cancels and goes back to payment method selection
        - Error occurs during payment processing
