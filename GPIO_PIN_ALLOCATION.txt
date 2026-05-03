@@ -1,0 +1,317 @@
+================================================================================
+COMPLETE GPIO PIN ALLOCATION DOCUMENTATION
+Vending Machine System - Raspberry Pi 5 (BCM Numbering)
+Generated: May 2026
+================================================================================
+
+QUICK SUMMARY - All GPIO Pins Used
+================================================================================
+Direct Pi GPIO (BCM):
+  2,  3 (I2C for MCP23017 expanders)
+  4    (Coin acceptor relay control - NEW)
+  5    (RFID reader reset)
+  8,  9, 10, 11 (RFID SPI interface)
+  16   (Solenoid lock - restock door)
+  19   (Coin acceptor pulse input)
+  20   (Solenoid lock - troubleshoot door)
+  26   (IR break-beam sensor)
+
+Expanded via MCP23017 I2C Expanders (3 chips total):
+  Stepper motors for product slots 1-10 (28BYJ-48 motors via ULN2003)
+  Each slot uses 4 control pins per expander
+
+
+================================================================================
+DETAILED PIN MAPPING
+================================================================================
+
+1) I2C COMMUNICATION (Raspberry Pi → MCP23017 Expanders)
+   ────────────────────────────────────────────────────
+   GPIO 2  (Physical Pin 3)  → SDA (I2C Data Line)
+   GPIO 3  (Physical Pin 5)  → SCL (I2C Clock Line)
+   3.3V    (Physical Pin 1)  → VDD (MCP23017 power)
+   GND     (Physical Pin 6)  → VSS (MCP23017 ground)
+
+   MCP23017 Configuration:
+   - Bus ID:     1 (use command: i2cdetect -y 1)
+   - Addresses:  0x20 (Chip #1), 0x21 (Chip #2), 0x22 (Chip #3)
+   - Detect:     i2cdetect -y 1 (should show all three addresses)
+
+
+2) RFID READER (MFRC522 - Single Shared Module via SPI)
+   ──────────────────────────────────────────────────────
+   GPIO 11 (Physical Pin 23) → SCK  (SPI Clock)
+   GPIO 10 (Physical Pin 19) → MOSI (SPI Data Out)
+   GPIO 9  (Physical Pin 21) → MISO (SPI Data In)
+   GPIO 8  (Physical Pin 24) → CS/SS/SDA (Chip Select, CE0)
+   GPIO 5  (Physical Pin 29) → RST (Reset)
+   3.3V    (Physical Pin 1)  → VCC
+   GND     (Physical Pin 6)  → GND
+
+   RFID Functionality:
+   - Payment verification (tap card to pay)
+   - Card reload (tap to add balance)
+   - Restock door unlock (tap with staff card)
+   - Troubleshoot door unlock (tap with admin card)
+
+
+3) COIN ACCEPTOR (Input + Relay Control)
+   ──────────────────────────────────
+   GPIO 19 (Physical Pin 35) → Pulse Output (Active-Low Input)
+     Signal: Pulse edge detection on falling/rising edge per setting
+     Rate: Varies by coin acceptor model (typically 1-2 pulses per coin)
+     Configuration: Stored in database as "payment_pulse_edge" setting
+
+   GPIO 4  (Physical Pin 7)  → Relay Enable (NEW) [Active-High Output]
+     Function: Enables coin acceptor only when user selects cash payment
+     Logic: HIGH = acceptor enabled, LOW = acceptor disabled
+     Activation Point: When user taps "Pay with Coins" button
+     Deactivation Points:
+       - User completes cash payment
+       - User cancels and goes back to payment method selection
+       - Error occurs during payment processing
+     Safety: Always starts in LOW (disabled) on system boot
+
+   Coin Session Tracking:
+   - Tracks accumulated coin pulses during payment
+   - Converts pulses to currency value (peso denominations)
+   - User pays when total ≥ transaction amount
+
+
+4) SOLENOID DOOR LOCKS (12V via 5V Relay Module)
+   ─────────────────────────────────────────────
+   GPIO 16 (Physical Pin 36) → IN1 (Restock Door Lock Control)
+   GPIO 20 (Physical Pin 38) → IN2 (Troubleshoot Door Lock Control)
+
+   Relay Module Specifications:
+   - Type: Songle dual-channel 5V relay (JD-VCC + VCC type)
+   - Config: Jumper installed for single-supply mode
+   - Activation: Active-low (IN=LOW energizes relay)
+   - VCC/JD-VCC → Pi 5V (Physical Pin 2 or 4)
+   - GND → Pi GND (Physical Pin 6)
+
+   Solenoid Characteristics:
+   - Type: 12V Solenoid Model 102
+   - External Supply: 12V DC (separate from Pi)
+   - Unlock Pulse Duration: 3 seconds (configurable)
+   - Protection: Flyback diode across each coil
+   - Common Ground: External 12V PSU GND tied to Pi GND
+
+   Door Unlock Authorization:
+   - Restock door: Staff or Admin role with RFID card
+   - Troubleshoot door: Admin role only with RFID card
+
+
+5) IR BREAK-BEAM SENSOR (Vend Confirmation)
+   ────────────────────────────────────────
+   GPIO 26 (Physical Pin 37) → Sensor Digital Output
+   3.3V or 5V               → VCC (module dependent)
+   GND                      → GND
+
+   Purpose: Confirms product dispensed when beam is broken
+   Signal Type: Active-low (LOW when beam broken)
+   Timeout: 3 seconds per product
+   Importance: Used for IR confirmation statistics in reports
+
+
+6) STEPPER MOTORS (28BYJ-48 via ULN2003 + MCP23017)
+   ──────────────────────────────────────────────────
+   Control Method: MCP23017 expander pins → ULN2003 driver → Stepper motor
+
+   Motor Specifications:
+   - Model: 28BYJ-48 (4-phase stepper)
+   - Steps per Revolution: 4096 (output shaft, 8-phase half-step)
+   - Voltage: 5V or 12V variant (verify your specific motor)
+   - Driver: ULN2003 transistor array
+
+   Step Configuration:
+   - Step Delay: 0.002 seconds (2ms between steps)
+   - Steps per Product: 4096 (full revolution per item dispensed)
+   - Power Supply: Separate 12V or 5V PSU with common GND to Pi
+
+   Slot to Expander Mapping:
+   │ Slot │ Address │ Pins   │ Slot │ Address │ Pins   │
+   ├──────┼─────────┼────────┼──────┼─────────┼────────┤
+   │  1   │  0x20   │ GP0-3  │  6   │  0x21   │ GP4-7  │
+   │  2   │  0x20   │ GP4-7  │  7   │  0x21   │ GP8-11 │
+   │  3   │  0x20   │ GP8-11 │  8   │  0x21   │ GP12-15│
+   │  4   │  0x20   │ GP12-15│  9   │  0x22   │ GP0-3  │
+   │  5   │  0x21   │ GP0-3  │  10  │  0x22   │ GP4-7  │
+
+   Each slot uses 4 pins for motor coil sequencing:
+     IN1 (Phase A, upper half) → bit 0 of the pin pair
+     IN2 (Phase A, lower half) → bit 1 of the pin pair
+     IN3 (Phase B, upper half) → bit 2 of the pin pair
+     IN4 (Phase B, lower half) → bit 3 of the pin pair
+
+   Step Sequence (8-phase half-step):
+     Phase 0: (1,0,0,0)
+     Phase 1: (1,1,0,0)
+     Phase 2: (0,1,0,0)
+     Phase 3: (0,1,1,0)
+     Phase 4: (0,0,1,0)
+     Phase 5: (0,0,1,1)
+     Phase 6: (0,0,0,1)
+     Phase 7: (1,0,0,1)
+
+   Operating Modes:
+   - Primary: MCP23017 (3 expanders, supports full 10-slot system)
+   - Fallback: Native GPIO bank mode (for testing; limited to 2 banks)
+     Bank A: GPIO 17,27,22,23 (slots 1,3,5,7,9)
+     Bank B: GPIO 4,18,15,14  (slots 2,4,6,8,10)
+
+
+================================================================================
+PHYSICAL PIN REFERENCE (Raspberry Pi 5 40-pin Header)
+================================================================================
+
+Row 1 (odd-numbered pins):  1, 3, 5, 7, 9,11,13,15,17,19,21,23,25,27,29,31,33,35,37,39
+Row 2 (even-numbered pins): 2, 4, 6, 8,10,12,14,16,18,20,22,24,26,28,30,32,34,36,38,40
+
+Pin 1  = 3.3V               Pin 21 = GPIO 9  (MISO)
+Pin 2  = 5V                 Pin 23 = GPIO 11 (SCK)
+Pin 3  = GPIO 2  (SDA)      Pin 24 = GPIO 8  (CE0/CS)
+Pin 4  = 5V                 Pin 25 = GND
+Pin 5  = GPIO 3  (SCL)      Pin 29 = GPIO 5  (RFID RST)
+Pin 6  = GND                Pin 31 = GND
+Pin 7  = GPIO 4  (COIN_RELAY)   Pin 35 = GPIO 19 (COIN_PULSE_IN)
+Pin 8  = GPIO 14            Pin 36 = GPIO 16 (SOLENOID_RESTOCK)
+Pin 9  = GND                Pin 37 = GPIO 26 (IR_BEAM)
+Pin 11 = GPIO 17            Pin 38 = GPIO 20 (SOLENOID_TROUBLESHOOT)
+Pin 13 = GPIO 27            Pin 39 = GND
+Pin 15 = GPIO 22            Pin 40 = GPIO 21
+Pin 19 = GPIO 10 (MOSI)
+
+
+================================================================================
+AVAILABLE GPIO PINS (NOT CURRENTLY USED)
+================================================================================
+GPIO: 6,  7, 12, 13, 14, 15, 17, 18, 21, 22, 23, 24, 25, 27
+
+Can be used for:
+  - Future expansion modules
+  - Additional sensors or actuators
+  - Testing hardware without affecting current system
+  - Alternative fallback configurations
+
+
+================================================================================
+POWER DISTRIBUTION
+================================================================================
+
+Raspberry Pi 5 Power:
+  - 5V Pin (2, 4): ~2A max combined (shared USB3 controller limit)
+  - 3.3V Pin (1): ~500mA (limited by voltage regulator)
+  - GND (pins 6, 9, 14, 20, 25, 30, 34, 39): Connect all to common ground
+
+External Supplies (MUST SHARE COMMON GND WITH PI):
+  - Solenoid PSU: 12V DC for locks and motor drivers
+  - Coin Acceptor: Per manufacturer spec (typically 12V)
+  - Motor Driver PSU: Separate from solenoid if using 12V motors
+
+Common Ground Setup:
+  External PSU GND → Solenoid GND → ULN2003 GND → Pi GND (pin 6 or similar)
+  This ensures proper signal reference and protects Pi GPIO from voltage spikes
+
+
+================================================================================
+HARDWARE SAFETY CHECKLIST
+================================================================================
+
+Before Operating:
+  ✓ All external PSU GND tied to Pi GND (common reference)
+  ✓ No motors/solenoids connected directly to Pi GPIO (use drivers)
+  ✓ Flyback diodes installed across all solenoid coils
+  ✓ I2C pull-up resistors verified (10k ohm typical)
+  ✓ MCP23017 reset line pulled high through resistor
+  ✓ Relay module jumper verified (JD-VCC jumper installed if in use)
+  ✓ All external PSU capacitors rated for intended voltage
+  ✓ GPIO headers protected from short-circuit
+
+During Operation:
+  • Monitor for GPIO allocation conflicts (use 'fuser' to detect)
+  • Check I2C bus status regularly with i2cdetect
+  • Monitor motor current draw (don't exceed 12V supply rating)
+  • Verify solenoid unlock pulses are brief (3 seconds max)
+  • Log any intermittent GPIO or I2C issues
+
+
+================================================================================
+TROUBLESHOOTING REFERENCE
+================================================================================
+
+I2C Bus Issues:
+  - Check: sudo i2cdetect -y 1 (should show 0x20, 0x21, 0x22)
+  - Enable: sudo raspi-config nonint do_i2c 0
+  - Verify: ls -la /dev/i2c-1 (should exist)
+
+GPIO Conflicts:
+  - Check: fuser -v /dev/gpiomem0 /dev/gpiochip0 /dev/gpiochip4
+  - Cleanup: Kill processes using GPIO before restarting app
+  - Reset: GPIO.cleanup() in Python (done automatically on graceful exit)
+
+Coin Acceptor Pulse Issues:
+  - Verify GPIO19 is not already claimed by another process
+  - Check edge detection setting: database.py → payment_pulse_edge
+  - Try alternate edge (rising/falling) if pulses not detected
+  - Add event bounce time if pulses are unstable
+
+Motor Control Issues:
+  - Verify ULN2003 is powered and wired to motor correctly
+  - Check MCP23017 addresses match environment variables
+  - Ensure motor power supply voltage matches motor specification
+  - Test with STEPPER_BACKEND=native_gpio for fallback mode
+
+Solenoid Issues:
+  - Verify relay module power (VCC and JD-VCC jumper)
+  - Test relay contacts with multimeter before installing solenoid
+  - Confirm unlock pulse duration (should be ~3 seconds)
+  - Check GND connection is solid (cold solder joint risk)
+
+
+================================================================================
+SOFTWARE CONFIGURATION FILES
+================================================================================
+
+Key References in Code:
+  main.py:
+    - GPIO constants (lines 190-260)
+    - gpio_init() function (initializes all pins)
+    - STEPPER_BACKEND environment variable control
+    - COIN_ACCEPTOR_RELAY_PIN = 4 (NEW)
+    - cash_payment_flow() (enables relay)
+    - _do_dispense_cash() (disables relay after completion)
+
+  database.py:
+    - get_hardware_setting() / set_hardware_setting()
+    - payment_pulse_edge setting
+
+  Environment Variables:
+    STEPPER_BACKEND=mcp23017 (default) or native_gpio
+    STEPPER_I2C_BUS=1
+    MCP23017_ADDRESSES=0x20,0x21,0x22 (comma-separated)
+    DISPLAY=:0 (for GUI)
+    PYTHONNOUSERSITE=1
+
+
+================================================================================
+VERSION HISTORY
+================================================================================
+
+v1.0 (May 2026):
+  - Initial comprehensive documentation
+  - Added GPIO 4 for coin acceptor relay control (NEW)
+  - Documented all active GPIO pins
+  - Included physical pin reference diagram
+  - Added troubleshooting guide
+  - Added power distribution guidelines
+
+Previous Versions:
+  - GPIO assignments stable since hardware implementation
+  - MCP23017 addressing scheme fixed (0x20, 0x21, 0x22)
+  - Stepper sequence verified on 28BYJ-48 motors
+
+
+================================================================================
+END OF DOCUMENTATION
+================================================================================

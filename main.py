@@ -256,6 +256,9 @@ PAYMENT_INPUT_PINS = {
     "coin_acceptor": 19,    # Physical pin 35
 }
 
+# Coin acceptor relay control (enable when user selects cash payment)
+COIN_ACCEPTOR_RELAY_PIN = 4   # Physical pin 7
+
 IR_BREAK_BEAM_PIN = 26        # Physical pin 37
 STEPS_PER_PRODUCT = 4096      # 28BYJ-48 output-shaft revolution (8-phase half-step)
 STEP_DELAY = 0.002
@@ -495,6 +498,10 @@ def gpio_init():
     for pin in SOLENOID_PINS.values():
         GPIO.setup(pin, GPIO.OUT)
         GPIO.output(pin, _solenoid_idle_level())
+
+    # Coin acceptor relay output (active-high: HIGH enables, LOW disables)
+    GPIO.setup(COIN_ACCEPTOR_RELAY_PIN, GPIO.OUT)
+    GPIO.output(COIN_ACCEPTOR_RELAY_PIN, GPIO.LOW)  # Start disabled
 
     # Shared RFID reader reset line
     GPIO.setup(RFID_PINS["reader_rst"], GPIO.OUT)
@@ -2477,6 +2484,14 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             self.sidebar_holder.destroy()
             self.sidebar_holder = None
         self.clear_screen()
+        
+        # Disable coin acceptor relay when navigating back to payment method selector
+        try:
+            GPIO.output(COIN_ACCEPTOR_RELAY_PIN, GPIO.LOW)
+            print("[HW] Coin acceptor relay disabled")
+        except Exception as e:
+            print(f"[HW] Warning: Failed to disable coin acceptor relay: {e}")
+        
         items = self._get_checkout_items()
         if not items:
             self.build_main_menu()
@@ -2499,6 +2514,13 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         Multi-item checkout returns to order review.
         Single-item checkout returns to main menu with the order panel quantity editor.
         """
+        # Disable coin acceptor relay when user cancels
+        try:
+            GPIO.output(COIN_ACCEPTOR_RELAY_PIN, GPIO.LOW)
+            print("[HW] Coin acceptor relay disabled")
+        except Exception as e:
+            print(f"[HW] Warning: Failed to disable coin acceptor relay: {e}")
+        
         items = self._get_checkout_items()
         if not items:
             self.build_main_menu()
@@ -2527,6 +2549,13 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             self.sidebar_holder = None
         self.clear_screen()
         cash_session.reset()
+        
+        # Enable coin acceptor relay when user selects cash payment
+        try:
+            GPIO.output(COIN_ACCEPTOR_RELAY_PIN, GPIO.HIGH)
+            print("[HW] Coin acceptor relay enabled")
+        except Exception as e:
+            print(f"[HW] Warning: Failed to enable coin acceptor relay: {e}")
 
         frame = ctk.CTkFrame(self.content_holder, fg_color=self.current_theme["bg"], corner_radius=0)
         frame.pack(expand=True, fill=tk.BOTH)
@@ -2560,6 +2589,14 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                 if not ir_ok:
                     print(f"[HW] WARNING: No IR vend confirmation for slot {p['slot_number']}")
                 record_transaction(p["id"], q, line_total, "cash", ir_confirmed=ir_ok)
+            
+            # Disable coin acceptor relay after payment is complete
+            try:
+                GPIO.output(COIN_ACCEPTOR_RELAY_PIN, GPIO.LOW)
+                print("[HW] Coin acceptor relay disabled after payment")
+            except Exception as relay_error:
+                print(f"[HW] Warning: Failed to disable coin acceptor relay: {relay_error}")
+            
             change_note = ""
             if change > 0:
                 change_note = (
@@ -2578,6 +2615,11 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                 ),
             )
         except Exception as e:
+            # Disable relay on error too
+            try:
+                GPIO.output(COIN_ACCEPTOR_RELAY_PIN, GPIO.LOW)
+            except Exception:
+                pass
             self.after(0, lambda: messagebox.showerror("Error", str(e)))
             self.after(0, lambda: (self._reset_checkout_state(), self.build_main_menu()))
 

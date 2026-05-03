@@ -102,6 +102,14 @@ Protection and behavior notes:
 Coin acceptor pulse output:
 - Pulse OUT -> GPIO19 (Physical pin 35)
 
+Coin acceptor relay control (NEW):
+- Relay IN -> GPIO4 (Physical pin 7)
+- Logic: Active-high (HIGH=enabled, LOW=disabled)
+- Activation: When user selects "Pay with Coins" payment method
+- Deactivation: After payment completes, or when user cancels/goes back
+- Purpose: Enables coin acceptor only during active payment collection
+- Protection: Starts in disabled state (LOW) on system boot
+
 Removed hardware in current build:
 - Bill acceptor (not used)
 - Coin change hopper(s) and hopper pulse feedback lines (not used)
@@ -117,4 +125,4 @@ Removed hardware in current build:
 GPIO Reserved Summary (current build)
 ========================================
 GPIO used by active runtime:
-2,3,5,8,9,10,11,16,19,20,26
+2,3,4,5,8,9,10,11,16,19,20,26
