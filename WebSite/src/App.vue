@@ -22,7 +22,26 @@
 </template>
 
 <script setup>
+import { onMounted, onUnmounted } from 'vue'
 import NavBar from './components/NavBar.vue'
 import FooterBar from './components/FooterBar.vue'
 import LoadingScreen from './components/LoadingScreen.vue'
+
+let tuqlasEl
+onMounted(() => {
+  // Load Tuqlas chatbot once (avoid duplicates on hot reload / remount).
+  const existing = document.querySelector('script[data-tuqlas="1"]')
+  if (existing) {
+    tuqlasEl = existing
+    return
+  }
+  tuqlasEl = document.createElement('script')
+  tuqlasEl.src = 'https://www.tuqlas.com/chatbot.js'
+  tuqlasEl.setAttribute('data-tuqlas', '1')
+  tuqlasEl.setAttribute('data-key', 'tq_live_29a16781b90f0349dde1556b59c1dc8ea40750ae')
+  tuqlasEl.setAttribute('data-api', 'https://www.tuqlas.com')
+  tuqlasEl.defer = true
+  document.body.appendChild(tuqlasEl)
+})
+onUnmounted(() => tuqlasEl?.remove())
 </script>

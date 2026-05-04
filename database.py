@@ -23,27 +23,27 @@ _CAPACITY_RULES = {
     "soap": 7,
     "deodorant": 8,
     "deo": 8,
-    "mouthwash": 6,
-    "mouth wash": 6,
+    "mouthwash": 7,
+    "mouth wash": 7,
     "wet wipes": 3,
     "wetwipes": 3,
     "wipes": 3,
     "tissue": 3,
     "tissues": 3,
-    "panty liner": 8,
-    "panty liners": 8,
-    "pantyliners": 8,
-    "panti liner": 8,
-    "all night pads": 6,
-    "all-night pads": 6,
-    "regular with wings": 7,
-    "regular w/ wings pads": 7,
-    "regular with wings pads": 7,
-    "non wings pad": 7,
-    "non wing pad": 7,
-    "non-wing pads": 7,
-    "non wing pads": 7,
-    "non-wing pad": 7,
+    "panty liner": 6,
+    "panty liners": 6,
+    "pantyliners": 6,
+    "panti liner": 6,
+    "all night pads": 5,
+    "all-night pads": 5,
+    "regular with wings": 5,
+    "regular w/ wings pads": 5,
+    "regular with wings pads": 5,
+    "non wings pad": 5,
+    "non wing pad": 5,
+    "non-wing pads": 5,
+    "non wing pads": 5,
+    "non-wing pad": 5,
 }
 
 # ── SHA-256 HMAC salt (shared with server.py) ──────────────────────
@@ -182,13 +182,13 @@ def init_db():
             ("Alcohol", "Green Cross Isopropyl Alcohol 70% Solution, 60mL", 25.00, 1, 3, 3),
             ("Soap", "Soap, 10grams", 5.00, 2, 7, 7),
             ("Deodorant", "Rexona Shower Clean, 3ml*12packs", 10.00, 3, 8, 8),
-            ("Mouthwash", "Scoban Mint Flavor, 10ml*10 packs", 8.00, 4, 6, 6),
+            ("Mouthwash", "Scoban Mint Flavor, 10ml*10 packs", 8.00, 4, 7, 7),
             ("Tissues", "Sanicare Hankies, 6 packs", 8.00, 5, 3, 3),
             ("Wet Wipes", "Sanicare Mini Wipes, 6 packs x 8 sheets", 18.00, 6, 3, 3),
-            ("Panty Liners", "Charmee Breathable, 20 liners", 5.00, 7, 8, 8),
-            ("All Night Pads", "Charmee All Night Plus, 4 pads", 10.00, 8, 6, 6),
-            ("Regular W/ Wings Pads", "Charmee Dry Net with wings, 8 pads", 7.00, 9, 7, 7),
-            ("Non-Wing Pads", "Charmee Cottony without wings, 8 pads", 7.00, 10, 7, 7),
+            ("Panty Liners", "Charmee Breathable, 20 liners", 5.00, 7, 6, 6),
+            ("All Night Pads", "Charmee All Night Plus, 4 pads", 10.00, 8, 5, 5),
+            ("Regular W/ Wings Pads", "Charmee Dry Net with wings, 8 pads", 7.00, 9, 5, 5),
+            ("Non-Wing Pads", "Charmee Cottony without wings, 8 pads", 7.00, 10, 5, 5),
         ]
         cur.executemany(
             """
@@ -216,6 +216,16 @@ def init_db():
             """
         )
         conn.commit()
+
+    # Demo / thesis mode: keep every product at full stock (current_stock == capacity).
+    # This does NOT affect RFID/GPIO/Coin logic; it only changes inventory counts in SQLite.
+    cur.execute(
+        """
+        UPDATE products
+        SET current_stock = capacity
+        """
+    )
+    conn.commit()
 
     # Seed a default staff RFID user for testing
     cur.execute("SELECT COUNT(*) AS c FROM rfid_users")

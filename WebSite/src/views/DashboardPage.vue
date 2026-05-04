@@ -2195,13 +2195,13 @@ function capacityByName(rawName) {
   if (key === 'alcohol') return 3
   if (key === 'soap') return 7
   if (key === 'deodorant') return 8
-  if (key === 'mouthwash') return 6
+  if (key === 'mouthwash') return 7
   if (key === 'wet_wipes') return 3
   if (key === 'tissue') return 3
-  if (key === 'panty_liner') return 8
-  if (key === 'all_night_pads') return 6
-  if (key === 'regular_with_wings') return 7
-  if (key === 'non_wing_pad') return 7
+  if (key === 'panty_liner') return 6
+  if (key === 'all_night_pads') return 5
+  if (key === 'regular_with_wings') return 5
+  if (key === 'non_wing_pad') return 5
   return 0
 }
 
