@@ -678,6 +678,8 @@ class StaffMixin:
 
         self._slide_in(frame)
         self.add_theme_toggle_footer()
+
+    def restock_product_dialog(self, product_row):
         max_add = product_row["capacity"] - product_row["current_stock"]
         if max_add <= 0:
             messagebox.showinfo("Full", "This tray is already full.")
