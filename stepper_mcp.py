@@ -221,6 +221,7 @@ class StepperMCPTestApp(ctk.CTk):
         self.stop_requested = False
         self._phase_index = 0
         self._calibration_steps = 0
+        self.pin_states = {0: 0, 1: 0, 2: 0, 3: 0}  # Track state of 4 pins per slot
 
         self.ctrl: MCP23017Controller | None = None
 
@@ -425,6 +426,77 @@ class StepperMCPTestApp(ctk.CTk):
             text_color=self.current_theme["button_fg"],
             height=40,
             corner_radius=10,
+        ).pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+        per_pin_card = self._card(left)
+        per_pin_card.pack(fill=tk.X, padx=0, pady=(10, 0))
+        ctk.CTkLabel(
+            per_pin_card,
+            text="Per-Pin Test (Connection Debugging)",
+            font=("Segoe UI", 16, "bold"),
+            text_color=self.current_theme["fg"],
+        ).pack(anchor="w", padx=18, pady=(14, 4))
+        ctk.CTkLabel(
+            per_pin_card,
+            text="Toggle individual pins to test wiring and connections independently of the sequence.",
+            font=("Segoe UI", 11),
+            text_color=self.current_theme["muted"],
+            wraplength=560,
+            justify="left",
+        ).pack(anchor="w", padx=18, pady=(0, 10))
+
+        self.pin_status_label = ctk.CTkLabel(
+            per_pin_card,
+            text="Pins OFF: [----]",
+            font=("Consolas", 11),
+            text_color=self.current_theme["fg"],
+        )
+        self.pin_status_label.pack(anchor="w", padx=18, pady=(0, 10))
+
+        self.pin_buttons = {}
+        pin_row1 = ctk.CTkFrame(per_pin_card, fg_color="transparent")
+        pin_row1.pack(fill=tk.X, padx=18, pady=(0, 6))
+        for i in range(2):
+            btn = ctk.CTkButton(
+                pin_row1,
+                text=f"IN{i+1}: OFF",
+                command=lambda idx=i: self._toggle_pin(idx),
+                fg_color=self.current_theme["button_bg"],
+                hover_color=self.current_theme["card_border"],
+                text_color=self.current_theme["button_fg"],
+                height=36,
+                corner_radius=8,
+            )
+            btn.pack(side=tk.LEFT, padx=(0, 8), fill=tk.X, expand=True)
+            self.pin_buttons[i] = btn
+
+        pin_row2 = ctk.CTkFrame(per_pin_card, fg_color="transparent")
+        pin_row2.pack(fill=tk.X, padx=18, pady=(0, 12))
+        for i in range(2, 4):
+            btn = ctk.CTkButton(
+                pin_row2,
+                text=f"IN{i+1}: OFF",
+                command=lambda idx=i: self._toggle_pin(idx),
+                fg_color=self.current_theme["button_bg"],
+                hover_color=self.current_theme["card_border"],
+                text_color=self.current_theme["button_fg"],
+                height=36,
+                corner_radius=8,
+            )
+            btn.pack(side=tk.LEFT, padx=(0, 8) if i < 3 else (0, 0), fill=tk.X, expand=True)
+            self.pin_buttons[i] = btn
+
+        all_off_pin_row = ctk.CTkFrame(per_pin_card, fg_color="transparent")
+        all_off_pin_row.pack(fill=tk.X, padx=18, pady=(0, 14))
+        ctk.CTkButton(
+            all_off_pin_row,
+            text="All pins OFF",
+            command=self.all_test_pins_off,
+            fg_color="#fbbf24",
+            hover_color="#f59e0b",
+            text_color="#000000",
+            height=36,
+            corner_radius=8,
         ).pack(side=tk.LEFT, fill=tk.X, expand=True)
 
         self.progress_label = ctk.CTkLabel(
@@ -648,10 +720,6 @@ class StepperMCPTestApp(ctk.CTk):
         self.current_slot.set(str(value))
         self._on_slot_change()
 
-    def _on_slot_change(self, *_args):
-        self._refresh_preview()
-        self.reset_calibration_counter(update_status=False)
-
     def _refresh_preview(self):
         slot = self._get_slot_number()
         cfg = self.slot_map.get(slot)
@@ -851,6 +919,93 @@ class StepperMCPTestApp(ctk.CTk):
             self.progress_label.configure(text="All coils OFF", text_color=self.current_theme["status_ok"])
         except Exception as exc:
             messagebox.showerror("MCP error", str(exc))
+
+    def _toggle_pin(self, pin_index):
+        """Toggle a single pin on/off for connection testing."""
+        if self.ctrl is None:
+            messagebox.showerror("MCP error", "MCP backend is not ready.")
+            return
+        
+        try:
+            cfg = self._slot_config(self._get_slot_number())
+        except Exception as exc:
+            messagebox.showerror("Invalid slot", str(exc))
+            return
+        
+        address = int(cfg["address"])
+        pins = cfg["pins"]
+        target_pin = pins[pin_index]
+        
+        # Toggle state
+        self.pin_states[pin_index] = 1 - self.pin_states[pin_index]
+        
+        try:
+            self.ctrl.write_pin(address, target_pin, self.pin_states[pin_index])
+            self._update_pin_ui()
+            status = "ON" if self.pin_states[pin_index] else "OFF"
+            self.progress_label.configure(
+                text=f"IN{pin_index+1}: {status}",
+                text_color=self.current_theme["status_warn"] if self.pin_states[pin_index] else self.current_theme["status_ok"]
+            )
+        except Exception as exc:
+            messagebox.showerror("Pin toggle error", str(exc))
+    
+    def all_test_pins_off(self):
+        """Turn all test pins off."""
+        if self.ctrl is None:
+            messagebox.showerror("MCP error", "MCP backend is not ready.")
+            return
+        
+        try:
+            cfg = self._slot_config(self._get_slot_number())
+        except Exception as exc:
+            messagebox.showerror("Invalid slot", str(exc))
+            return
+        
+        address = int(cfg["address"])
+        pins = cfg["pins"]
+        
+        try:
+            for i in range(4):
+                self.pin_states[i] = 0
+                self.ctrl.write_pin(address, pins[i], 0)
+            self._update_pin_ui()
+            self.progress_label.configure(text="All test pins OFF", text_color=self.current_theme["status_ok"])
+        except Exception as exc:
+            messagebox.showerror("All pins OFF error", str(exc))
+    
+    def _update_pin_ui(self):
+        """Update the per-pin test UI to reflect current state."""
+        pins_on = [i+1 for i in range(4) if self.pin_states[i]]
+        status_str = "Pins ON: [" + "".join("█" if self.pin_states[i] else "·" for i in range(4)) + "]"
+        self.pin_status_label.configure(text=status_str)
+        
+        for i in range(4):
+            status = "ON" if self.pin_states[i] else "OFF"
+            self.pin_buttons[i].configure(text=f"IN{i+1}: {status}")
+            if self.pin_states[i]:
+                self.pin_buttons[i].configure(
+                    fg_color=self.current_theme["accent"],
+                    hover_color=self.current_theme["accent_hover"],
+                    text_color="#ffffff"
+                )
+            else:
+                self.pin_buttons[i].configure(
+                    fg_color=self.current_theme["button_bg"],
+                    hover_color=self.current_theme["card_border"],
+                    text_color=self.current_theme["button_fg"]
+                )
+    
+    def _on_slot_change(self, *_args):
+        self._refresh_preview()
+        self.reset_calibration_counter(update_status=False)
+        # Reset per-pin states when slot changes
+        for i in range(4):
+            self.pin_states[i] = 0
+        try:
+            self._update_pin_ui()
+        except Exception:
+            pass
 
     def reset_calibration_counter(self, update_status=True):
         self._calibration_steps = 0
