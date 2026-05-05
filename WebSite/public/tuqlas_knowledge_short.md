@@ -9,10 +9,10 @@ Products (slot • item • price • capacity):
 2 Soap ₱5 cap7
 3 Deodorant/Deo ₱10 cap8
 4 Mouthwash ₱8 cap7
-5 Tissues ₱8 cap3
-6 Wet Wipes ₱18 cap3
-7 Panty Liners ₱5 cap6
-8 All Night Pads ₱10 cap5
+5 Wet Wipes ₱18 cap3
+6 Tissues ₱8 cap3
+7 All Night Pads ₱10 cap5
+8 Panty Liners ₱5 cap6
 9 Regular w/ Wings ₱7 cap5
 10 Non‑Wing Pads ₱7 cap5
 

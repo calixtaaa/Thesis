@@ -73,6 +73,53 @@ def get_connection():
     return conn
 
 
+# Canonical slot → product (physical tray). Must stay aligned with sample seed + Supabase sync.
+_TARGET_SLOT_BY_NAME = {
+    "Alcohol": 1,
+    "Soap": 2,
+    "Deodorant": 3,
+    "Mouthwash": 4,
+    "Wet Wipes": 5,
+    "Tissues": 6,
+    "All Night Pads": 7,
+    "Panty Liners": 8,
+    "Regular W/ Wings Pads": 9,
+    "Non-Wing Pads": 10,
+}
+
+
+def _normalize_product_slots(cur, conn) -> None:
+    """Assign each known product to its canonical slot_number (UNIQUE-safe, idempotent)."""
+    cur.execute("SELECT id, name, slot_number FROM products")
+    rows = cur.fetchall()
+    if not rows:
+        return
+    mismatches = []
+    for row in rows:
+        name = row["name"]
+        want = _TARGET_SLOT_BY_NAME.get(name)
+        if want is not None and int(row["slot_number"]) != int(want):
+            mismatches.append((row["id"], name, want))
+    if not mismatches:
+        return
+    # Phase 1: move canonical rows off 1..10 so we can rewrite without UNIQUE collisions.
+    for row in rows:
+        name = row["name"]
+        if name in _TARGET_SLOT_BY_NAME:
+            cur.execute(
+                "UPDATE products SET slot_number = ? WHERE id = ?",
+                (1000 + int(row["id"]), int(row["id"])),
+            )
+    conn.commit()
+    # Phase 2: final slots by product name.
+    for name, slot in _TARGET_SLOT_BY_NAME.items():
+        cur.execute(
+            "UPDATE products SET slot_number = ? WHERE name = ?",
+            (int(slot), name),
+        )
+    conn.commit()
+
+
 def init_db():
     conn = get_connection()
     cur = conn.cursor()
@@ -183,10 +230,10 @@ def init_db():
             ("Soap", "Soap, 10grams", 5.00, 2, 7, 7),
             ("Deodorant", "Rexona Shower Clean, 3ml*12packs", 10.00, 3, 8, 8),
             ("Mouthwash", "Scoban Mint Flavor, 10ml*10 packs", 8.00, 4, 7, 7),
-            ("Tissues", "Sanicare Hankies, 6 packs", 8.00, 5, 3, 3),
-            ("Wet Wipes", "Sanicare Mini Wipes, 6 packs x 8 sheets", 18.00, 6, 3, 3),
-            ("Panty Liners", "Charmee Breathable, 20 liners", 5.00, 7, 6, 6),
-            ("All Night Pads", "Charmee All Night Plus, 4 pads", 10.00, 8, 5, 5),
+            ("Wet Wipes", "Sanicare Mini Wipes, 6 packs x 8 sheets", 18.00, 5, 3, 3),
+            ("Tissues", "Sanicare Hankies, 6 packs", 8.00, 6, 3, 3),
+            ("All Night Pads", "Charmee All Night Plus, 4 pads", 10.00, 7, 5, 5),
+            ("Panty Liners", "Charmee Breathable, 20 liners", 5.00, 8, 6, 6),
             ("Regular W/ Wings Pads", "Charmee Dry Net with wings, 8 pads", 7.00, 9, 5, 5),
             ("Non-Wing Pads", "Charmee Cottony without wings, 8 pads", 7.00, 10, 5, 5),
         ]
@@ -199,6 +246,8 @@ def init_db():
         )
         conn.commit()
     else:
+        # Align slot numbers with current physical tray (idempotent).
+        _normalize_product_slots(cur, conn)
         # Keep capacities aligned with the latest machine layout even on existing DBs.
         for raw_name, cap in _CAPACITY_RULES.items():
             cur.execute(
