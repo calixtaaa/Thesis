@@ -269,9 +269,17 @@ SOLENOID_ACTIVE_LOW = True
 
 
 def set_coin_acceptor_relay(enabled: bool) -> None:
-    # Coin acceptor relay: HIGH = enabled (active-high logic)
-    GPIO.output(COIN_ACCEPTOR_RELAY_PIN, GPIO.HIGH if enabled else GPIO.LOW)
+    global _coin_pulse_ignore_until
+    # Coin acceptor relay: active-low (LOW energizes, HIGH de-energizes)
+    GPIO.output(COIN_ACCEPTOR_RELAY_PIN, GPIO.LOW if enabled else GPIO.HIGH)
 
+    # Clear pending counts and ignore startup transients after relay enable.
+    if enabled:
+        _payment_pulse_counts["coin_acceptor"] = 0
+        _coin_pulse_ignore_until = time.monotonic() + (COIN_ACCEPTOR_ENABLE_IGNORE_MS / 1000.0)
+    else:
+        _coin_pulse_ignore_until = 0.0
+        _payment_pulse_counts["coin_acceptor"] = 0
 
 COINS_PER_SECOND = {
     1: 5,                     # 1-peso hopper fallback rate when no pulse feedback
@@ -281,10 +289,13 @@ COINS_PER_SECOND = {
 COIN_ACCEPTOR_PULSE_VALUE = 1.0
 PAYMENT_PULSE_EDGE_DEFAULT = "falling"  # supported: falling, rising
 PAYMENT_PULSE_BOUNCETIME_MS = 50
+COIN_ACCEPTOR_ENABLE_IGNORE_MS = 350
 
 _payment_pulse_counts = {
     "coin_acceptor": 0,
 }
+
+_coin_pulse_ignore_until = 0.0
 
 
 def get_payment_pulse_counts() -> dict:
@@ -295,6 +306,8 @@ def get_payment_pulse_counts() -> dict:
 
 def _payment_pulse_callback(channel: int):
     if channel == PAYMENT_INPUT_PINS["coin_acceptor"]:
+        if time.monotonic() < _coin_pulse_ignore_until:
+            return
         _payment_pulse_counts["coin_acceptor"] += 1
 
 
