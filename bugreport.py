@@ -247,6 +247,13 @@ def show_bug_report_screen(app, *, version: str, hover_scale_btn):
     )
     email_entry.pack(anchor="w", pady=(0, 12))
 
+    # Touch-friendly typing: show virtual keyboard when user taps the email field.
+    try:
+        email_entry.bind("<FocusIn>", lambda _e: app.show_virtual_keyboard(email_entry))
+        email_entry.bind("<Button-1>", lambda _e: app.show_virtual_keyboard(email_entry))
+    except Exception:
+        pass
+
     options = [
         "UI not responding / Freeze",
         "Theme / colors wrong",
@@ -444,6 +451,13 @@ def show_report_updates_screen(app, *, version: str):
         placeholder_text="you@example.com",
     )
     email_entry.pack(side=tk.LEFT, padx=(0, 10))
+
+    # Touch-friendly typing: show virtual keyboard when user taps the email field.
+    try:
+        email_entry.bind("<FocusIn>", lambda _e: app.show_virtual_keyboard(email_entry))
+        email_entry.bind("<Button-1>", lambda _e: app.show_virtual_keyboard(email_entry))
+    except Exception:
+        pass
 
     results_wrap = ctk.CTkFrame(body, fg_color=card_bg)
     results_wrap.pack(fill=tk.BOTH, expand=True)

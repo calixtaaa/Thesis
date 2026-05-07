@@ -970,8 +970,250 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
 
     # ---------- Screen helpers ----------
 
+    # ---------- Virtual keyboard (touchscreen typing) ----------
+    def ensure_virtual_keyboard(self):
+        """
+        Create an on-screen keyboard overlay (used on touchscreen LCD).
+        Attached to the app root so screen rebuilds don't destroy it.
+        """
+        try:
+            vk = getattr(self, "_virtual_keyboard_frame", None)
+            if vk is not None and vk.winfo_exists():
+                return
+
+            scale = float(getattr(self, "_lcd_scale", 1.0) or 1.0)
+            kb_height = int(220 * scale)
+
+            self._virtual_keyboard_frame = ctk.CTkFrame(
+                self,
+                fg_color=self.current_theme.get("card_bg", self.current_theme["bg"]),
+                corner_radius=14,
+                border_width=1,
+                border_color=self.current_theme.get("card_border", "#e2e8f0"),
+            )
+            # Create, but hide by default (place_forget). We'll re-place on show.
+            self._virtual_keyboard_frame.place(
+                relx=0,
+                rely=1,
+                anchor="sw",
+                relwidth=1,
+                height=kb_height,
+                x=10,
+                y=-10,
+            )
+            self._virtual_keyboard_frame.place_forget()
+
+            inner = ctk.CTkFrame(
+                self._virtual_keyboard_frame,
+                fg_color="transparent",
+                corner_radius=10,
+            )
+            inner.pack(fill=tk.BOTH, expand=True, padx=12, pady=12)
+            self._virtual_keyboard_inner = inner
+
+            key_font = int(12 * scale)
+            key_h = int(34 * scale)
+            padx = max(1, int(2 * scale))
+            pady = max(2, int(3 * scale))
+
+            # Letters / digits / email symbols
+            rows = [
+                list("qwertyuiop"),
+                list("asdfghjkl"),
+                list("zxcvbnm"),
+                list("0123456789"),
+                ["@", ".", "_", "-", "+"],
+            ]
+
+            for r_i, row_keys in enumerate(rows):
+                for c_i, ch in enumerate(row_keys):
+                    self._mk_vk_key(
+                        parent=inner,
+                        text=ch,
+                        row=r_i,
+                        col=c_i,
+                        key_font=key_font,
+                        key_h=key_h,
+                        padx=padx,
+                        pady=pady,
+                    )
+
+            # Bottom control row
+            base_row = len(rows)
+
+            def _space():
+                self._vk_press(" ")
+
+            def _backspace():
+                self._vk_backspace()
+
+            def _done():
+                self.hide_virtual_keyboard()
+
+            # Space spans the first 7 columns so it feels easier to hit on touch.
+            self._mk_vk_key(
+                parent=inner,
+                text="Space",
+                row=base_row,
+                col=0,
+                colspan=7,
+                key_font=key_font,
+                key_h=key_h,
+                padx=padx,
+                pady=pady,
+                command=_space,
+            )
+            self._mk_vk_key(
+                parent=inner,
+                text="⌫",
+                row=base_row,
+                col=7,
+                key_font=key_font,
+                key_h=key_h,
+                padx=padx,
+                pady=pady,
+                command=_backspace,
+            )
+            self._mk_vk_key(
+                parent=inner,
+                text="Done",
+                row=base_row,
+                col=8,
+                key_font=key_font,
+                key_h=key_h,
+                padx=padx,
+                pady=pady,
+                command=_done,
+            )
+        except Exception:
+            return
+
+    def _mk_vk_key(
+        self,
+        *,
+        parent,
+        text: str,
+        row: int,
+        col: int,
+        key_font: int,
+        key_h: int,
+        padx: int,
+        pady: int,
+        colspan: int = 1,
+        command=None,
+    ):
+        # Default command: insert the key text (letters/digits/symbols).
+        if command is None:
+            if len(text) == 1:
+                command = lambda t=text: self._vk_press(t)
+            else:
+                command = lambda: None
+
+        btn = ctk.CTkButton(
+            parent,
+            text=text,
+            font=(self._ui_font_name, key_font, "bold"),
+            height=key_h,
+            fg_color=self.current_theme.get("button_bg", "#242440"),
+            hover_color=self.current_theme.get("button_border", "#3D3A5C"),
+            text_color=self.current_theme.get("fg", "#F0EFF4"),
+            corner_radius=10,
+            command=command,
+        )
+        btn.grid(row=row, column=col, columnspan=colspan, padx=padx, pady=pady, sticky="nsew")
+        return btn
+
+    def show_virtual_keyboard(self, entry):
+        """Show VK and set which CTkEntry receives typed characters."""
+        try:
+            if entry is None:
+                return
+            if not hasattr(entry, "winfo_exists") or not entry.winfo_exists():
+                return
+        except Exception:
+            return
+
+        try:
+            self.ensure_virtual_keyboard()
+            vk = getattr(self, "_virtual_keyboard_frame", None)
+            if vk is None or not vk.winfo_exists():
+                return
+
+            self._vk_target_entry = entry
+            vk.place(relx=0, rely=1, anchor="sw", relwidth=1, x=10, y=-10)
+            vk.lift()
+
+            # Helps cursor placement.
+            try:
+                self._safe_focus(entry)
+            except Exception:
+                pass
+        except Exception:
+            return
+
+    def hide_virtual_keyboard(self):
+        """Hide VK overlay."""
+        try:
+            vk = getattr(self, "_virtual_keyboard_frame", None)
+            if vk is not None and vk.winfo_exists():
+                vk.place_forget()
+        except Exception:
+            pass
+        try:
+            self._vk_target_entry = None
+        except Exception:
+            pass
+
+    def _vk_press(self, text: str):
+        """Insert a character/string into the active CTkEntry."""
+        entry = getattr(self, "_vk_target_entry", None)
+        if entry is None:
+            return
+        try:
+            if not entry.winfo_exists():
+                return
+        except Exception:
+            return
+
+        try:
+            native = getattr(entry, "_entry", None)
+            widget = native if native is not None else entry
+            widget.insert(tk.INSERT, text)
+        except Exception:
+            try:
+                existing = entry.get() if hasattr(entry, "get") else ""
+                entry.delete(0, tk.END)
+                entry.insert(0, existing + text)
+            except Exception:
+                return
+
+    def _vk_backspace(self):
+        """Backspace on the active CTkEntry."""
+        entry = getattr(self, "_vk_target_entry", None)
+        if entry is None:
+            return
+        try:
+            if not entry.winfo_exists():
+                return
+        except Exception:
+            return
+
+        try:
+            native = getattr(entry, "_entry", None)
+            widget = native if native is not None else entry
+            idx = widget.index(tk.INSERT)
+            if idx <= 0:
+                return
+            widget.delete(idx - 1)
+        except Exception:
+            return
+
     def clear_screen(self):
         # Close any right-side sidebars (not children of content_holder)
+        try:
+            self.hide_virtual_keyboard()
+        except Exception:
+            pass
         try:
             if self.sidebar_frame is not None and self.sidebar_frame.winfo_exists():
                 self.sidebar_frame.destroy()
