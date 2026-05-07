@@ -51,6 +51,25 @@
     box-shadow: 0 2px 24px rgba(0, 0, 0, 0.04);
   }
 
+  /* Stronger glass for drawers/sidebars */
+  .glass-drawer {
+    background: rgba(2, 6, 23, 0.66);
+    backdrop-filter: blur(28px) saturate(1.35);
+    -webkit-backdrop-filter: blur(28px) saturate(1.35);
+    border: 1px solid rgba(148, 163, 184, 0.12);
+    box-shadow:
+      0 28px 80px rgba(0, 0, 0, 0.55),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+
+  html.light .glass-drawer {
+    background: rgba(255, 255, 255, 0.78);
+    border: 1px solid rgba(148, 163, 184, 0.20);
+    box-shadow:
+      0 22px 70px rgba(2, 6, 23, 0.14),
+      inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  }
+
   .glass-light {
     background: rgba(30, 41, 59, 0.35);
     backdrop-filter: blur(16px);
@@ -61,6 +80,25 @@
   html.light .glass-light {
     background: rgba(255, 255, 255, 0.5);
     border: 1px solid rgba(148, 163, 184, 0.12);
+  }
+
+  /* iOS-style glass/neumorphism hybrid panel */
+  .ios-card {
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(20px) saturate(1.15);
+    -webkit-backdrop-filter: blur(20px) saturate(1.15);
+    border: 1px solid rgba(148, 163, 184, 0.10);
+    box-shadow:
+      0 22px 60px rgba(0, 0, 0, 0.35),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+
+  html.light .ios-card {
+    background: rgba(255, 255, 255, 0.78);
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    box-shadow:
+      0 18px 50px rgba(2, 6, 23, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.55);
   }
 
   .gradient-text {

@@ -2,62 +2,99 @@
   <div class="relative min-h-[calc(100vh-4rem)] flex flex-col lg:flex-row">
 
     <!-- Overlay for mobile sidebar -->
-    <div
-      v-if="sidebarOpen"
-      @click="sidebarOpen = false"
-      class="lg:hidden fixed inset-0 bg-surface-950/60 z-40 backdrop-blur-sm transition-opacity"
-    ></div>
+    <transition
+      enter-active-class="transition-opacity duration-200 ease-out"
+      enter-from-class="opacity-0"
+      enter-to-class="opacity-100"
+      leave-active-class="transition-opacity duration-150 ease-in"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
+    >
+      <div
+        v-if="sidebarOpen"
+        @click="sidebarOpen = false"
+        class="lg:hidden fixed inset-0 bg-black/35 light:bg-black/25 z-40 backdrop-blur-[1px]"
+      ></div>
+    </transition>
 
     <!-- Sidebar -->
     <aside
-      class="fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-300 ease-in-out glass lg:translate-x-0 lg:sticky lg:top-16 lg:h-[calc(100vh-4rem)] lg:z-30 lg:border-r border-surface-800/30 flex flex-col shadow-2xl lg:shadow-none"
-      :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
+      class="fixed inset-y-0 left-0 z-[45] w-60 sm:w-64 transform transition-transform duration-300 ease-out will-change-transform glass lg:translate-x-0 lg:sticky lg:top-16 lg:h-[calc(100vh-4rem)] lg:z-30 lg:border-r border-surface-800/30 flex flex-col shadow-2xl lg:shadow-none"
+      :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'"
     >
-      <div class="p-5 lg:p-6 pb-2">
-        <div class="flex items-center justify-between mb-6">
-          <div>
-            <h2 class="text-2xl lg:text-3xl font-bold font-display text-surface-100 light:text-surface-900 mb-0.5 tracking-tight">Admin</h2>
-            <p class="text-xs lg:text-sm text-surface-400 light:text-surface-700 font-medium break-all">{{ currentUser?.username || '—' }}</p>
-          </div>
+      <div class="p-4 sm:p-5 lg:p-6 pb-2">
+        <!-- Profile Header (mobile drawer style) -->
+        <div class="flex flex-col items-center text-center lg:flex-row lg:items-center lg:justify-between lg:text-left mb-4 sm:mb-6">
           <!-- Profile Image Upload Node -->
-          <div class="relative group cursor-pointer w-12 h-12 shrink-0">
+          <div class="relative group cursor-pointer w-14 h-14 sm:w-16 sm:h-16 lg:w-12 lg:h-12 shrink-0 order-1 lg:order-2 mb-2 sm:mb-3 lg:mb-0">
             <input type="file" accept="image/*" @change="handleProfileUpload" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" title="Change Profile Picture" />
-            <div class="w-full h-full rounded-full overflow-hidden bg-surface-800/40 border-2 border-transparent group-hover:border-brand-500/50 transition-all duration-300 transform group-hover:scale-110 group-hover:rotate-[15deg] shadow-md flex items-center justify-center">
-              <img v-if="adminProfileImage" :src="adminProfileImage" class="w-full h-full object-cover" />
-              <svg v-else class="w-6 h-6 text-surface-400 group-hover:text-brand-500 transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+            <div class="w-full h-full rounded-full overflow-hidden bg-surface-800/40 border-2 border-transparent group-hover:border-brand-500/50 transition-all duration-300 shadow-md flex items-center justify-center">
+              <img v-if="adminProfileImage" :src="adminProfileImage" loading="lazy" decoding="async" class="w-full h-full object-cover" />
+              <svg v-else class="w-6 h-6 sm:w-7 sm:h-7 lg:w-6 lg:h-6 text-surface-400 group-hover:text-brand-500 transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
             </div>
+          </div>
+
+          <div class="order-2 lg:order-1">
+            <h2 class="text-2xl lg:text-3xl font-bold font-display text-surface-100 light:text-surface-900 mb-0.5 tracking-tight">
+              Admin
+            </h2>
+            <p class="text-xs lg:text-sm text-surface-400 light:text-surface-700 font-medium break-all">
+              {{ currentUser?.username || '—' }}
+            </p>
           </div>
         </div>
 
-        <nav class="space-y-1.5 flex-1">
+        <nav class="space-y-1 flex-1">
           <button
             v-for="item in sidebarItems"
             :key="item.id"
             @click="activeSection = item.id; sidebarOpen = false"
-            class="relative w-full flex items-center p-3.5 rounded-2xl transition-all duration-300 group"
+            class="relative w-full flex items-center gap-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-2xl transition-all duration-300 group"
             :class="activeSection === item.id
               ? 'bg-brand-700 text-white shadow-lg shadow-brand-800/30 border border-brand-900/10'
-              : 'text-surface-500 hover:text-surface-100 font-medium hover:bg-surface-800/30'"
+              : 'text-surface-500 hover:text-surface-100 light:text-surface-600 light:hover:text-surface-900 font-medium hover:bg-surface-800/30 light:hover:bg-surface-200/60'"
           >
-            <span v-html="item.icon" class="absolute left-4 w-5 h-5 shrink-0 transition-opacity" :class="activeSection === item.id ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'"></span>
-            <span class="w-full text-center leading-[1.25] text-[14.5px] font-display pr-1 pl-6" :class="activeSection === item.id ? 'font-bold' : 'font-medium'">{{ item.label }}</span>
+            <span v-html="item.icon" class="w-[18px] h-[18px] sm:w-5 sm:h-5 shrink-0 transition-opacity" :class="activeSection === item.id ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'"></span>
+            <span class="flex-1 text-left leading-[1.25] text-[13px] sm:text-[14.5px] font-display" :class="activeSection === item.id ? 'font-bold' : 'font-medium'">{{ item.label }}</span>
             <span
               v-if="item.id === 'machine-feed' && activeSection !== 'machine-feed' && liveFeedBadgeCount > 0"
-              class="absolute right-3 inline-flex items-center justify-center min-w-[1.6rem] h-5 px-1.5 rounded-full text-[11px] font-extrabold border"
+              class="inline-flex items-center justify-center min-w-[1.6rem] h-5 px-1.5 rounded-full text-[11px] font-extrabold border"
               :class="activeSection === item.id
                 ? 'bg-white/15 text-white border-white/10'
-                : 'bg-surface-900/50 text-surface-200 border-surface-800/40 group-hover:bg-surface-800/50'"
+                : 'bg-surface-900/50 text-surface-200 border-surface-800/40 group-hover:bg-surface-800/50 light:bg-surface-200/70 light:text-surface-900 light:border-surface-300'"
             >
               {{ liveFeedBadgeText }}
             </span>
             <span
               v-if="item.id === 'reports' && activeSection !== 'reports' && reportsBadgeCount > 0"
-              class="absolute right-3 inline-flex items-center justify-center min-w-[1.6rem] h-5 px-1.5 rounded-full text-[11px] font-extrabold border"
+              class="inline-flex items-center justify-center min-w-[1.6rem] h-5 px-1.5 rounded-full text-[11px] font-extrabold border"
               :class="activeSection === item.id
                 ? 'bg-white/15 text-white border-white/10'
-                : 'bg-surface-900/50 text-surface-200 border-surface-800/40 group-hover:bg-surface-800/50'"
+                : 'bg-surface-900/50 text-surface-200 border-surface-800/40 group-hover:bg-surface-800/50 light:bg-surface-200/70 light:text-surface-900 light:border-surface-300'"
             >
               {{ reportsBadgeText }}
+            </span>
+          </button>
+
+          <!-- Mobile: Clock near navigation -->
+          <div class="lg:hidden px-3 sm:px-4 pt-2">
+            <div class="rounded-2xl border border-surface-800/40 bg-surface-900/40 light:bg-surface-100/90 light:border-surface-300 px-3 py-2.5 text-center shadow-inner">
+              <p class="text-base font-mono font-bold text-surface-100 light:text-surface-900 tabular-nums tracking-tight">{{ phTime }}</p>
+              <p class="text-[11px] text-surface-400 light:text-surface-600 mt-0.5">{{ phDate }} · PHT</p>
+            </div>
+          </div>
+
+          <!-- Mobile: Sign out near navigation (below Change Credentials) -->
+          <button
+            type="button"
+            @click="handleLogout"
+            class="lg:hidden w-full flex items-center gap-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-2xl transition-colors duration-300 text-red-300 hover:text-red-200 bg-red-500/10 hover:bg-red-500/15 border border-red-500/15 light:text-red-700 light:hover:text-red-800 light:bg-red-500/10 light:hover:bg-red-500/15 light:border-red-500/20"
+          >
+            <svg class="w-[18px] h-[18px] sm:w-5 sm:h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+            <span class="flex-1 text-left leading-[1.25] text-[13px] sm:text-[14.5px] font-display font-bold">
+              Sign out
             </span>
           </button>
         </nav>
@@ -66,7 +103,7 @@
       <div class="flex-1"></div>
 
       <!-- Philippines clock (sidebar bottom, above logout) -->
-      <div class="px-5 lg:px-6 pb-3">
+      <div class="hidden lg:block px-5 lg:px-6 pb-3">
         <div class="rounded-2xl border border-surface-800/40 light:border-surface-200/80 bg-surface-900/50 light:bg-surface-100/90 px-3 py-3 text-center shadow-inner">
           <p class="text-lg font-mono font-bold text-surface-100 light:text-surface-900 tabular-nums tracking-tight">{{ phTime }}</p>
           <p class="text-[11px] text-surface-400 light:text-surface-600 mt-1">{{ phDate }} · PHT</p>
@@ -74,28 +111,18 @@
       </div>
 
       <!-- Logout -->
-      <div class="p-5 lg:p-6 pt-2 border-t border-surface-800/30 mt-auto">
+      <div class="hidden lg:block p-4 sm:p-5 lg:p-6 pt-2 border-t border-surface-800/30 mt-auto">
         <button
           @click="handleLogout"
-          class="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-[14.5px] font-bold text-red-500 hover:bg-red-500/10 hover:text-red-400 transition-all duration-300"
+          class="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-[14.5px] font-bold text-surface-200 hover:text-white bg-surface-900/40 hover:bg-surface-800/50 border border-surface-800/40 transition-colors duration-300"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
           </svg>
-          <span class="leading-none mt-0.5">Logout</span>
+          <span class="leading-none mt-0.5">Sign out</span>
         </button>
       </div>
     </aside>
-
-    <!-- Mobile sidebar toggle -->
-    <button
-      @click="sidebarOpen = !sidebarOpen"
-      class="lg:hidden fixed bottom-6 right-6 z-30 w-14 h-14 rounded-full bg-brand-700 text-white shadow-xl shadow-brand-800/40 flex items-center justify-center active:scale-95 transition-transform border border-brand-600/30"
-    >
-      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-      </svg>
-    </button>
 
     <!-- Main Content -->
     <main class="flex-1 w-full lg:w-auto p-4 sm:p-6 lg:p-8">
@@ -225,6 +252,10 @@
         </transition>
 
         <p v-if="!machine.loading" class="text-xs text-surface-500 mb-4">{{ machineSummaryLine }}</p>
+        <div v-else class="mb-4 space-y-2">
+          <SkeletonBox className="h-3 w-2/3" />
+          <SkeletonBox className="h-3 w-1/2" />
+        </div>
 
         <!-- Realtime activity from vending machine -->
           <div class="ios-card rounded-2xl p-5 sm:p-6 mb-6">
@@ -258,7 +289,15 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="row in liveFeedPreview" :key="row.key" class="border-b border-surface-800/20">
+                <tr v-if="machine.loading" v-for="i in 6" :key="'sk-live-' + i" class="border-b border-surface-800/20">
+                  <td class="py-2 pr-3"><SkeletonBox className="h-3 w-20" /></td>
+                  <td class="py-2 pr-3"><SkeletonBox className="h-3 w-16" /></td>
+                  <td class="py-2"><SkeletonBox className="h-3 w-48" /></td>
+                  <td class="hidden sm:table-cell py-2 pr-3 text-right"><SkeletonBox className="h-3 w-10 ml-auto" /></td>
+                  <td class="hidden sm:table-cell py-2"><SkeletonBox className="h-3 w-12" /></td>
+                  <td class="hidden sm:table-cell py-2 text-right"><SkeletonBox className="h-3 w-14 ml-auto" /></td>
+                </tr>
+                <tr v-else v-for="row in liveFeedPreview" :key="row.key" class="border-b border-surface-800/20">
                   <td class="py-2 pr-3 text-surface-500 text-xs whitespace-nowrap">{{ row.time }}</td>
                   <td class="py-2 pr-3 text-brand-400 text-xs">{{ row.type }}</td>
                   <td class="py-2 text-surface-200 text-xs">{{ row.message }}</td>
@@ -986,9 +1025,11 @@
               <thead class="sticky top-0 bg-surface-950/95 light:bg-[#DD9E59] z-10 border-b border-surface-800/40 light:border-[#DD9E59]/70">
                 <tr>
                   <th class="text-left text-xs text-surface-400 light:text-white uppercase py-3 px-4 font-bold whitespace-nowrap">Time (PH)</th>
+                  <th class="hidden md:table-cell text-left text-xs text-surface-400 light:text-white uppercase py-3 px-4 font-bold whitespace-nowrap">Ticket</th>
+                  <th class="hidden lg:table-cell text-left text-xs text-surface-400 light:text-white uppercase py-3 px-4 font-bold whitespace-nowrap">Email</th>
                   <th class="hidden sm:table-cell text-left text-xs text-surface-400 light:text-white uppercase py-3 px-4 font-bold whitespace-nowrap">Machine</th>
                   <th class="text-left text-xs text-surface-400 light:text-white uppercase py-3 px-4 font-bold whitespace-nowrap">Category</th>
-                  <th class="text-left text-xs text-surface-400 light:text-white uppercase py-3 px-4 font-bold">Details</th>
+                  <th class="text-left text-xs text-surface-400 light:text-white uppercase py-3 px-4 font-bold w-[10rem] max-w-[10rem]">Details</th>
                   <th class="hidden md:table-cell text-left text-xs text-surface-400 light:text-white uppercase py-3 px-4 font-bold whitespace-nowrap">Version</th>
                   <th class="hidden md:table-cell text-left text-xs text-surface-400 light:text-white uppercase py-3 px-4 font-bold whitespace-nowrap">Theme</th>
                   <th class="text-right text-xs text-surface-400 light:text-white uppercase py-3 px-4 font-bold whitespace-nowrap">Action</th>
@@ -1001,9 +1042,11 @@
                   class="border-b border-surface-800/20 hover:bg-surface-900/25 transition-colors light:border-[#DD9E59]/25 light:hover:bg-[#F0D8A1]/45"
                 >
                   <td class="py-3 px-4 text-surface-500 light:text-slate-700 text-xs whitespace-nowrap">{{ r.timePh }}</td>
+                  <td class="hidden md:table-cell py-3 px-4 text-surface-200 light:text-slate-900 text-xs font-mono whitespace-nowrap">{{ r.ticketNumber || '—' }}</td>
+                  <td class="hidden lg:table-cell py-3 px-4 text-surface-300 light:text-slate-800 text-xs whitespace-nowrap">{{ r.email || '—' }}</td>
                   <td class="hidden sm:table-cell py-3 px-4 text-surface-200 light:text-slate-900 text-xs whitespace-nowrap">{{ r.machineId }}</td>
                   <td class="py-3 px-4 text-amber-300 light:text-[#7A4A1C] text-xs font-extrabold whitespace-nowrap">{{ r.category }}</td>
-                  <td class="py-3 px-4 text-surface-200 light:text-slate-900 text-xs whitespace-pre-wrap">{{ r.details }}</td>
+                  <td class="py-3 px-4 text-surface-200 light:text-slate-900 text-xs whitespace-pre-wrap break-words w-[10rem] max-w-[10rem] leading-relaxed">{{ r.details }}</td>
                   <td class="hidden md:table-cell py-3 px-4 text-surface-300 light:text-slate-800 text-xs whitespace-nowrap">{{ r.version }}</td>
                   <td class="hidden md:table-cell py-3 px-4 text-surface-300 light:text-slate-800 text-xs whitespace-nowrap">{{ r.theme }}</td>
                   <td class="py-3 px-4 text-right whitespace-nowrap">
@@ -1021,7 +1064,7 @@
                   </td>
                 </tr>
                 <tr v-if="(bugReportTab === 'fixed' ? bugReportsFixed.length : bugReportsOpen.length) === 0">
-                  <td colspan="7" class="py-10 text-center text-surface-500 light:text-slate-700 text-sm">No reports yet.</td>
+                  <td colspan="9" class="py-10 text-center text-surface-500 light:text-slate-700 text-sm">No reports yet.</td>
                 </tr>
               </tbody>
             </table>
@@ -1037,7 +1080,7 @@
                   Category: <span class="text-surface-950 dark:text-surface-200 font-semibold">{{ fixingReport.category }}</span>
                 </p>
                 <p class="text-xs text-surface-700 dark:text-surface-400 mt-1">
-                  Details: <span class="text-surface-950 dark:text-surface-200">{{ fixingReport.details }}</span>
+                  Details: <span class="text-surface-950 dark:text-surface-200 whitespace-pre-wrap break-words leading-relaxed">{{ fixingReport.details }}</span>
                 </p>
 
                 <label class="mt-4 flex items-center gap-2 text-xs text-surface-900 dark:text-surface-200">
@@ -1173,27 +1216,119 @@
             </div>
             <div>
               <label class="block text-xs text-surface-500 uppercase tracking-wider mb-1">New password</label>
-              <input
-                v-model="credentialForm.password"
-                type="password"
-                required
-                minlength="4"
-                class="w-full px-3 py-2.5 rounded-xl bg-surface-800/40 border border-surface-700/40 text-surface-100 text-sm focus:border-brand-600 focus:outline-none transition-colors"
-              />
+              <div class="relative">
+                <input
+                  v-model="credentialForm.password"
+                  :type="showCredentialPassword ? 'text' : 'password'"
+                  required
+                  minlength="8"
+                  class="w-full px-3 py-2.5 rounded-xl bg-surface-800/40 border border-surface-700/40 text-surface-100 text-sm focus:border-brand-600 focus:outline-none transition-colors pr-10"
+                />
+                <button
+                  type="button"
+                  @click="showCredentialPassword = !showCredentialPassword"
+                  class="absolute right-2.5 top-1/2 -translate-y-1/2 text-surface-500 hover:text-surface-300 transition-colors"
+                  aria-label="Toggle password visibility"
+                >
+                  <svg v-if="!showCredentialPassword" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                  <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                  </svg>
+                </button>
+              </div>
+
+              <!-- Password Strength Meter -->
+              <div v-if="credentialForm.password?.length" class="mt-3">
+                <div class="flex items-center gap-2">
+                  <div class="flex-1 grid grid-cols-3 gap-2">
+                    <div class="h-1.5 rounded-full bg-surface-700/60 overflow-hidden">
+                      <div
+                        class="h-full rounded-full transition-all duration-300"
+                        :class="credentialPasswordStrength === 'weak' || credentialPasswordStrength === 'medium' || credentialPasswordStrength === 'strong' ? 'bg-red-500' : 'bg-surface-700/40'"
+                      />
+                    </div>
+                    <div class="h-1.5 rounded-full bg-surface-700/60 overflow-hidden">
+                      <div
+                        class="h-full rounded-full transition-all duration-300"
+                        :class="credentialPasswordStrength === 'medium' || credentialPasswordStrength === 'strong' ? 'bg-yellow-400' : 'bg-surface-700/40'"
+                      />
+                    </div>
+                    <div class="h-1.5 rounded-full bg-surface-700/60 overflow-hidden">
+                      <div
+                        class="h-full rounded-full transition-all duration-300"
+                        :class="credentialPasswordStrength === 'strong' ? 'bg-emerald-500' : 'bg-surface-700/40'"
+                      />
+                    </div>
+                  </div>
+                  <div
+                    class="text-xs font-semibold min-w-[4.5rem] text-right"
+                    :class="credentialPasswordStrength === 'weak' ? 'text-red-400' : credentialPasswordStrength === 'medium' ? 'text-yellow-300' : 'text-emerald-400'"
+                  >
+                    {{ credentialPasswordStrengthLabel }}
+                  </div>
+                </div>
+
+                <div class="mt-2 grid grid-cols-1 gap-1 text-xs text-surface-500">
+                  <div class="flex items-center justify-between">
+                    <span>8+ characters</span>
+                    <span :class="credentialPasswordChecks.hasMinLength ? 'text-emerald-400' : 'text-surface-500'">●</span>
+                  </div>
+                  <div class="flex items-center justify-between">
+                    <span>Uppercase (A-Z)</span>
+                    <span :class="credentialPasswordChecks.hasUpper ? 'text-emerald-400' : 'text-surface-500'">●</span>
+                  </div>
+                  <div class="flex items-center justify-between">
+                    <span>Lowercase (a-z)</span>
+                    <span :class="credentialPasswordChecks.hasLower ? 'text-emerald-400' : 'text-surface-500'">●</span>
+                  </div>
+                  <div class="flex items-center justify-between">
+                    <span>Number (0-9)</span>
+                    <span :class="credentialPasswordChecks.hasNumber ? 'text-emerald-400' : 'text-surface-500'">●</span>
+                  </div>
+                  <div class="flex items-center justify-between">
+                    <span>Special character</span>
+                    <span :class="credentialPasswordChecks.hasSpecial ? 'text-emerald-400' : 'text-surface-500'">●</span>
+                  </div>
+                </div>
+              </div>
             </div>
             <div>
               <label class="block text-xs text-surface-500 uppercase tracking-wider mb-1">Confirm new password</label>
-              <input
-                v-model="credentialForm.confirmPassword"
-                type="password"
-                required
-                minlength="4"
-                class="w-full px-3 py-2.5 rounded-xl bg-surface-800/40 border border-surface-700/40 text-surface-100 text-sm focus:border-brand-600 focus:outline-none transition-colors"
-              />
+              <div class="relative">
+                <input
+                  v-model="credentialForm.confirmPassword"
+                  :type="showCredentialConfirmPassword ? 'text' : 'password'"
+                  required
+                  minlength="8"
+                  class="w-full px-3 py-2.5 rounded-xl bg-surface-800/40 border border-surface-700/40 text-surface-100 text-sm focus:outline-none transition-colors pr-10"
+                  :class="credentialPasswordsMismatch ? 'border-red-500/60 focus:border-red-500' : 'focus:border-brand-600'"
+                />
+                <button
+                  type="button"
+                  @click="showCredentialConfirmPassword = !showCredentialConfirmPassword"
+                  class="absolute right-2.5 top-1/2 -translate-y-1/2 text-surface-500 hover:text-surface-300 transition-colors"
+                  aria-label="Toggle confirm password visibility"
+                >
+                  <svg v-if="!showCredentialConfirmPassword" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                  <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                  </svg>
+                </button>
+              </div>
+              <div v-if="credentialPasswordsMismatch" class="mt-1 text-xs text-red-400">
+                Password is not similar what you input
+              </div>
             </div>
             <div class="flex items-center gap-3">
               <button
                 type="submit"
+                :disabled="!credentialPasswordMeetsPolicy || !credentialPasswordsMatch"
                 class="px-5 py-2.5 rounded-xl text-sm font-bold bg-brand-700 text-white hover:bg-brand-600 transition-colors"
               >
                 Save Password
@@ -1231,6 +1366,7 @@ import { useRouter } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
 import { useRealtimeMachineData } from '../composables/useRealtimeMachineData'
 import { supabase } from '../lib/supabaseClient'
+import SkeletonBox from '../components/SkeletonBox.vue'
 let Chart = null
 let registerables = null
 import { debounce } from '../utils/timing'
@@ -1629,6 +1765,8 @@ const bugReportRows = computed(() => {
     .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
     .map((r) => ({
       id: r.id,
+      ticketNumber: r.ticket_number || '',
+      email: r.email || '',
       createdAt: r.created_at || null,
       timePh: r.created_at ? tf.format(new Date(r.created_at)) : '—',
       machineId: r.machine_id || '—',
@@ -1905,6 +2043,9 @@ async function downloadSalesReportXlsx() {
 const activeSection = ref('overview')
 const sidebarOpen = ref(false)
 
+function clamp(n, min, max) {
+  return Math.min(max, Math.max(min, n))
+}
 const REPORTS_LAST_SEEN_LS = 'dashboard_reports_last_seen_ms'
 
 function readReportsLastSeenMs() {
@@ -2104,6 +2245,10 @@ const sidebarItems = [
 ]
 
 const currentSidebarItem = computed(() => sidebarItems.find(i => i.id === activeSection.value))
+
+function handleNavToggleSidebar() {
+  sidebarOpen.value = !sidebarOpen.value
+}
 
 function handleLogout() {
   logout()
@@ -2833,6 +2978,54 @@ const allUsers = ref(getUsers())
 const credentialForm = ref({ password: '', confirmPassword: '' })
 const credentialMsg = ref('')
 const credentialMsgType = ref('ok')
+const showCredentialPassword = ref(false)
+const showCredentialConfirmPassword = ref(false)
+
+function getPasswordChecks(rawPassword) {
+  const p = String(rawPassword ?? '')
+  return {
+    hasMinLength: p.length >= 8,
+    hasUpper: /[A-Z]/.test(p),
+    hasLower: /[a-z]/.test(p),
+    hasNumber: /[0-9]/.test(p),
+    hasSpecial: /[^A-Za-z0-9]/.test(p),
+  }
+}
+
+function getPasswordStrengthFromChecks(checks) {
+  const score =
+    Number(checks.hasMinLength) +
+    Number(checks.hasUpper) +
+    Number(checks.hasLower) +
+    Number(checks.hasNumber) +
+    Number(checks.hasSpecial)
+
+  if (score === 5) return 'strong'
+  if (score >= 3) return 'medium'
+  return 'weak'
+}
+
+function strengthLabel(strength) {
+  return strength === 'strong' ? 'Strong' : strength === 'medium' ? 'Medium' : 'Weak'
+}
+
+const credentialPasswordChecks = computed(() => getPasswordChecks(credentialForm.value.password))
+const credentialPasswordMeetsPolicy = computed(() => {
+  const c = credentialPasswordChecks.value
+  return c.hasMinLength && c.hasUpper && c.hasLower && c.hasNumber && c.hasSpecial
+})
+const credentialPasswordStrength = computed(() => getPasswordStrengthFromChecks(credentialPasswordChecks.value))
+const credentialPasswordStrengthLabel = computed(() => strengthLabel(credentialPasswordStrength.value))
+const credentialPasswordsMatch = computed(() => {
+  const pwd = String(credentialForm.value.password || '')
+  const confirm = String(credentialForm.value.confirmPassword || '')
+  return Boolean(pwd) && Boolean(confirm) && pwd === confirm
+})
+const credentialPasswordsMismatch = computed(() => {
+  const pwd = String(credentialForm.value.password || '')
+  const confirm = String(credentialForm.value.confirmPassword || '')
+  return Boolean(pwd) && Boolean(confirm) && pwd !== confirm
+})
 
 function handleCreateUser() {
   userMsg.value = ''
@@ -2864,6 +3057,11 @@ async function handleChangeCredentials() {
   if (!pwd || !confirm) {
     credentialMsgType.value = 'warn'
     credentialMsg.value = 'Password fields are required.'
+    return
+  }
+  if (!credentialPasswordMeetsPolicy.value) {
+    credentialMsgType.value = 'warn'
+    credentialMsg.value = 'Password must be 8+ characters and include uppercase, lowercase, number, and special character.'
     return
   }
   if (pwd !== confirm) {
@@ -2911,6 +3109,8 @@ onMounted(async () => {
   updateCompactUi()
   refreshPhClock()
   phTimer = setInterval(refreshPhClock, 1000)
+  // Register immediately so early taps aren't missed.
+  window.addEventListener('dashboard:toggleSidebar', handleNavToggleSidebar)
   const today = manilaDayFmt.format(new Date())
   const [y, m] = today.split('-').map(Number)
   calYear.value = y
@@ -2927,6 +3127,7 @@ onBeforeUnmount(() => {
   if (salesReportMsgTimer) clearTimeout(salesReportMsgTimer)
   document.removeEventListener('pointerdown', handleDocPointerDown, { capture: true })
   window.removeEventListener('resize', updateCompactUi)
+  window.removeEventListener('dashboard:toggleSidebar', handleNavToggleSidebar)
 })
 
 // === PREDICTION ANALYSIS ===

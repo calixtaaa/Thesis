@@ -985,6 +985,17 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             pass
         self.sidebar_holder = None
 
+        # If a CTkEntry had focus, destroying it during a theme rebuild can trigger
+        # TclError in Tk's internal focus handling. Move focus to the root first.
+        try:
+            self.focus_set()
+        except Exception:
+            pass
+        try:
+            self.content_holder.focus_set()
+        except Exception:
+            pass
+
         # Cancel any pending focus callbacks before destroying widgets
         for after_id in getattr(self, "_pending_focus_ids", []):
             try:
@@ -1512,6 +1523,12 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
 
     def _apply_theme_change(self, next_theme_name):
         """Core logic to switch the theme (no animation)."""
+        # Ensure focus is not inside a widget that will be destroyed on rebuild
+        # (prevents Tk from trying to refocus a dead Entry path).
+        try:
+            self.focus_set()
+        except Exception:
+            pass
         old_theme = dict(self.current_theme)
         self.current_theme_name = next_theme_name
         self.current_theme = THEMES[next_theme_name]

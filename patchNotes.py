@@ -199,15 +199,20 @@ PATCH_v1_0_3 = {
         "Receipt screen after dispensing: shows items, quantities, line totals, and payment method.",
         "Order Summary: product thumbnails shown next to each item (uses same image mapping as product cards).",
         "Payment Method (single item): product image preview shown even when Order Summary is skipped.",
+        "New footer button: Updates (next to Report) so users can check the status of their submitted reports.",
+        "Updates screen: enter email used in reports to view ticket number and status (OPEN / FIXED).",
     ],
     "improved": [
         "Machine UI responsiveness: dispensing + DB writes run off the UI thread to prevent freezes.",
         "Website realtime dashboard: stronger client-side deduplication for live feed and selected-day machine events.",
         "Machine events on selected date: aligned calendar selection and newest-first sorting for clarity.",
+        "Main menu footer alignment updated to include Updates while keeping the same one-row layout.",
+        "Updates email input now persists across Light/Dark theme toggles (no retyping).",
     ],
     "bugs_fixed": [
         "Checkout UI: fixed sqlite3.Row compatibility (no .get() usage) for product image rendering.",
         "Website dashboard: removed repeating sale rows by treating transactions as the single source of truth for sales feed.",
+        "Light/Dark theme toggle: prevented focus-related TclError when rebuilding screens with active text inputs.",
     ],
     "future": [
         "Optional: add printable receipt (thermal printer) integration if hardware is added.",

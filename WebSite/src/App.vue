@@ -3,18 +3,15 @@
     <LoadingScreen />
     <NavBar />
     <main class="flex-1 pt-16 lg:pt-18">
-      <router-view v-slot="{ Component }">
-        <transition
-          enter-active-class="transition-opacity duration-300 ease-out"
-          enter-from-class="opacity-0"
-          enter-to-class="opacity-100"
-          leave-active-class="transition-opacity duration-200 ease-in"
-          leave-from-class="opacity-100"
-          leave-to-class="opacity-0"
-          mode="out-in"
-        >
-          <component :is="Component" />
-        </transition>
+      <router-view v-slot="{ Component, route }">
+        <component
+          :is="Component"
+          :key="route.fullPath"
+          v-motion
+          :initial="{ opacity: 0 }"
+          :enter="{ opacity: 1, transition: { duration: 220 } }"
+          :leave="{ opacity: 0, transition: { duration: 140 } }"
+        />
       </router-view>
     </main>
     <FooterBar />

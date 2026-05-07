@@ -5,7 +5,7 @@
         <!-- Logo -->
         <router-link to="/" class="flex items-center gap-3 group">
           <div class="w-9 h-9 rounded-lg overflow-hidden shadow-lg shadow-brand-800/30 group-hover:shadow-brand-800/50 transition-shadow duration-300">
-            <img :src="logoImg" alt="Syntax Error" class="w-full h-full object-cover" />
+            <img :src="logoImg" alt="Syntax Error" loading="lazy" decoding="async" class="w-full h-full object-cover" />
           </div>
           <span class="text-lg font-bold font-display tracking-tight">
             <span class="text-surface-100 light:text-surface-900">Syntax</span>
@@ -66,8 +66,17 @@
           </button>
         </div>
 
-        <!-- Mobile: Theme Toggle + Menu Toggle -->
+        <!-- Mobile: Dashboard Sidebar Toggle + Theme Toggle + Menu Toggle -->
         <div class="md:hidden flex items-center gap-2">
+          <button
+            v-if="route.path === '/dashboard'"
+            type="button"
+            @click="toggleDashboardSidebar"
+            class="p-2 rounded-xl border bg-brand-700/15 border-brand-600/25 text-brand-200 hover:text-brand-100 hover:bg-brand-700/25 active:scale-95 transition-all duration-200 shadow-sm shadow-brand-800/20"
+            aria-label="Toggle dashboard sidebar"
+          >
+            <img src="/sidebarmenu.png" alt="" class="w-6 h-6" />
+          </button>
           <button
             @click="toggleTheme"
             class="p-2 rounded-lg text-surface-400 hover:text-surface-100 hover:bg-surface-800/50 transition-all duration-300"
@@ -155,6 +164,10 @@ const isActive = (path) => route.path === path
 function handleLogout() {
   logout()
   router.push('/')
+}
+
+function toggleDashboardSidebar() {
+  window.dispatchEvent(new CustomEvent('dashboard:toggleSidebar'))
 }
 
 // Simple inline SVG icon components

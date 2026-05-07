@@ -709,6 +709,7 @@ def build_main_menu_footer(app, *, version, hover_scale_btn):
     nav_bg = app.current_theme.get("nav_bg", "#8E4585")
     nav_fg = app.current_theme.get("nav_fg", "#ffffff")
     nav_hover = app.current_theme.get("nav_hover", "#723670")
+    # Single row like the reference: Reload (RFID) - Report - Updates - How to use? - Patch Notes
     ctk.CTkButton(
         actions_row,
         text="Reload (RFID)",
@@ -724,6 +725,19 @@ def build_main_menu_footer(app, *, version, hover_scale_btn):
         actions_row,
         text="Report",
         command=lambda: bugreport.show_bug_report_screen(app, version=version, hover_scale_btn=hover_scale_btn),
+        font=app._ui_font_body,
+        fg_color="transparent",
+        hover_color=app.current_theme.get("search_bg", "#F0EFF4"),
+        text_color=app.current_theme.get("nav_bg", "#8E4585"),
+        border_width=1,
+        border_color=app.current_theme.get("nav_bg", "#8E4585"),
+        corner_radius=980,
+        height=36,
+    ).pack(side=tk.LEFT, padx=6)
+    ctk.CTkButton(
+        actions_row,
+        text="Updates",
+        command=lambda: bugreport.show_report_updates_screen(app, version=version),
         font=app._ui_font_body,
         fg_color="transparent",
         hover_color=app.current_theme.get("search_bg", "#F0EFF4"),

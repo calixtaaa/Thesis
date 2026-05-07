@@ -16,7 +16,7 @@
 
     <!-- Main Carousel Layout -->
     <div class="relative max-w-7xl mx-auto px-4 py-4 lg:py-8 z-10">
-      <div class="flex flex-col lg:flex-row items-center lg:items-center gap-6 lg:gap-16 justify-center min-h-[500px] lg:min-h-[560px]">
+      <div class="flex flex-col lg:flex-row items-center lg:items-center gap-6 lg:gap-16 justify-center min-h-[440px] sm:min-h-[500px] lg:min-h-[560px]">
 
         <!-- LEFT: Stacked Card Carousel -->
         <div class="relative w-full lg:w-auto flex justify-center items-center" style="perspective: 1200px">
@@ -40,6 +40,8 @@
                 <img
                   :src="member.photo"
                   :alt="member.name"
+                  loading="lazy"
+                  decoding="async"
                   class="w-full h-full object-cover object-top"
                 />
               </div>
@@ -58,7 +60,7 @@
                 rel="noopener noreferrer"
                 class="w-10 h-10 rounded-full bg-blue-600/15 flex items-center justify-center hover:bg-blue-600/25 transition-all duration-300 group"
               >
-                <img :src="facebookIcon" alt="Facebook" class="w-5 h-5 opacity-60 group-hover:opacity-100 transition-opacity" />
+                <img :src="facebookIcon" alt="Facebook" loading="lazy" decoding="async" class="w-5 h-5 opacity-60 group-hover:opacity-100 transition-opacity" />
               </a>
             </div>
           </transition>
@@ -132,7 +134,7 @@
               ? 'border-brand-600 scale-110 shadow-lg shadow-brand-600/30'
               : 'border-surface-700/30 grayscale opacity-60 hover:opacity-80'"
           >
-            <img :src="member.photo" :alt="member.name" class="w-full h-full object-cover object-top" />
+            <img :src="member.photo" :alt="member.name" loading="lazy" decoding="async" class="w-full h-full object-cover object-top" />
           </div>
         </button>
       </div>

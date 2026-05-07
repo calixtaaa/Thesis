@@ -151,7 +151,7 @@
             </div>
 
             <!-- Stats -->
-            <div class="grid grid-cols-3 gap-6 mt-10 pt-8 border-t border-surface-800/50">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mt-10 pt-8 border-t border-surface-800/50">
               <div v-for="stat in stats" :key="stat.label" class="text-center">
                 <div class="text-2xl sm:text-3xl font-bold font-display gradient-text">{{ stat.value }}</div>
                 <div class="text-xs text-surface-500 mt-1 uppercase tracking-wider">{{ stat.label }}</div>

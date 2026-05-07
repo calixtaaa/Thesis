@@ -42,7 +42,7 @@
             :class="isFlipped ? 'opacity-0 scale-95 pointer-events-none' : 'opacity-100 scale-100 group-hover:opacity-0 group-hover:scale-95 group-hover:pointer-events-none'"
           >
             <div class="w-44 h-44 sm:w-52 sm:h-52 rounded-full overflow-hidden border-[3px] border-surface-800 light:border-surface-200 mb-6 shadow-xl transition-transform duration-500 group-hover:scale-105 mt-2">
-              <img :src="adviserPhotoSrc" alt="Prof. Gemma Belga" class="w-full h-full object-cover object-top" />
+              <img :src="adviserPhotoSrc" alt="Prof. Gemma Belga" loading="lazy" decoding="async" class="w-full h-full object-cover object-top" />
             </div>
             
             <h3 class="text-2xl sm:text-3xl font-display font-bold text-surface-100 pb-1 text-center">

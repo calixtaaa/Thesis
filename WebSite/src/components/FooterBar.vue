@@ -9,7 +9,7 @@
         <div class="flex flex-col items-center md:items-start gap-2">
           <div class="flex items-center gap-3">
             <div class="w-8 h-8 rounded-lg overflow-hidden">
-              <img :src="logoImg" alt="Syntax Error" class="w-full h-full object-cover" />
+              <img :src="logoImg" alt="Syntax Error" loading="lazy" decoding="async" class="w-full h-full object-cover" />
             </div>
             <span class="text-sm font-bold font-display tracking-tight text-surface-300 light:text-surface-700">
               Syntax <span class="gradient-text">Error</span>

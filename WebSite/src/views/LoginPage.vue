@@ -12,7 +12,7 @@
         <!-- Header -->
         <div class="text-center mb-8">
           <div class="w-16 h-16 mx-auto mb-4 rounded-2xl overflow-hidden shadow-lg shadow-brand-800/30">
-            <img :src="logoImg" alt="Syntax Error" class="w-full h-full object-cover" />
+            <img :src="logoImg" alt="Syntax Error" loading="lazy" decoding="async" class="w-full h-full object-cover" />
           </div>
           <h1 class="text-2xl sm:text-3xl font-bold font-display text-surface-100 dark:text-surface-100">
             Welcome Back
@@ -134,6 +134,78 @@
               class="w-full px-4 py-3 rounded-xl bg-surface-800/50 border border-surface-700/50 text-surface-100 placeholder-surface-500 focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 transition-all duration-300 text-sm"
               placeholder="Choose password"
             />
+
+            <!-- Password Strength Meter -->
+            <div v-if="newPassword.length" class="mt-3">
+              <div class="flex items-center gap-2">
+                <div class="flex-1 grid grid-cols-3 gap-2">
+                  <div class="h-1.5 rounded-full bg-surface-700/60 overflow-hidden">
+                    <div
+                      class="h-full rounded-full transition-all duration-300"
+                      :class="newPasswordStrength === 'weak' || newPasswordStrength === 'medium' || newPasswordStrength === 'strong' ? 'bg-red-500' : 'bg-surface-700/40'"
+                    />
+                  </div>
+                  <div class="h-1.5 rounded-full bg-surface-700/60 overflow-hidden">
+                    <div
+                      class="h-full rounded-full transition-all duration-300"
+                      :class="newPasswordStrength === 'medium' || newPasswordStrength === 'strong' ? 'bg-yellow-400' : 'bg-surface-700/40'"
+                    />
+                  </div>
+                  <div class="h-1.5 rounded-full bg-surface-700/60 overflow-hidden">
+                    <div
+                      class="h-full rounded-full transition-all duration-300"
+                      :class="newPasswordStrength === 'strong' ? 'bg-emerald-500' : 'bg-surface-700/40'"
+                    />
+                  </div>
+                </div>
+                <div
+                  class="text-xs font-semibold min-w-[4.5rem] text-right"
+                  :class="newPasswordStrength === 'weak' ? 'text-red-400' : newPasswordStrength === 'medium' ? 'text-yellow-300' : 'text-emerald-400'"
+                >
+                  {{ newPasswordStrengthLabel }}
+                </div>
+              </div>
+
+              <div class="mt-2 grid grid-cols-1 gap-1 text-xs text-surface-500">
+                <div class="flex items-center justify-between">
+                  <span>8+ characters</span>
+                  <span :class="newPasswordChecks.hasMinLength ? 'text-emerald-400' : 'text-surface-500'">●</span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span>Uppercase (A-Z)</span>
+                  <span :class="newPasswordChecks.hasUpper ? 'text-emerald-400' : 'text-surface-500'">●</span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span>Lowercase (a-z)</span>
+                  <span :class="newPasswordChecks.hasLower ? 'text-emerald-400' : 'text-surface-500'">●</span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span>Number (0-9)</span>
+                  <span :class="newPasswordChecks.hasNumber ? 'text-emerald-400' : 'text-surface-500'">●</span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span>Special character</span>
+                  <span :class="newPasswordChecks.hasSpecial ? 'text-emerald-400' : 'text-surface-500'">●</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <label for="new-confirm-password" class="block text-xs font-semibold text-surface-400 uppercase tracking-wider mb-2">
+              Confirm Password
+            </label>
+            <input
+              id="new-confirm-password"
+              v-model="newConfirmPassword"
+              type="password"
+              required
+              class="w-full px-4 py-3 rounded-xl bg-surface-800/50 border border-surface-700/50 text-surface-100 placeholder-surface-500 focus:outline-none focus:ring-1 transition-all duration-300 text-sm"
+              :class="newPasswordsMismatch ? 'border-red-500/60 focus:border-red-500 focus:ring-red-500' : 'focus:border-brand-600 focus:ring-brand-600'"
+              placeholder="Confirm password"
+            />
+            <div v-if="newPasswordsMismatch" class="mt-1 text-xs text-red-400">
+              Password is not similar what you input
+            </div>
           </div>
           <div>
             <label for="new-role" class="block text-xs font-semibold text-surface-400 uppercase tracking-wider mb-2">
@@ -163,7 +235,8 @@
 
           <button
             type="submit"
-            class="w-full btn-primary text-center justify-center"
+            :disabled="!newPasswordMeetsPolicy || !newPasswordsMatch"
+            class="w-full btn-primary text-center justify-center disabled:opacity-60 disabled:cursor-not-allowed"
           >
             Create Account
           </button>
@@ -194,6 +267,52 @@ let lockTimer = null
 const remainingMs = computed(() => Math.max(0, lockUntilMs.value - nowMs.value))
 const isLocked = computed(() => remainingMs.value > 0)
 const lockSeconds = computed(() => Math.ceil(remainingMs.value / 1000))
+
+function getPasswordChecks(rawPassword) {
+  const p = String(rawPassword ?? '')
+  return {
+    hasMinLength: p.length >= 8,
+    hasUpper: /[A-Z]/.test(p),
+    hasLower: /[a-z]/.test(p),
+    hasNumber: /[0-9]/.test(p),
+    hasSpecial: /[^A-Za-z0-9]/.test(p),
+  }
+}
+
+function getPasswordStrengthFromChecks(checks) {
+  const score =
+    Number(checks.hasMinLength) +
+    Number(checks.hasUpper) +
+    Number(checks.hasLower) +
+    Number(checks.hasNumber) +
+    Number(checks.hasSpecial)
+
+  if (score === 5) return 'strong'
+  if (score >= 3) return 'medium'
+  return 'weak'
+}
+
+function strengthLabel(strength) {
+  return strength === 'strong' ? 'Strong' : strength === 'medium' ? 'Medium' : 'Weak'
+}
+
+const newPasswordChecks = computed(() => getPasswordChecks(newPassword.value))
+const newPasswordMeetsPolicy = computed(() => {
+  const c = newPasswordChecks.value
+  return c.hasMinLength && c.hasUpper && c.hasLower && c.hasNumber && c.hasSpecial
+})
+const newPasswordStrength = computed(() => getPasswordStrengthFromChecks(newPasswordChecks.value))
+const newPasswordStrengthLabel = computed(() => strengthLabel(newPasswordStrength.value))
+const newPasswordsMatch = computed(() => {
+  const pwd = String(newPassword.value || '')
+  const confirm = String(newConfirmPassword.value || '')
+  return Boolean(pwd) && Boolean(confirm) && pwd === confirm
+})
+const newPasswordsMismatch = computed(() => {
+  const pwd = String(newPassword.value || '')
+  const confirm = String(newConfirmPassword.value || '')
+  return Boolean(pwd) && Boolean(confirm) && pwd !== confirm
+})
 
 function startLockCountdown(untilMs) {
   lockUntilMs.value = Number(untilMs ?? 0) || 0
@@ -238,6 +357,7 @@ async function handleLogin() {
 const showCreateUser = ref(false)
 const newUsername = ref('')
 const newPassword = ref('')
+const newConfirmPassword = ref('')
 const newRole = ref('staff')
 const createError = ref('')
 const createSuccess = ref('')
@@ -245,11 +365,20 @@ const createSuccess = ref('')
 function handleCreateUser() {
   createError.value = ''
   createSuccess.value = ''
+  if (!newPasswordMeetsPolicy.value) {
+    createError.value = 'Password must be 8+ characters and include uppercase, lowercase, number, and special character.'
+    return
+  }
+  if (!newPasswordsMatch.value) {
+    createError.value = 'Password is not similar what you input'
+    return
+  }
   const result = createUser(newUsername.value, newPassword.value, newRole.value)
   if (result.success) {
     createSuccess.value = `Account ${newUsername.value.trim()} created! You can now sign in.`
     newUsername.value = ''
     newPassword.value = ''
+    newConfirmPassword.value = ''
     newRole.value = 'staff'
     setTimeout(() => {
       showCreateUser.value = false
