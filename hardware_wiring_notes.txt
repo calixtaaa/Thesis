@@ -1,11 +1,16 @@
 Hardware Wiring Notes and Electrical Safety
 
 1) Power Distribution
-- Raspberry Pi 5 runs on its own regulated 5V supply.
-- 12V devices (solenoids and stepper motors) need a separate 12V PSU.
-- Your 28BYJ-48 dispensing motor is the 12V variant, so each ULN2003AN board motor supply should be 12V.
-- ULN2003AN inputs are controlled by 3.3V Raspberry Pi GPIO, but motor power is external.
-- Tie all grounds together: Pi GND, 12V driver board GND, ULN2003 GND, sensor GND.
+- Raspberry Pi 5: USB-C 5V supply (separate from motors/solenoids).
+- 12V / 12.5A Switched-Mode Power Supply (SMPS):
+  - Output: +12V nominal (11.5–12.5V under load)
+  - Capacity: 150W continuous (handles all ULN2003 and solenoid loads)
+  - Use quality connectors and keep current path short
+- 28BYJ-48 dispensing motor is the 12V variant; each ULN2003AN board motor supply is 12V from SMPS.
+- ULN2003AN inputs are controlled by 3.3V Raspberry Pi GPIO (via MCP23017), but motor power is from SMPS.
+- Tie all grounds together: Pi GND = SMPS GND = all ULN2003 GND = sensor GND.
+  - Use multiple ground wires if board layout is spread out
+  - Verify continuity with multimeter: all GND points should read 0 ohms to each other
 
 2) Solenoid Driving
 - Solenoid locks are inductive loads.

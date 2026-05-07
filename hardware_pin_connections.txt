@@ -28,11 +28,18 @@ RFID flow usage:
 ========================================
 2) Stepper Expansion (28BYJ-48 + ULN2003 + MCP23017-E/SP)
 ========================================
+Power Supply:
+- 12V / 12.5A Switched-Mode Power Supply (SMPS)
+- Output: +12V (nominal 12V, typical range 11.5–12.5V under load)
+- Capacity: 150W continuous (12V × 12.5A)
+- Purpose: Powers all ULN2003 stepper driver boards and solenoid relay coils
+- Protection: Tie PSU GND to Pi GND for common reference; do NOT float the ground
+
 Per ULN2003 board (12V motor variant):
 - Motor connector -> ULN2003 motor socket
-- ULN2003 V+ / DC+ -> +12V external PSU
-- ULN2003 GND / DC- -> PSU GND
-- Pi GND -> same PSU GND (common ground)
+- ULN2003 V+ / DC+ -> +12V from SMPS
+- ULN2003 GND / DC- -> SMPS GND
+- Pi GND -> same SMPS GND (common ground)
 - MCP23017 GPIO -> ULN2003 IN1, IN2, IN3, IN4
 
 MCP23017 bus wiring:
@@ -126,3 +133,43 @@ GPIO Reserved Summary (current build)
 ========================================
 GPIO used by active runtime:
 2,3,4,5,8,9,10,11,16,19,20,26
+
+========================================
+6) I2C Bus Troubleshooting (MCP23017 errno 121)
+========================================
+Symptom: `i2cdetect -y 1` shows MCP addresses (0x20, 0x21, 0x22), but stepper_mcp.py or main.py fails with errno 121 (Remote I/O error).
+
+Common causes and fixes:
+
+1) SDA/SCL wires swapped or loose:
+   - Verify Pi GPIO2 (Physical pin 3) -> MCP SDA
+   - Verify Pi GPIO3 (Physical pin 5) -> MCP SCL
+   - Check all connections are secure; no cold solder joints
+   - If using breadboard, verify tight wire insertion
+
+2) Missing or broken common ground:
+   - Tie Pi GND -> SMPS GND -> all MCP boards VSS pin
+   - Use multiple GND wires if board layout is spread out
+   - Check continuity: Pi GND to SMPS GND should read 0 ohms
+   - Check continuity: Pi GND to each MCP VSS should read 0 ohms
+
+3) MCP VDD power failure:
+   - MCP23017 requires 3.3V on VDD pin
+   - Measure voltage at MCP VDD with multimeter; should read 3.3V ±5%
+   - If low, check 3.3V line on Pi and verify no solder bridges
+
+4) Missing RESET pull-up resistor:
+   - MCP23017 RESET pin must be pulled up to 3.3V via 4.7k–10k ohm resistor
+   - If floating, the chip may not initialize properly
+   - Add resistor: 3.3V -> [4.7k–10k ohm] -> MCP RESET pin
+
+5) Address straps (A0, A1, A2) misconfigured:
+   - MCP #1 (0x20): A0=GND, A1=GND, A2=GND
+   - MCP #2 (0x21): A0=3.3V, A1=GND, A2=GND
+   - MCP #3 (0x22): A0=GND, A1=3.3V, A2=GND
+   - Use multimeter to check voltage at each A pin
+
+6) Intermittent connection (marginal wiring):
+   - `i2cdetect` may succeed (simpler probe) while register read fails (errno 121)
+   - If addresses disappear/reappear, suspect loose wire or cold joint
+   - Power cycle Pi or unplug/re-insert MCP boards and retry

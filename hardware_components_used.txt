@@ -3,12 +3,20 @@ Components Context Checklist
 Core Controller
 - Raspberry Pi 5
 
+Power Supplies
+- Raspberry Pi 5: USB-C 5V supply (separate from motors/solenoids)
+- 12V / 12.5A Switched-Mode Power Supply (SMPS)
+  - Output: +12V nominal (typical range 11.5–12.5V under load)
+  - Capacity: 150W continuous (12V × 12.5A)
+  - Powers: All ULN2003 stepper driver boards, solenoid locks, and related 12V loads
+  - GND must be tied to Raspberry Pi GND for common reference
+
 Vending Motors
 - 28BYJ-48 stepper motor (12V variant for product dispensing)
 - ULN2003AN stepper motor driver board (one per tray/lane)
   - ULN2003 IN1..IN4 are driven by MCP23017 GPIO expander outputs
-  - ULN2003 board power input is supplied by external 12V PSU for the 12V motor
-  - Raspberry Pi and 12V PSU grounds are tied together (common ground)
+  - ULN2003 board power input is supplied by 12V from SMPS
+  - Raspberry Pi GND and SMPS GND are tied together (common ground)
 - 3x MCP23017-E/SP I2C GPIO expander
   - Addresses used: 0x20, 0x21, 0x22
   - Provides independent IN1..IN4 control lines for slots 1..10

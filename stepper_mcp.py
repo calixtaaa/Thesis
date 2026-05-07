@@ -7,6 +7,7 @@ through MCP23017 GPIO expander pins over I2C.
 
 from __future__ import annotations
 
+import errno
 import threading
 import time
 import tkinter as tk
@@ -25,6 +26,20 @@ DEFAULT_STEPS_PER_REV = 4096
 DEFAULT_STEP_DELAY = 0.002
 DEFAULT_I2C_BUS = 1
 DEFAULT_ADDRESSES = [0x20, 0x21, 0x22]
+
+# Fixed slot layout used by the test UI and main app.
+SLOT_LAYOUT = {
+    1: (0x20, [0, 1, 2, 3]),
+    2: (0x20, [4, 5, 6, 7]),
+    3: (0x20, [8, 9, 10, 11]),
+    4: (0x20, [12, 13, 14, 15]),
+    5: (0x21, [0, 1, 2, 3]),
+    6: (0x21, [4, 5, 6, 7]),
+    7: (0x21, [8, 9, 10, 11]),
+    8: (0x21, [12, 13, 14, 15]),
+    9: (0x22, [0, 1, 2, 3]),
+    10: (0x22, [4, 5, 6, 7]),
+}
 
 ULN2003_SEQUENCE = [
     (1, 0, 0, 0),
@@ -92,6 +107,7 @@ class MCP23017Controller:
                 _ = self.bus.read_byte_data(addr, IODIRA)
                 detected.append(addr)
             except Exception:
+                # Treat any probe error as missing; the write phase will catch real I/O faults.
                 missing.append(addr)
         return detected, missing
 
@@ -111,10 +127,19 @@ class MCP23017Controller:
         self.olat_cache = {addr: {"A": 0x00, "B": 0x00} for addr in detected}
 
         for addr in self.addresses:
-            self.bus.write_byte_data(addr, IODIRA, 0x00)
-            self.bus.write_byte_data(addr, IODIRB, 0x00)
-            self.bus.write_byte_data(addr, OLATA, 0x00)
-            self.bus.write_byte_data(addr, OLATB, 0x00)
+            try:
+                self.bus.write_byte_data(addr, IODIRA, 0x00)
+                self.bus.write_byte_data(addr, IODIRB, 0x00)
+                self.bus.write_byte_data(addr, OLATA, 0x00)
+                self.bus.write_byte_data(addr, OLATB, 0x00)
+            except Exception as exc:
+                if getattr(exc, "errno", None) == errno.EREMOTEIO:
+                    raise MCPError(
+                        f"I2C remote I/O error while configuring 0x{addr:02X}. "
+                        "This usually means the chip is not talking on the bus: recheck SDA/SCL, "
+                        "3.3V/VDD, GND, RESET pull-up, and address straps."
+                    ) from exc
+                raise
 
         return missing
 
@@ -160,17 +185,14 @@ class MCP23017Controller:
 
 def build_slot_map(addresses: list[int]) -> dict[int, dict]:
     mapping: dict[int, dict] = {}
-    slot = 1
-    for address in addresses:
-        for base_pin in (0, 4, 8, 12):
-            if slot > 10:
-                return mapping
-            mapping[slot] = {
-                "backend": "mcp23017",
-                "address": address,
-                "pins": [base_pin, base_pin + 1, base_pin + 2, base_pin + 3],
-            }
-            slot += 1
+    detected = set(addresses)
+    for slot, (address, pins) in SLOT_LAYOUT.items():
+        mapping[slot] = {
+            "backend": "mcp23017",
+            "address": address,
+            "pins": pins,
+            "available": address in detected,
+        }
     return mapping
 
 
@@ -728,6 +750,18 @@ class StepperMCPTestApp(ctk.CTk):
             return
         address = int(cfg["address"])
         pins = cfg["pins"]
+        if not cfg.get("available", False):
+            self.pin_preview.configure(
+                text=(
+                    f"Selected slot: {slot}\n"
+                    f"MCP 0x{address:02X} not detected\n"
+                    f"IN1 GP{pins[0]}\n"
+                    f"IN2 GP{pins[1]}\n"
+                    f"IN3 GP{pins[2]}\n"
+                    f"IN4 GP{pins[3]}"
+                )
+            )
+            return
         self.pin_preview.configure(
             text=(
                 f"Selected slot: {slot}\n"
@@ -745,6 +779,10 @@ class StepperMCPTestApp(ctk.CTk):
             raise MCPError(
                 f"No MCP mapping for slot {slot}. Detected addresses: "
                 f"{', '.join(f'0x{x:02X}' for x in self.detected_addresses) or 'none'}"
+            )
+        if not cfg.get("available", False):
+            raise MCPError(
+                f"Slot {slot} is mapped to MCP 0x{int(cfg['address']):02X}, but that address was not detected."
             )
         return cfg
 
@@ -824,7 +862,7 @@ class StepperMCPTestApp(ctk.CTk):
         if self.ctrl is None:
             messagebox.showerror("MCP error", "MCP backend is not ready.")
             return
-        slots = sorted(self.slot_map.keys())
+        slots = [slot for slot in sorted(self.slot_map.keys()) if self.slot_map[slot].get("available", False)]
         if not slots:
             messagebox.showerror("No slot mapping", "No detected MCP slot mapping is available.")
             return
