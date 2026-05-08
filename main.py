@@ -2523,9 +2523,44 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             except Exception:
                 pass
         self.clear_screen()
-        # UI ordering should match physical tray layout:
-        # show highest slot at the top so the bottom-most/heaviest (slot 1) appears last.
-        all_products = sorted(get_all_products(), key=lambda p: int(p["slot_number"]), reverse=True)
+        # UI ordering should match the physical tray layout (see latest placement sketch):
+        #   10 | 9
+        #   8  | 7
+        #   6  | 5
+        #   3  | 4
+        #   2  | 1
+        # This differs from a simple descending sort because slots 3 and 4 are swapped in the grid.
+        _UI_SLOT_ORDER = [10, 9, 8, 7, 6, 5, 3, 4, 2, 1]
+        raw_products = list(get_all_products())
+
+        def _slot_of(prod) -> int:
+            """Support sqlite3.Row or dict-like objects."""
+            try:
+                return int(prod["slot_number"])
+            except Exception:
+                pass
+            try:
+                return int(getattr(prod, "get", lambda *_a, **_k: 0)("slot_number", 0) or 0)
+            except Exception:
+                return 0
+
+        by_slot = {}
+        for p in raw_products:
+            try:
+                by_slot[_slot_of(p)] = p
+            except Exception:
+                continue
+        all_products = [by_slot[s] for s in _UI_SLOT_ORDER if s in by_slot]
+        # Fallback: append any unexpected products (keeps UI usable if DB has extra rows)
+        if len(all_products) != len(raw_products):
+            used = {id(p) for p in all_products}
+            extras = []
+            for p in raw_products:
+                if id(p) in used:
+                    continue
+                extras.append(p)
+            extras.sort(key=_slot_of, reverse=True)
+            all_products.extend(extras)
 
         # Destroy any existing sidebar
         if self.sidebar_holder is not None and self.sidebar_holder.winfo_exists():
