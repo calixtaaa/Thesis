@@ -300,6 +300,7 @@ def build_promo_carousel(app, parent, *, grid_kw=None):
 
 def _show_product_detail_modal(app, product):
     """Full-screen overlay showing product details with Add to Cart."""
+    scale = float(getattr(app, "_lcd_scale", 1.0) or 1.0)
     overlay = ctk.CTkFrame(
         app.content_holder,
         fg_color=app.current_theme["bg"],
@@ -317,7 +318,7 @@ def _show_product_detail_modal(app, product):
     ctk.CTkButton(
         top_bar,
         text="← Back",
-        font=(app._ui_font_name, 13, "bold"),
+        font=(app._ui_font_name, max(12, int(13 * scale)), "bold"),
         fg_color="transparent",
         hover_color=app.current_theme["button_bg"],
         text_color=app.current_theme.get("nav_bg", "#8E4585"),
@@ -329,7 +330,7 @@ def _show_product_detail_modal(app, product):
     ctk.CTkLabel(
         top_bar,
         text="Product Details",
-        font=(app._ui_font_name, 16, "bold"),
+        font=(app._ui_font_name, max(14, int(16 * scale)), "bold"),
         text_color=app.current_theme["fg"],
     ).pack(side=tk.LEFT, padx=12)
 
@@ -358,7 +359,7 @@ def _show_product_detail_modal(app, product):
             img_path = _resolve_product_image_path(product["name"])
             if img_path:
                 pil_img = Image.open(str(img_path)).convert("RGBA")
-                ctk_img = _pil_square_rgba_to_ctk(pil_img, 200)
+                ctk_img = _pil_square_rgba_to_ctk(pil_img, int(200 * scale))
                 lbl = ctk.CTkLabel(img_holder, image=ctk_img, text="", fg_color="transparent")
                 lbl._ctk_img_ref = ctk_img
                 lbl.pack(padx=20, pady=20)
@@ -369,7 +370,7 @@ def _show_product_detail_modal(app, product):
                 file=sys.stderr,
             )
     if not detail_img_ok:
-        tkph = _load_product_image_tk(product["name"], 200)
+        tkph = _load_product_image_tk(product["name"], int(200 * scale))
         if tkph is not None:
             lbl = tk.Label(
                 img_holder,
@@ -388,14 +389,14 @@ def _show_product_detail_modal(app, product):
     ctk.CTkLabel(
         scroll_body,
         text=product["name"],
-        font=(app._ui_font_name, 22, "bold"),
+        font=(app._ui_font_name, max(18, int(22 * scale)), "bold"),
         text_color=app.current_theme["fg"],
     ).pack(pady=(4, 2))
 
     ctk.CTkLabel(
         scroll_body,
         text=f"\u20b1{product['price']:.2f}",
-        font=(app._ui_font_name, 20, "bold"),
+        font=(app._ui_font_name, max(16, int(20 * scale)), "bold"),
         text_color=app.current_theme.get("price_color", "#8E4585"),
     ).pack(pady=(0, 6))
 
@@ -404,9 +405,9 @@ def _show_product_detail_modal(app, product):
         ctk.CTkLabel(
             scroll_body,
             text=details_text,
-            font=(app._ui_font_name, 12),
+            font=(app._ui_font_name, max(12, int(12 * scale))),
             text_color=app.current_theme.get("muted", "#7A7491"),
-            wraplength=520,
+            wraplength=int(520 * scale),
             justify="center",
         ).pack(pady=(0, 10))
 
@@ -415,7 +416,7 @@ def _show_product_detail_modal(app, product):
     ctk.CTkLabel(
         scroll_body,
         text=stock_text,
-        font=(app._ui_font_name, 13),
+        font=(app._ui_font_name, max(12, int(13 * scale))),
         text_color=stock_color,
     ).pack(pady=(0, 8))
 
@@ -434,7 +435,7 @@ def _show_product_detail_modal(app, product):
         ctk.CTkLabel(
             desc_card,
             text="\U0001f4a1 How this helps you",
-            font=(app._ui_font_name, 13, "bold"),
+            font=(app._ui_font_name, max(12, int(13 * scale)), "bold"),
             text_color=app.current_theme.get("accent", "#50C878"),
             anchor="w",
         ).pack(padx=16, pady=(12, 4), anchor="w")
@@ -442,9 +443,9 @@ def _show_product_detail_modal(app, product):
         ctk.CTkLabel(
             desc_card,
             text=desc,
-            font=(app._ui_font_name, 12),
+            font=(app._ui_font_name, max(12, int(12 * scale))),
             text_color=app.current_theme.get("muted", "#7A7491"),
-            wraplength=400,
+            wraplength=int(420 * scale),
             justify="left",
             anchor="w",
         ).pack(padx=16, pady=(0, 12), anchor="w")
@@ -535,8 +536,9 @@ def build_main_menu_products(app, parent, products):
     app._cart_selected_border = app.current_theme.get("selected_border", app.current_theme.get("accent", "#50C878"))
     app._product_placeholder_bg = "#F0EFF4" if app.current_theme_name == "light" else "#242440"
     scale = float(getattr(app, "_lcd_scale", 1.0) or 1.0)
-    # Larger image area on 7-inch LCD for readability.
-    app._product_placeholder_size = int(190 * scale)
+    # Keep cards compact so touch scrolling stays smooth.
+    # (Large cards can "grab" gestures on small touch screens.)
+    app._product_placeholder_size = int(135 * scale)
     app._product_card_refs = {}
 
     for idx, product in enumerate(products):
@@ -547,6 +549,17 @@ def build_product_card(app, grid, product, idx):
     in_cart = app._cart_has_product(product)
     row_index, column_index = idx // 2 + 1, idx % 2
 
+    # Subtle shadow underlay (dark mode only) to avoid "flat/ugly" look on OLED/LCD.
+    # Implemented as a separate frame behind the card with a slight offset.
+    if getattr(app, "current_theme_name", "light") == "dark":
+        shadow = ctk.CTkFrame(
+            grid,
+            fg_color="#070A14",  # deep navy shadow
+            corner_radius=18,
+        )
+        # Offset down-right by using asymmetric padding; card will be gridded on top.
+        shadow.grid(row=row_index, column=column_index, padx=(10, 6), pady=(8, 4), sticky="nsew")
+
     # 2.5D card: thicker border, larger corner radius, soft shadow effect
     card = ctk.CTkFrame(
         grid,
@@ -555,13 +568,40 @@ def build_product_card(app, grid, product, idx):
         border_color=app._cart_selected_border if in_cart else app._cart_card_border,
         corner_radius=18,
     )
-    card.grid(row=row_index, column=column_index, padx=10, pady=8, sticky="nsew")
+    # Asymmetric padding pairs with the shadow offset above.
+    card.grid(row=row_index, column=column_index, padx=(6, 10), pady=(4, 8), sticky="nsew")
 
-    # Make card clickable → product detail modal
-    def _on_card_tap(event=None, p=product):
-        _show_product_detail_modal(app, p)
+    # Make card tappable, but allow swipe/drag to scroll smoothly.
+    # We only treat it as a "tap" if the finger didn't move past a small threshold.
+    _tap_state = {"x": None, "y": None, "dragged": False}
 
-    card.bind("<Button-1>", _on_card_tap)
+    def _tap_press(e):
+        _tap_state["x"] = getattr(e, "x_root", None)
+        _tap_state["y"] = getattr(e, "y_root", None)
+        _tap_state["dragged"] = False
+
+    def _tap_motion(e):
+        if _tap_state["dragged"]:
+            return
+        x0 = _tap_state.get("x")
+        y0 = _tap_state.get("y")
+        if x0 is None or y0 is None:
+            return
+        dx = abs(int(getattr(e, "x_root", 0)) - int(x0))
+        dy = abs(int(getattr(e, "y_root", 0)) - int(y0))
+        if dx >= 8 or dy >= 8:
+            _tap_state["dragged"] = True
+
+    def _tap_release(_e, p=product):
+        if not _tap_state.get("dragged"):
+            _show_product_detail_modal(app, p)
+
+    def _bind_tap_or_scroll(widget):
+        widget.bind("<ButtonPress-1>", _tap_press, add="+")
+        widget.bind("<B1-Motion>", _tap_motion, add="+")
+        widget.bind("<ButtonRelease-1>", _tap_release, add="+")
+
+    _bind_tap_or_scroll(card)
 
     # ── Product image (uniform size) ──
     placeholder = ctk.CTkFrame(
@@ -571,9 +611,9 @@ def build_product_card(app, grid, product, idx):
         height=app._product_placeholder_size,
         corner_radius=12,
     )
-    placeholder.pack(pady=(12, 8), padx=12, fill=tk.NONE)
+    placeholder.pack(pady=(10, 6), padx=10, fill=tk.NONE)
     placeholder.pack_propagate(False)
-    placeholder.bind("<Button-1>", _on_card_tap)
+    _bind_tap_or_scroll(placeholder)
 
     sz = app._product_placeholder_size - 20
     image_placed = False
@@ -588,7 +628,7 @@ def build_product_card(app, grid, product, idx):
                 )
                 img_label._ctk_img_ref = ctk_img
                 img_label.place(relx=0.5, rely=0.5, anchor="center")
-                img_label.bind("<Button-1>", _on_card_tap)
+                _bind_tap_or_scroll(img_label)
                 image_placed = True
         except Exception as ex:
             print(
@@ -607,12 +647,12 @@ def build_product_card(app, grid, product, idx):
             )
             lbl.tk_img_ref = tkph
             lbl.place(relx=0.5, rely=0.5, anchor="center")
-            lbl.bind("<Button-1>", _on_card_tap)
+            _bind_tap_or_scroll(lbl)
 
     # ── Product name ──
     scale = float(getattr(app, "_lcd_scale", 1.0) or 1.0)
-    name_font = (app._ui_font_name, int(14 * scale), "bold")
-    price_font = (app._ui_font_name, int(15 * scale), "bold")
+    name_font = (app._ui_font_name, int(13 * scale), "bold")
+    price_font = (app._ui_font_name, int(14 * scale), "bold")
     stock_font = (app._ui_font_name, int(11 * scale))
     name_text = product["name"]
     if len(name_text) > 20:
@@ -625,8 +665,8 @@ def build_product_card(app, grid, product, idx):
         wraplength=app._product_placeholder_size + 40,
         justify="center",
     )
-    name_label.pack(padx=8, pady=(0, 2))
-    name_label.bind("<Button-1>", _on_card_tap)
+    name_label.pack(padx=8, pady=(0, 1))
+    _bind_tap_or_scroll(name_label)
 
     # ── Price (plum colored) ──
     price_label = ctk.CTkLabel(
@@ -635,8 +675,8 @@ def build_product_card(app, grid, product, idx):
         font=price_font,
         text_color=app.current_theme.get("price_color", "#8E4585"),
     )
-    price_label.pack(pady=(0, 6))
-    price_label.bind("<Button-1>", _on_card_tap)
+    price_label.pack(pady=(0, 4))
+    _bind_tap_or_scroll(price_label)
 
     # ── Stock indicator ──
     if product["current_stock"] <= 0:
@@ -649,7 +689,7 @@ def build_product_card(app, grid, product, idx):
 
     # ── Quick-add button ──
     action_btn = build_product_card_button(app, card, product, in_cart)
-    action_btn.pack(pady=(2, 14))
+    action_btn.pack(pady=(2, 8))
     app._product_card_refs[product["id"]] = {
         "card": card,
         "btn": action_btn,
@@ -660,9 +700,9 @@ def build_product_card(app, grid, product, idx):
 
 def build_product_card_button(app, card, product, in_cart):
     scale = float(getattr(app, "_lcd_scale", 1.0) or 1.0)
-    btn_font = (app._ui_font_name, int(13 * scale), "bold")
-    btn_w = int(112 * scale)
-    btn_h = int(40 * scale)
+    btn_font = (app._ui_font_name, int(12 * scale), "bold")
+    btn_w = int(96 * scale)
+    btn_h = int(34 * scale)
     if in_cart:
         return ctk.CTkButton(
             card,

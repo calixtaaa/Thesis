@@ -706,6 +706,15 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             self.after(50, lambda: self._apply_lcd_fit(profile="customer"))
         except Exception:
             pass
+        # Keep UI responsive if the window size changes (desktop dev / Windows tablets).
+        # Debounced to avoid expensive rebuilds while the user is actively resizing.
+        self._responsive_resize_after_id = None
+        self._last_responsive_size = (None, None)
+        self._last_responsive_scale = None
+        try:
+            self.bind("<Configure>", self._on_window_configure, add="+")
+        except Exception:
+            pass
         try:
             self.after(250, self._report_window_state)
         except Exception:
@@ -909,6 +918,113 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                 self.geometry(f"{target_w}x{target_h}+{x}+{y}")
         except Exception:
             pass
+
+    def _compute_responsive_scale(self) -> float:
+        """
+        Compute a stable UI scale based on the *current window* size.
+        Keeps the UI readable on small LCDs while avoiding oversized widgets on large screens.
+        """
+        try:
+            w = int(self.winfo_width() or 0)
+            h = int(self.winfo_height() or 0)
+        except Exception:
+            w, h = 0, 0
+
+        # If geometry isn't ready yet, fall back to the existing scale.
+        if w <= 1 or h <= 1:
+            return float(getattr(self, "_lcd_scale", 1.0) or 1.0)
+
+        try:
+            screen_w = int(self.winfo_screenwidth() or 0)
+            screen_h = int(self.winfo_screenheight() or 0)
+        except Exception:
+            screen_w, screen_h = 0, 0
+
+        is_small_lcd = (screen_w and screen_w <= 1024) or (screen_h and screen_h <= 600)
+        # 7-inch LCDs (800x480 / 1024x600) need a larger base scale for readability.
+        base = 1.35 if is_small_lcd else 1.0
+
+        # Scale down when the window is smaller than the design size.
+        # Do NOT scale up beyond base (prevents giant UI on big monitors).
+        rel = min(w / float(BASE_APP_W), h / float(BASE_APP_H))
+        # Allow a bit more downscaling on tiny windows, but keep it readable.
+        rel = max(0.85, min(1.0, rel))
+        return float(base * rel)
+
+    def _apply_responsive_scale(self, scale: float) -> None:
+        scale = float(scale or 1.0)
+        if scale <= 0:
+            scale = 1.0
+
+        self._lcd_scale = scale
+        try:
+            ctk.set_widget_scaling(scale)
+        except Exception:
+            pass
+
+        # Keep font family, adjust point sizes proportionally.
+        # (Most screens are tuned around scale ~1.0–1.25.)
+        try:
+            def _pt(n: int) -> int:
+                return max(10, int(round(n * scale)))
+
+            if scale >= 1.10:
+                self._ui_font_bold = (UI_FONT, _pt(22), "bold")
+                self._ui_font_title = (UI_FONT, _pt(20), "bold")
+                self._ui_font_body = (UI_FONT, _pt(13))
+                self._ui_font_small = (UI_FONT, _pt(11))
+                self._ui_font_button = (UI_FONT, _pt(13), "bold")
+            else:
+                # Preserve the default tuples (keeps styling consistent at normal scale).
+                self._ui_font_bold = UI_FONT_BOLD
+                self._ui_font_title = UI_FONT_TITLE
+                self._ui_font_body = UI_FONT_BODY
+                self._ui_font_small = UI_FONT_SMALL
+                self._ui_font_button = UI_FONT_BUTTON
+        except Exception:
+            pass
+
+    def _on_window_configure(self, _event=None) -> None:
+        # Debounce: window resize can fire many times per second.
+        try:
+            if self._responsive_resize_after_id is not None:
+                self.after_cancel(self._responsive_resize_after_id)
+        except Exception:
+            pass
+        try:
+            self._responsive_resize_after_id = self.after(180, self._refresh_responsive_ui)
+        except Exception:
+            self._responsive_resize_after_id = None
+
+    def _refresh_responsive_ui(self) -> None:
+        self._responsive_resize_after_id = None
+
+        try:
+            w = int(self.winfo_width() or 0)
+            h = int(self.winfo_height() or 0)
+        except Exception:
+            w, h = 0, 0
+
+        # If nothing meaningful changed, skip.
+        last_w, last_h = self._last_responsive_size
+        if (w, h) == (last_w, last_h) or w <= 1 or h <= 1:
+            return
+        self._last_responsive_size = (w, h)
+
+        new_scale = self._compute_responsive_scale()
+        old_scale = self._last_responsive_scale
+        if old_scale is not None and abs(float(new_scale) - float(old_scale)) < 0.03:
+            return
+        self._last_responsive_scale = float(new_scale)
+        self._apply_responsive_scale(new_scale)
+
+        # Rebuild current screen to re-flow layouts under the new scale.
+        builder = getattr(self, "_current_screen_builder", None)
+        if callable(builder):
+            try:
+                builder()
+            except Exception:
+                pass
 
         # Font + widget scaling for small 7-inch LCDs (800x480/1024x600): bump sizes for readability.
         try:
