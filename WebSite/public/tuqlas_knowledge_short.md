@@ -7,8 +7,8 @@ System: Machine app (Python + SQLite `vending.db`) + Admin Dashboard (Vue/Vite) 
 Products (slot • item • price • capacity):
 1 Soap ₱5 cap7
 2 Alcohol ₱25 cap3
-3 Mouthwash ₱8 cap7
-4 Deodorant/Deo ₱10 cap8
+3 Deodorant/Deo ₱10 cap8
+4 Mouthwash ₱8 cap7
 5 Wet Wipes ₱18 cap3
 6 Tissues ₱8 cap3
 7 All Night Pads ₱10 cap5

@@ -18,8 +18,8 @@ DB_PATH = BASE_DIR / "vending.db"
 LATEST_LAYOUT = {
     1: {"name": "Soap", "details": "Soap, 10grams", "price": 5.00},
     2: {"name": "Alcohol", "details": "Green Cross Isopropyl Alcohol 70% Solution, 60mL", "price": 25.00},
-    3: {"name": "Mouthwash", "details": "Scoban Mint Flavor, 10ml*10 packs", "price": 8.00},
-    4: {"name": "Deodorant", "details": "Rexona Shower Clean, 3ml*12packs", "price": 10.00},
+    3: {"name": "Deodorant", "details": "Rexona Shower Clean, 3ml*12packs", "price": 10.00},
+    4: {"name": "Mouthwash", "details": "Scoban Mint Flavor, 10ml*10 packs", "price": 8.00},
     5: {"name": "Wet Wipes", "details": "Sanicare Mini Wipes, 6 packs x 8 sheets", "price": 18.00},
     6: {"name": "Tissues", "details": "Sanicare Hankies, 6 packs", "price": 8.00},
     7: {"name": "All Night Pads", "details": "Charmee All Night Plus, 4 pads", "price": 10.00},

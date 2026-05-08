@@ -2,7 +2,7 @@
 -- Updates `public.products.slot_number` to match the latest physical tray layout.
 --
 -- Layout (1..10):
--- 1 Soap, 2 Alcohol, 3 Mouthwash, 4 Deodorant, 5 Wet Wipes,
+-- 1 Soap, 2 Alcohol, 3 Deodorant, 4 Mouthwash, 5 Wet Wipes,
 -- 6 Tissues, 7 All Night Pads, 8 Panty Liners, 9 Regular w/o Wings, 10 Regular w/ Wings.
 --
 -- Notes:
@@ -39,8 +39,8 @@ begin
   -- Phase 2: set final canonical slots
   update public.products set slot_number = 1 where public.product_key_from_name(name) = 'soap';
   update public.products set slot_number = 2 where public.product_key_from_name(name) = 'alcohol';
-  update public.products set slot_number = 3 where public.product_key_from_name(name) = 'mouthwash';
-  update public.products set slot_number = 4 where public.product_key_from_name(name) = 'deodorant';
+  update public.products set slot_number = 3 where public.product_key_from_name(name) = 'deodorant';
+  update public.products set slot_number = 4 where public.product_key_from_name(name) = 'mouthwash';
   update public.products set slot_number = 5 where public.product_key_from_name(name) = 'wet_wipes';
   update public.products set slot_number = 6 where public.product_key_from_name(name) = 'tissue';
   update public.products set slot_number = 7 where public.product_key_from_name(name) = 'all_night_pads';
