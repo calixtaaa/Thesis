@@ -176,6 +176,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Walk a single ON bit across GPA0..GPA7 and GPB0..GPB7",
     )
+    mode.add_argument(
+        "--test-slots-5-6",
+        action="store_true",
+        help="Run the slots 5 and 6 MCP mapping smoke test (uses address 0x22 GPB8..15)",
+    )
     mode.add_argument("--all-on", action="store_true", help="Turn all GPB pins ON")
     mode.add_argument("--all-off", action="store_true", help="Turn all GPB pins OFF")
 

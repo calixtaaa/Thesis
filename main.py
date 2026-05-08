@@ -224,21 +224,78 @@ MCP23017_ADDRESSES = [
 
 
 def _build_mcp23017_stepper_map() -> dict[int, dict]:
+    """
+    Custom mapping for MCP23017 stepper slots.
+    Slots 5-6 use free pins on 0x22 to bypass faulty GPA1 on 0x21.
+    """
     mapping: dict[int, dict] = {}
-    slot = 1
-    for address in MCP23017_ADDRESSES:
-        for base_pin in (0, 4, 8, 12):
-            if slot > 10:
-                return mapping
-            mapping[slot] = {
-                "backend": "mcp23017",
-                "address": address,
-                "in1": base_pin,
-                "in2": base_pin + 1,
-                "in3": base_pin + 2,
-                "in4": base_pin + 3,
-            }
-            slot += 1
+    
+    # Slots 1-4: 0x20 pins 0-3, 4-7, 8-11, 12-15
+    for slot in range(1, 5):
+        base_pin = (slot - 1) * 4
+        mapping[slot] = {
+            "backend": "mcp23017",
+            "address": 0x20,
+            "in1": base_pin,
+            "in2": base_pin + 1,
+            "in3": base_pin + 2,
+            "in4": base_pin + 3,
+        }
+    
+    # Slots 5-6: 0x22 pins 8-11, 12-15 (free slots, bypassing faulty 0x21)
+    mapping[5] = {
+        "backend": "mcp23017",
+        "address": 0x22,
+        "in1": 8,
+        "in2": 9,
+        "in3": 10,
+        "in4": 11,
+    }
+    mapping[6] = {
+        "backend": "mcp23017",
+        "address": 0x22,
+        "in1": 12,
+        "in2": 13,
+        "in3": 14,
+        "in4": 15,
+    }
+    
+    # Slots 7-8: 0x21 pins 0-3, 4-7 (moved from slots 5-6)
+    mapping[7] = {
+        "backend": "mcp23017",
+        "address": 0x21,
+        "in1": 0,
+        "in2": 1,
+        "in3": 2,
+        "in4": 3,
+    }
+    mapping[8] = {
+        "backend": "mcp23017",
+        "address": 0x21,
+        "in1": 4,
+        "in2": 5,
+        "in3": 6,
+        "in4": 7,
+    }
+    
+    # Slots 9-10: 0x22 pins 0-3, 4-7
+    mapping[9] = {
+        "backend": "mcp23017",
+        "address": 0x22,
+        "in1": 0,
+        "in2": 1,
+        "in3": 2,
+        "in4": 3,
+    }
+    mapping[10] = {
+        "backend": "mcp23017",
+        "address": 0x22,
+        "in1": 4,
+        "in2": 5,
+        "in3": 6,
+        "in4": 7,
+    }
+    
     return mapping
 
 

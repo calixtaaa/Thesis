@@ -33,10 +33,12 @@ SLOT_LAYOUT = {
     2: (0x20, [4, 5, 6, 7]),
     3: (0x20, [8, 9, 10, 11]),
     4: (0x20, [12, 13, 14, 15]),
-    5: (0x21, [0, 1, 2, 3]),
-    6: (0x21, [4, 5, 6, 7]),
-    7: (0x21, [8, 9, 10, 11]),
-    8: (0x21, [12, 13, 14, 15]),
+    # Slots 5-6 remapped to 0x22 to bypass faulty GP on 0x21
+    5: (0x22, [8, 9, 10, 11]),
+    6: (0x22, [12, 13, 14, 15]),
+    # Slots 7-8 shifted into 0x21's low pins
+    7: (0x21, [0, 1, 2, 3]),
+    8: (0x21, [4, 5, 6, 7]),
     9: (0x22, [0, 1, 2, 3]),
     10: (0x22, [4, 5, 6, 7]),
 }
@@ -311,7 +313,7 @@ class StepperMCPTestApp(ctk.CTk):
         ).pack(anchor="w", padx=18, pady=(18, 4))
         ctk.CTkLabel(
             control_card,
-            text="Slot mapping follows main.py: slot 1..4 on 0x20, 5..8 on 0x21, 9..10 on 0x22.",
+            text="Slot mapping follows main.py: slots 1-4 => 0x20; 5-6 => 0x22 (temporary); 7-8 => 0x21; 9-10 => 0x22.",
             font=("Segoe UI", 11),
             text_color=self.current_theme["muted"],
             wraplength=560,
@@ -618,7 +620,8 @@ class StepperMCPTestApp(ctk.CTk):
             "RESET needs pull-up to 3.3V\n\n"
             "Slot map:\n"
             "1-4 => 0x20\n"
-            "5-8 => 0x21\n"
+            "5-6 => 0x22 (temporary)\n"
+            "7-8 => 0x21\n"
             "9-10 => 0x22"
         )
         ctk.CTkLabel(
