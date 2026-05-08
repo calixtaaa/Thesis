@@ -5,8 +5,8 @@ Members: Asriel Romulo (Leader), Jonamae Tiu (Papers), Zharie Ann R. Valero (Pap
 Overview: Hygiene-products vending machine + Admin Dashboard website. Machine runs Python and stores inventory/sales in SQLite (`vending.db`). Website is Vue/Vite and reads from Supabase. Optional bridge syncs `products`, `transactions`, and events so the dashboard can update realtime/near-realtime. Security: never expose Supabase service_role key in the website.
 
 Products (slot • item • price • capacity):
-1 Alcohol ₱25 cap3; 2 Soap ₱5 cap7; 3 Deodorant/Deo ₱10 cap8; 4 Mouthwash ₱8 cap7; 5 Wet Wipes ₱18 cap3;
-6 Tissues ₱8 cap3; 7 All Night Pads ₱10 cap5; 8 Panty Liners ₱5 cap6; 9 Regular w/ Wings ₱7 cap5; 10 Non‑Wing Pads ₱7 cap5.
+1 Soap ₱5 cap7; 2 Alcohol ₱25 cap3; 3 Mouthwash ₱8 cap7; 4 Deodorant/Deo ₱10 cap8; 5 Wet Wipes ₱18 cap3;
+6 Tissues ₱8 cap3; 7 All Night Pads ₱10 cap5; 8 Panty Liners ₱5 cap6; 9 Regular w/o Wings ₱7 cap5; 10 Regular w/ Wings ₱7 cap5.
 
 Low-stock thresholds (≤ = Low): Alcohol 1, Soap 3, Deodorant 3, Mouthwash 3, Wet Wipes 1, Tissue 1, Panty Liner 3, All Night Pads 2, Regular w/ Wings 3, Non‑Wing 3.
 Status: Full if stock≥capacity; In Stock if threshold<stock<capacity; Low if 0<stock≤threshold; Empty if stock≤0.

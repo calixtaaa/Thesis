@@ -74,17 +74,20 @@ def get_connection():
 
 
 # Canonical slot → product (physical tray). Must stay aligned with sample seed + Supabase sync.
+# Layout (1..10):
+# 1 Soap, 2 Alcohol, 3 Mouthwash, 4 Deodorant, 5 Wet Wipes,
+# 6 Tissues, 7 All Night Pads, 8 Panty Liners, 9 Non-Wing Pads, 10 Regular W/ Wings Pads.
 _TARGET_SLOT_BY_NAME = {
-    "Alcohol": 1,
-    "Soap": 2,
-    "Deodorant": 3,
-    "Mouthwash": 4,
+    "Soap": 1,
+    "Alcohol": 2,
+    "Mouthwash": 3,
+    "Deodorant": 4,
     "Wet Wipes": 5,
     "Tissues": 6,
     "All Night Pads": 7,
     "Panty Liners": 8,
-    "Regular W/ Wings Pads": 9,
-    "Non-Wing Pads": 10,
+    "Non-Wing Pads": 9,
+    "Regular W/ Wings Pads": 10,
 }
 
 
@@ -226,16 +229,16 @@ def init_db():
     if cur.fetchone()["c"] == 0:
         sample_products = [
             # Slot → Product (per latest physical tray layout)
-            ("Alcohol", "Green Cross Isopropyl Alcohol 70% Solution, 60mL", 25.00, 1, 3, 3),
-            ("Soap", "Soap, 10grams", 5.00, 2, 7, 7),
-            ("Deodorant", "Rexona Shower Clean, 3ml*12packs", 10.00, 3, 8, 8),
-            ("Mouthwash", "Scoban Mint Flavor, 10ml*10 packs", 8.00, 4, 7, 7),
+            ("Soap", "Soap, 10grams", 5.00, 1, 7, 7),
+            ("Alcohol", "Green Cross Isopropyl Alcohol 70% Solution, 60mL", 25.00, 2, 3, 3),
+            ("Mouthwash", "Scoban Mint Flavor, 10ml*10 packs", 8.00, 3, 7, 7),
+            ("Deodorant", "Rexona Shower Clean, 3ml*12packs", 10.00, 4, 8, 8),
             ("Wet Wipes", "Sanicare Mini Wipes, 6 packs x 8 sheets", 18.00, 5, 3, 3),
             ("Tissues", "Sanicare Hankies, 6 packs", 8.00, 6, 3, 3),
             ("All Night Pads", "Charmee All Night Plus, 4 pads", 10.00, 7, 5, 5),
             ("Panty Liners", "Charmee Breathable, 20 liners", 5.00, 8, 6, 6),
-            ("Regular W/ Wings Pads", "Charmee Dry Net with wings, 8 pads", 7.00, 9, 5, 5),
-            ("Non-Wing Pads", "Charmee Cottony without wings, 8 pads", 7.00, 10, 5, 5),
+            ("Non-Wing Pads", "Charmee Cottony without wings, 8 pads", 7.00, 9, 5, 5),
+            ("Regular W/ Wings Pads", "Charmee Dry Net with wings, 8 pads", 7.00, 10, 5, 5),
         ]
         cur.executemany(
             """
