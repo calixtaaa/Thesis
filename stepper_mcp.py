@@ -8,6 +8,7 @@ through MCP23017 GPIO expander pins over I2C.
 from __future__ import annotations
 
 import errno
+import sys
 import threading
 import time
 import tkinter as tk
@@ -1154,6 +1155,36 @@ class StepperMCPTestApp(ctk.CTk):
         self.destroy()
 
 
+def _display_setup_help() -> str:
+    return """\
+Tkinter could not open the graphical display. Common causes:
+
+  • SSH without X11 forwarding: use `ssh -X user@host` or `ssh -Y user@host`
+    from a machine that runs an X server (Linux desktop; on Windows use VcXsrv
+    or similar and enable forwarding).
+
+  • Forcing DISPLAY=:0 over SSH: sessions on :0 belong to whoever is logged in
+    at the HDMI screen; your SSH user usually lacks that X authority cookie.
+    Either run this script from a terminal on the Pi's local console, or merge
+    xauth cookies / use `xhost` (less secure) — forwarding is simpler.
+
+  • No GUI session: if the Pi only shows a text console on HDMI, there is no
+    X server on :0; install/start a desktop or use SSH X forwarding.
+
+The blank gray window (if you see one) is often an empty window frame drawn
+before Tk fails to finish initializing, or a broken X11-forwarded shell — not
+a bug in the stepper/I2C code.
+"""
+
+
 if __name__ == "__main__":
-    app = StepperMCPTestApp()
-    app.mainloop()
+    try:
+        app = StepperMCPTestApp()
+        app.mainloop()
+    except tk.TclError as exc:
+        err = str(exc).lower()
+        if any(s in err for s in ("couldn't connect to display", "no display name and no $display")):
+            print(_display_setup_help(), file=sys.stderr)
+            print(f"Original error: {exc}", file=sys.stderr)
+            sys.exit(1)
+        raise
