@@ -126,9 +126,18 @@ RFID_PINS = {
 
 _STEPPER_BANK_A = {"in1": 17, "in2": 27, "in3": 22, "in4": 23}
 _STEPPER_BANK_B = {"in1": 4, "in2": 18, "in3": 15, "in4": 14}
-PRODUCT_STEPPER_PINS = {
-    slot: (_STEPPER_BANK_A if slot % 2 == 1 else _STEPPER_BANK_B).copy() for slot in range(1, 11)
-}
+
+
+def _native_bank_for_slot(slot: int) -> dict:
+    if 1 <= slot <= 8:
+        partner = slot + 1 if slot % 2 == 1 else slot - 1
+        use_bank_a = partner % 2 == 1
+    else:
+        use_bank_a = slot % 2 == 1
+    return (_STEPPER_BANK_A if use_bank_a else _STEPPER_BANK_B).copy()
+
+
+PRODUCT_STEPPER_PINS = {slot: _native_bank_for_slot(slot) for slot in range(1, 11)}
 
 SOLENOID_PINS = {
     "restock": 16,
@@ -146,15 +155,15 @@ ALL_OUTPUT_PINS = {
     "RFID SPI SCLK (11)": 11,
     "RFID SPI MOSI (10)": 10,
     "RFID Reader RST (5)": 5,
-    "Motor bank A (slots 1,3,5,7,9) IN1 (17)": 17,
-    "Motor bank A (slots 1,3,5,7,9) IN2 (27)": 27,
-    "Motor bank A (slots 1,3,5,7,9) IN3 (22)": 22,
-    "Motor bank A (slots 1,3,5,7,9) IN4 (23)": 23,
-    "Motor bank B (slots 2,4,6,8,10) IN1 (4)": 4,
-    "Coin Acceptor Relay (6)": 6,
-    "Motor bank B (slots 2,4,6,8,10) IN2 (18)": 18,
-    "Motor bank B (slots 2,4,6,8,10) IN3 (15)": 15,
-    "Motor bank B (slots 2,4,6,8,10) IN4 (14)": 14,
+    "Motor bank A IN1 (17)": 17,
+    "Motor bank A IN2 (27)": 27,
+    "Motor bank A IN3 (22)": 22,
+    "Motor bank A IN4 (23)": 23,
+    "Motor bank B IN1 (4)": 4,
+    "Coin Acceptor Relay (21)": 21,
+    "Motor bank B IN2 (18)": 18,
+    "Motor bank B IN3 (15)": 15,
+    "Motor bank B IN4 (14)": 14,
     "Solenoid Restock (16)": 16,
     "Solenoid Troubleshoot (20)": 20,
 }

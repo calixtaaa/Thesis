@@ -29,9 +29,18 @@ except ImportError:
 
 _STEPPER_BANK_A = {"in1": 17, "in2": 27, "in3": 22, "in4": 23}
 _STEPPER_BANK_B = {"in1": 4, "in2": 18, "in3": 15, "in4": 14}
-PRODUCT_STEPPER_PINS = {
-    slot: (_STEPPER_BANK_A if slot % 2 == 1 else _STEPPER_BANK_B).copy() for slot in range(1, 11)
-}
+
+
+def _native_bank_for_slot(slot: int) -> dict:
+    if 1 <= slot <= 8:
+        partner = slot + 1 if slot % 2 == 1 else slot - 1
+        use_bank_a = partner % 2 == 1
+    else:
+        use_bank_a = slot % 2 == 1
+    return (_STEPPER_BANK_A if use_bank_a else _STEPPER_BANK_B).copy()
+
+
+PRODUCT_STEPPER_PINS = {slot: _native_bank_for_slot(slot) for slot in range(1, 11)}
 
 ULN2003_SEQUENCE = [
     (1, 0, 0, 0),
@@ -432,8 +441,8 @@ class StepperTestApp(ctk.CTk):
         ).pack(anchor="w", padx=18, pady=(18, 8))
         info_text = (
             "ULN2003 IN1-IN4 -> Raspberry Pi GPIO.\n\n"
-            "Bank A (odd slots): 17, 27, 22, 23\n"
-            "Bank B (even slots): 4, 18, 15, 14\n\n"
+            "Bank A: 17, 27, 22, 23 — Bank B: 4, 18, 15, 14.\n"
+            "Slots 1–8 use adjacent-pair swapping vs strict odd/even (same as main.py native_gpio).\n\n"
             "Motor power must come from the external 12V supply.\n"
             "Share ground between Pi, PSU, and driver board.\n\n"
             "This tool rotates a selected slot bank using the same sequence as main.py."

@@ -41,19 +41,16 @@ ULN2003_SEQUENCE = [
 DEFAULT_ADDRESSES = [0x20, 0x21, 0x22]
 DEFAULT_PINS = [0, 1, 2, 3]
 
-# Slot mapping mirrors main.py/hardware_pin_connections.txt defaults:
-# slot 1..4 -> 0x20 GP0..15 in groups of 4
-# slot 5..8 -> 0x21 GP0..15 in groups of 4
-# slot 9..10 -> 0x22 GP0..7 in groups of 4
+# Slot mapping mirrors stepper_mcp.SLOT_LAYOUT / main.py (pairs 1↔2 … 7↔8 swapped on MCP).
 SLOT_TO_MCP_GROUP = {
-    1: (0x20, [0, 1, 2, 3]),
-    2: (0x20, [4, 5, 6, 7]),
-    3: (0x20, [8, 9, 10, 11]),
-    4: (0x20, [12, 13, 14, 15]),
-    5: (0x21, [0, 1, 2, 3]),
-    6: (0x21, [4, 5, 6, 7]),
-    7: (0x21, [8, 9, 10, 11]),
-    8: (0x21, [12, 13, 14, 15]),
+    1: (0x20, [4, 5, 6, 7]),
+    2: (0x20, [0, 1, 2, 3]),
+    3: (0x20, [12, 13, 14, 15]),
+    4: (0x20, [8, 9, 10, 11]),
+    5: (0x21, [4, 5, 6, 7]),
+    6: (0x21, [0, 1, 2, 3]),
+    7: (0x21, [12, 13, 14, 15]),
+    8: (0x21, [8, 9, 10, 11]),
     9: (0x22, [0, 1, 2, 3]),
     10: (0x22, [4, 5, 6, 7]),
 }

@@ -210,9 +210,16 @@ _STEPPER_BANK_B = {"backend": "native_gpio", "in1": 4, "in2": 18, "in3": 15, "in
 
 
 def _build_native_stepper_map() -> dict[int, dict]:
-    return {
-        slot: (_STEPPER_BANK_A if slot % 2 == 1 else _STEPPER_BANK_B).copy() for slot in range(1, 11)
-    }
+    # Slots 1–8: swap adjacent pairs vs nominal odd/even banks (matches MCP tray wiring).
+    def bank_for_slot(slot: int) -> dict:
+        if 1 <= slot <= 8:
+            partner = slot + 1 if slot % 2 == 1 else slot - 1
+            use_bank_a = partner % 2 == 1
+        else:
+            use_bank_a = slot % 2 == 1
+        return (_STEPPER_BANK_A if use_bank_a else _STEPPER_BANK_B).copy()
+
+    return {slot: bank_for_slot(slot) for slot in range(1, 11)}
 
 STEPPER_BACKEND = os.getenv("STEPPER_BACKEND", "mcp23017" if ON_RPI else "native_gpio").strip().lower()
 STEPPER_I2C_BUS = int(os.getenv("STEPPER_I2C_BUS", "1"))
@@ -223,22 +230,33 @@ MCP23017_ADDRESSES = [
 ]
 
 
+# Must stay aligned with stepper_mcp.SLOT_LAYOUT (adjacent pairs 1↔2 … 7↔8 swapped).
+_MCP23017_SLOT_LAYOUT: dict[int, tuple[int, tuple[int, int, int, int]]] = {
+    1: (0x20, (4, 5, 6, 7)),
+    2: (0x20, (0, 1, 2, 3)),
+    3: (0x20, (12, 13, 14, 15)),
+    4: (0x20, (8, 9, 10, 11)),
+    5: (0x21, (4, 5, 6, 7)),
+    6: (0x21, (0, 1, 2, 3)),
+    7: (0x21, (12, 13, 14, 15)),
+    8: (0x21, (8, 9, 10, 11)),
+    9: (0x22, (0, 1, 2, 3)),
+    10: (0x22, (4, 5, 6, 7)),
+}
+
+
 def _build_mcp23017_stepper_map() -> dict[int, dict]:
     mapping: dict[int, dict] = {}
-    slot = 1
-    for address in MCP23017_ADDRESSES:
-        for base_pin in (0, 4, 8, 12):
-            if slot > 10:
-                return mapping
-            mapping[slot] = {
-                "backend": "mcp23017",
-                "address": address,
-                "in1": base_pin,
-                "in2": base_pin + 1,
-                "in3": base_pin + 2,
-                "in4": base_pin + 3,
-            }
-            slot += 1
+    for slot, (address, pins) in _MCP23017_SLOT_LAYOUT.items():
+        p1, p2, p3, p4 = pins
+        mapping[slot] = {
+            "backend": "mcp23017",
+            "address": address,
+            "in1": p1,
+            "in2": p2,
+            "in3": p3,
+            "in4": p4,
+        }
     return mapping
 
 
@@ -257,7 +275,7 @@ PAYMENT_INPUT_PINS = {
 }
 
 # Coin acceptor relay control (enable when user selects cash payment)
-COIN_ACCEPTOR_RELAY_PIN = 6   # Physical pin 31
+COIN_ACCEPTOR_RELAY_PIN = 21   # Physical pin 40
 
 IR_BREAK_BEAM_PIN = 26        # Physical pin 37
 STEPS_PER_PRODUCT = 4096      # 28BYJ-48 output-shaft revolution (8-phase half-step)

@@ -12,7 +12,8 @@ fi
 cd "$ROOT_DIR"
 export PYTHONNOUSERSITE=1
 
-"$VENV_PYTHON" gpio_toggle_single.py 6
+# BCM GPIO21 — coin acceptor relay (see COIN_ACCEPTOR_RELAY_PIN in main.py)
+"$VENV_PYTHON" gpio_toggle_single.py 21
 
 echo ""
 echo "Press Enter to close..."
