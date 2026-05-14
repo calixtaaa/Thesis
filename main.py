@@ -1515,7 +1515,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             GPIO.output(RFID_PINS["reader_rst"], GPIO.LOW)
             time.sleep(0.01)
             GPIO.output(RFID_PINS["reader_rst"], GPIO.HIGH)
-            time.sleep(0.01)
+            time.sleep(0.12)
         except Exception:
             pass
 
@@ -1524,8 +1524,19 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             return False, "Could not initialize MFRC522 reader on SPI0 CE0."
 
         try:
+            for init_method in ("PCD_Init", "InitRC522", "init"):
+                if hasattr(reader, init_method):
+                    try:
+                        getattr(reader, init_method)()
+                        break
+                    except Exception:
+                        pass
+
             version_reg = int(getattr(reader, "VersionReg", 0x37))
             value = self._read_mfrc522_register(reader, version_reg)
+            if value in {0x00, 0xFF}:
+                time.sleep(0.05)
+                value = self._read_mfrc522_register(reader, version_reg)
             if value is None:
                 return False, "Reader API does not expose a known register-read method."
             if value in {0x00, 0xFF}:

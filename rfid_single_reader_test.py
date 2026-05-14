@@ -141,16 +141,29 @@ def _probe_mfrc522_spi_link() -> tuple[bool, str]:
     if MFRC522 is None:
         return False, "MFRC522 backend is not available."
 
-    # Brief reset pulse before probing the version register over SPI.
-    _pulse_reader_reset(pulses=1, low_s=0.02, high_s=0.02)
+    # Hard reset pulse, then wait for oscillator / internal POR to finish.
+    # Many MFRC522 boards return 0x00/0xFF on VersionReg if SPI starts too soon (see UID path: 100ms).
+    _pulse_reader_reset(pulses=1, low_s=0.01, high_s=0.01)
+    time.sleep(0.12)
 
     reader = _create_mfrc522_reader()
     if reader is None:
         return False, "Could not initialize MFRC522 reader on SPI0 CE0."
 
     try:
+        for init_method in ("PCD_Init", "InitRC522", "init"):
+            if hasattr(reader, init_method):
+                try:
+                    getattr(reader, init_method)()
+                    break
+                except Exception:
+                    pass
+
         version_reg = int(getattr(reader, "VersionReg", 0x37))
         value = _read_reader_register(reader, version_reg)
+        if value in {0x00, 0xFF}:
+            time.sleep(0.05)
+            value = _read_reader_register(reader, version_reg)
         if value is None:
             return False, "Reader API does not expose a known register-read method."
         if value in {0x00, 0xFF}:

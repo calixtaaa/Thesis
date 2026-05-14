@@ -17,7 +17,6 @@ Examples:
 from __future__ import annotations
 
 import argparse
-import sys
 import time
 
 from rfid_single_reader_test import (
@@ -33,11 +32,12 @@ def reinit_spi_path(*, rst_pulses: int, settle_s: float) -> tuple[bool, str]:
     """Hardware reset line + fresh SPI session (probe opens/closes MFRC522)."""
     ok_pulse, pulse_msg = _pulse_reader_reset(
         pulses=max(1, rst_pulses),
-        low_s=0.02,
-        high_s=max(0.02, settle_s),
+        low_s=0.01,
+        high_s=max(0.12, settle_s),
     )
     if not ok_pulse:
         return False, pulse_msg
+    # Extra settle after last RST edge; probe() does its own pulse + 120ms wait.
     time.sleep(max(0.0, settle_s))
     return _probe_mfrc522_spi_link()
 
@@ -53,8 +53,8 @@ def main() -> int:
     parser.add_argument(
         "--settle",
         type=float,
-        default=0.05,
-        help="Seconds to hold RST high each half-cycle / extra settle after pulse (default: 0.05)",
+        default=0.02,
+        help="Extra seconds to sleep after RST train (default: 0.02). High phase uses max(0.12, this).",
     )
     parser.add_argument(
         "--retry",
