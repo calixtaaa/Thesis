@@ -251,7 +251,7 @@
           </div>
         </transition>
 
-        <p v-if="!machine.loading" class="text-xs text-surface-500 mb-4">{{ machineSummaryLine }}</p>
+        <p v-if="!isMachineDataLoading" class="text-xs text-surface-500 mb-4">{{ machineSummaryLine }}</p>
         <div v-else class="mb-4 space-y-2">
           <SkeletonBox className="h-3 w-2/3" />
           <SkeletonBox className="h-3 w-1/2" />
@@ -289,25 +289,29 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-if="machine.loading" v-for="i in 6" :key="'sk-live-' + i" class="border-b border-surface-800/20">
-                  <td class="py-2 pr-3"><SkeletonBox className="h-3 w-20" /></td>
-                  <td class="py-2 pr-3"><SkeletonBox className="h-3 w-16" /></td>
-                  <td class="py-2"><SkeletonBox className="h-3 w-48" /></td>
-                  <td class="hidden sm:table-cell py-2 pr-3 text-right"><SkeletonBox className="h-3 w-10 ml-auto" /></td>
-                  <td class="hidden sm:table-cell py-2"><SkeletonBox className="h-3 w-12" /></td>
-                  <td class="hidden sm:table-cell py-2 text-right"><SkeletonBox className="h-3 w-14 ml-auto" /></td>
-                </tr>
-                <tr v-else v-for="row in liveFeedPreview" :key="row.key" class="border-b border-surface-800/20">
-                  <td class="py-2 pr-3 text-surface-500 text-xs whitespace-nowrap">{{ row.time }}</td>
-                  <td class="py-2 pr-3 text-brand-400 text-xs">{{ row.type }}</td>
-                  <td class="py-2 text-surface-200 text-xs">{{ row.message }}</td>
-                  <td class="hidden sm:table-cell py-2 pr-3 text-right text-surface-300 text-xs whitespace-nowrap">{{ row.quantity ?? '—' }}</td>
-                  <td class="hidden sm:table-cell py-2 text-surface-300 text-xs whitespace-nowrap">{{ row.irBeamSensed ?? '—' }}</td>
-                  <td class="hidden sm:table-cell py-2 text-right text-surface-300 text-xs whitespace-nowrap">{{ row.totalAmount != null ? `₱${row.totalAmount}` : '—' }}</td>
-                </tr>
-                <tr v-if="liveFeedPreview.length === 0">
-                  <td colspan="6" class="py-10 text-center text-surface-500 text-sm">No feed rows yet — run <code class="text-surface-400">machine_live_feed.sql</code> and insert from the machine.</td>
-                </tr>
+                <template v-if="showLiveFeedSkeleton">
+                  <tr v-for="i in 6" :key="'sk-live-' + i" class="border-b border-surface-800/20">
+                    <td class="py-2 pr-3"><SkeletonBox className="h-3 w-20" /></td>
+                    <td class="py-2 pr-3"><SkeletonBox className="h-3 w-16" /></td>
+                    <td class="py-2"><SkeletonBox className="h-3 w-48" /></td>
+                    <td class="hidden sm:table-cell py-2 pr-3 text-right"><SkeletonBox className="h-3 w-10 ml-auto" /></td>
+                    <td class="hidden sm:table-cell py-2"><SkeletonBox className="h-3 w-12" /></td>
+                    <td class="hidden sm:table-cell py-2 text-right"><SkeletonBox className="h-3 w-14 ml-auto" /></td>
+                  </tr>
+                </template>
+                <template v-else>
+                  <tr v-for="row in liveFeedPreview" :key="row.key" class="border-b border-surface-800/20">
+                    <td class="py-2 pr-3 text-surface-500 text-xs whitespace-nowrap">{{ row.time }}</td>
+                    <td class="py-2 pr-3 text-brand-400 text-xs">{{ row.type }}</td>
+                    <td class="py-2 text-surface-200 text-xs">{{ row.message }}</td>
+                    <td class="hidden sm:table-cell py-2 pr-3 text-right text-surface-300 text-xs whitespace-nowrap">{{ row.quantity ?? '—' }}</td>
+                    <td class="hidden sm:table-cell py-2 text-surface-300 text-xs whitespace-nowrap">{{ row.irBeamSensed ?? '—' }}</td>
+                    <td class="hidden sm:table-cell py-2 text-right text-surface-300 text-xs whitespace-nowrap">{{ row.totalAmount != null ? `₱${row.totalAmount}` : '—' }}</td>
+                  </tr>
+                  <tr v-if="liveFeedPreview.length === 0">
+                    <td colspan="6" class="py-10 text-center text-surface-500 text-sm">No feed rows yet — run <code class="text-surface-400">machine_live_feed.sql</code> and insert from the machine.</td>
+                  </tr>
+                </template>
               </tbody>
               <tfoot v-if="!isCompactUi && liveFeedPreview.length > 0" class="sticky bottom-0 bg-surface-950/95 light:bg-surface-100/95 border-t border-surface-800/40">
                 <tr>
@@ -1141,8 +1145,29 @@
                 </div>
                 <div>
                   <label class="block text-xs text-surface-500 uppercase tracking-wider mb-1">Password</label>
-                  <input v-model="newUser.password" type="password" required
-                    class="w-full px-3 py-2.5 rounded-xl bg-surface-800/40 border border-surface-700/40 text-surface-100 text-sm focus:border-brand-600 focus:outline-none transition-colors" />
+                  <div class="relative">
+                    <input
+                      v-model="newUser.password"
+                      :type="showNewUserPassword ? 'text' : 'password'"
+                      required
+                      autocomplete="new-password"
+                      class="w-full px-3 py-2.5 rounded-xl bg-surface-800/40 border border-surface-700/40 text-surface-100 text-sm focus:border-brand-600 focus:outline-none transition-colors pr-10"
+                    />
+                    <button
+                      type="button"
+                      @click="showNewUserPassword = !showNewUserPassword"
+                      class="absolute right-2.5 top-1/2 -translate-y-1/2 text-surface-500 hover:text-surface-300 transition-colors"
+                      :aria-label="showNewUserPassword ? 'Hide password' : 'Show password'"
+                    >
+                      <svg v-if="!showNewUserPassword" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                      <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
                 <div>
                   <label class="block text-xs text-surface-500 uppercase tracking-wider mb-1">Role</label>
@@ -2587,6 +2612,11 @@ const liveFeedRows = computed(() => {
 
 const liveFeedPreview = computed(() => liveFeedRows.value.slice(0, 10))
 
+// `machine.loading` is a nested ref; `v-if="machine.loading"` in templates stays truthy (Ref object).
+const isMachineDataLoading = computed(() => Boolean(machine.loading.value))
+// Avoid skeleton forever when merged preview already has rows (e.g. realtime ahead of fetch, or reload).
+const showLiveFeedSkeleton = computed(() => isMachineDataLoading.value && liveFeedPreview.value.length === 0)
+
 // "Unread" badge: clears when you open the Live feed section, reappears only for newer events.
 const liveFeedLastSeenAt = ref(Date.now())
 watch(activeSection, (next) => {
@@ -2980,6 +3010,7 @@ const credentialMsg = ref('')
 const credentialMsgType = ref('ok')
 const showCredentialPassword = ref(false)
 const showCredentialConfirmPassword = ref(false)
+const showNewUserPassword = ref(false)
 
 function getPasswordChecks(rawPassword) {
   const p = String(rawPassword ?? '')
@@ -3035,6 +3066,7 @@ function handleCreateUser() {
     userMsgType.value = 'success'
     allUsers.value = getUsers()
     newUser.value = { username: '', password: '', role: 'staff' }
+    showNewUserPassword.value = false
     setTimeout(() => { showUserForm.value = false; userMsg.value = '' }, 1500)
   } else {
     userMsg.value = result.message

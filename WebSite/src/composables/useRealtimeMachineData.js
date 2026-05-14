@@ -124,71 +124,77 @@ export function useRealtimeMachineData() {
     loading.value = true
     error.value = ''
 
-    const [prodRes, txRes, feedRes, lowRes, mailRes, bugRes] = await Promise.all([
-      supabase.from('products').select('*').order('slot_number', { ascending: true }),
-      supabase
-        .from('transactions')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(3000),
-      supabase.from('live_feed').select('*').order('created_at', { ascending: false }).limit(1000),
-      supabase.from('low_stock_products').select('*').order('slot_number', { ascending: true }).limit(200),
-      supabase.from('emails').select('id, email, created_at, password').order('created_at', { ascending: false }).limit(500),
-      supabase.from('bug_reports').select('*').order('created_at', { ascending: false }).limit(500),
-    ])
+    try {
+      const [prodRes, txRes, feedRes, lowRes, mailRes, bugRes] = await Promise.all([
+        supabase.from('products').select('*').order('slot_number', { ascending: true }),
+        supabase
+          .from('transactions')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(3000),
+        supabase.from('live_feed').select('*').order('created_at', { ascending: false }).limit(1000),
+        supabase.from('low_stock_products').select('*').order('slot_number', { ascending: true }).limit(200),
+        supabase.from('emails').select('id, email, created_at, password').order('created_at', { ascending: false }).limit(500),
+        supabase.from('bug_reports').select('*').order('created_at', { ascending: false }).limit(500),
+      ])
 
-    const { data: prod, error: prodErr } = prodRes
-    const { data: tx, error: txErr } = txRes
-    const { data: feed, error: feedErr } = feedRes
-    const { data: low, error: lowErr } = lowRes
-    const { data: mails, error: mailErr } = mailRes
-    const { data: bugs, error: bugErr } = bugRes
+      const { data: prod, error: prodErr } = prodRes
+      const { data: tx, error: txErr } = txRes
+      const { data: feed, error: feedErr } = feedRes
+      const { data: low, error: lowErr } = lowRes
+      const { data: mails, error: mailErr } = mailRes
+      const { data: bugs, error: bugErr } = bugRes
 
-    if (prodErr) error.value = prodErr.message
-    if (txErr) error.value = error.value ? `${error.value}; ${txErr.message}` : txErr.message
-    if (feedErr) {
-      const msg = feedErr.message || String(feedErr)
-      if (!/relation|does not exist|not find/i.test(msg)) {
-        error.value = error.value ? `${error.value}; ${msg}` : msg
+      if (prodErr) error.value = prodErr.message
+      if (txErr) error.value = error.value ? `${error.value}; ${txErr.message}` : txErr.message
+      if (feedErr) {
+        const msg = feedErr.message || String(feedErr)
+        if (!/relation|does not exist|not find/i.test(msg)) {
+          error.value = error.value ? `${error.value}; ${msg}` : msg
+        }
+        liveFeed.value = []
+      } else {
+        liveFeed.value = dedupeBy(Array.isArray(feed) ? feed : [], feedKey)
       }
-      liveFeed.value = []
-    } else {
-      liveFeed.value = dedupeBy(Array.isArray(feed) ? feed : [], feedKey)
-    }
 
-    if (lowErr) {
-      const msg = lowErr.message || String(lowErr)
-      if (!/relation|does not exist|not find/i.test(msg)) {
-        error.value = error.value ? `${error.value}; ${msg}` : msg
+      if (lowErr) {
+        const msg = lowErr.message || String(lowErr)
+        if (!/relation|does not exist|not find/i.test(msg)) {
+          error.value = error.value ? `${error.value}; ${msg}` : msg
+        }
+        lowStockProducts.value = []
+      } else {
+        lowStockProducts.value = Array.isArray(low) ? low : []
       }
-      lowStockProducts.value = []
-    } else {
-      lowStockProducts.value = Array.isArray(low) ? low : []
-    }
-    if (mailErr) {
-      // Missing table or RLS: keep dashboard usable; surface message once
-      const msg = mailErr.message || String(mailErr)
-      if (!/relation|does not exist|not find/i.test(msg)) {
-        error.value = error.value ? `${error.value}; ${msg}` : msg
+      if (mailErr) {
+        // Missing table or RLS: keep dashboard usable; surface message once
+        const msg = mailErr.message || String(mailErr)
+        if (!/relation|does not exist|not find/i.test(msg)) {
+          error.value = error.value ? `${error.value}; ${msg}` : msg
+        }
+        subscriberEmails.value = []
+      } else {
+        subscriberEmails.value = Array.isArray(mails) ? mails : []
       }
-      subscriberEmails.value = []
-    } else {
-      subscriberEmails.value = Array.isArray(mails) ? mails : []
-    }
 
-    if (bugErr) {
-      const msg = bugErr.message || String(bugErr)
-      if (!/relation|does not exist|not find/i.test(msg)) {
-        error.value = error.value ? `${error.value}; ${msg}` : msg
+      if (bugErr) {
+        const msg = bugErr.message || String(bugErr)
+        if (!/relation|does not exist|not find/i.test(msg)) {
+          error.value = error.value ? `${error.value}; ${msg}` : msg
+        }
+        bugReports.value = []
+      } else {
+        bugReports.value = Array.isArray(bugs) ? bugs : []
       }
-      bugReports.value = []
-    } else {
-      bugReports.value = Array.isArray(bugs) ? bugs : []
-    }
 
-    products.value = Array.isArray(prod) ? prod : []
-    transactions.value = dedupeBy(Array.isArray(tx) ? tx : [], txKey)
-    loading.value = false
+      products.value = Array.isArray(prod) ? prod : []
+      transactions.value = dedupeBy(Array.isArray(tx) ? tx : [], txKey)
+    } catch (e) {
+      const msg = e?.message ? String(e.message) : String(e)
+      error.value = error.value ? `${error.value}; ${msg}` : msg
+    } finally {
+      loading.value = false
+    }
   }
 
   async function refreshLatest() {
