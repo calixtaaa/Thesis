@@ -90,6 +90,95 @@ _TARGET_SLOT_BY_NAME = {
     "Regular W/ Wings Pads": 10,
 }
 
+# Common DB / UI name variants → canonical product name in _TARGET_SLOT_BY_NAME.
+_NAME_ALIASES_TO_CANONICAL = {
+    "soap": "Soap",
+    "alcohol": "Alcohol",
+    "deodorant": "Deodorant",
+    "deo": "Deodorant",
+    "mouthwash": "Mouthwash",
+    "mouth wash": "Mouthwash",
+    "wet wipes": "Wet Wipes",
+    "wetwipes": "Wet Wipes",
+    "wipes": "Wet Wipes",
+    "tissue": "Tissues",
+    "tissues": "Tissues",
+    "all night pads": "All Night Pads",
+    "all-night pads": "All Night Pads",
+    "panty liners": "Panty Liners",
+    "panty liner": "Panty Liners",
+    "pantyliners": "Panty Liners",
+    "panti liner": "Panty Liners",
+    "non-wing pads": "Non-Wing Pads",
+    "non wing pads": "Non-Wing Pads",
+    "non-wing pad": "Non-Wing Pads",
+    "non wing pad": "Non-Wing Pads",
+    "regular w/ wings pads": "Regular W/ Wings Pads",
+    "regular with wings pads": "Regular W/ Wings Pads",
+    "regular with wings": "Regular W/ Wings Pads",
+}
+
+
+def canonical_product_name(name: str | None) -> str | None:
+    if not name:
+        return None
+    key = str(name).strip().lower()
+    if key in _NAME_ALIASES_TO_CANONICAL:
+        return _NAME_ALIASES_TO_CANONICAL[key]
+    for canonical in _TARGET_SLOT_BY_NAME:
+        if key == canonical.lower():
+            return canonical
+    return None
+
+
+def canonical_slot_for_name(name: str | None) -> int | None:
+    canonical = canonical_product_name(name)
+    if canonical is None:
+        return None
+    return _TARGET_SLOT_BY_NAME.get(canonical)
+
+
+def resolve_product_slot_number(product) -> int:
+    """
+    Hardware slot (1..10) for stepper dispense.
+
+    Prefers the canonical tray slot from the product name so a stale DB slot_number
+    (e.g. Wet Wipes still at 6 after layout changes) cannot drive the wrong motor.
+    """
+    if product is None:
+        raise ValueError("Missing product for dispense")
+
+    name = None
+    raw_slot = None
+    try:
+        name = product["name"]
+        raw_slot = product["slot_number"]
+    except (KeyError, TypeError, IndexError):
+        if isinstance(product, dict):
+            name = product.get("name")
+            raw_slot = product.get("slot_number")
+
+    expected = canonical_slot_for_name(name)
+    if expected is not None:
+        try:
+            db_slot = int(raw_slot)
+        except (TypeError, ValueError):
+            db_slot = 0
+        if db_slot != expected:
+            print(
+                f"[HW] Correcting dispense slot for {name!r}: "
+                f"DB slot_number={raw_slot!r} -> hardware slot {expected}"
+            )
+        return int(expected)
+
+    try:
+        slot = int(raw_slot)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"Invalid slot_number for product {name!r}: {raw_slot!r}") from exc
+    if 1 <= slot <= 10:
+        return slot
+    raise ValueError(f"Out-of-range slot_number for product {name!r}: {slot}")
+
 
 def _normalize_product_slots(cur, conn) -> None:
     """Assign each known product to its canonical slot_number (UNIQUE-safe, idempotent)."""
@@ -100,25 +189,30 @@ def _normalize_product_slots(cur, conn) -> None:
     mismatches = []
     for row in rows:
         name = row["name"]
-        want = _TARGET_SLOT_BY_NAME.get(name)
+        canonical = canonical_product_name(name)
+        want = _TARGET_SLOT_BY_NAME.get(canonical) if canonical else None
         if want is not None and int(row["slot_number"]) != int(want):
             mismatches.append((row["id"], name, want))
     if not mismatches:
         return
     # Phase 1: move canonical rows off 1..10 so we can rewrite without UNIQUE collisions.
     for row in rows:
-        name = row["name"]
-        if name in _TARGET_SLOT_BY_NAME:
+        canonical = canonical_product_name(row["name"])
+        if canonical and canonical in _TARGET_SLOT_BY_NAME:
             cur.execute(
                 "UPDATE products SET slot_number = ? WHERE id = ?",
                 (1000 + int(row["id"]), int(row["id"])),
             )
     conn.commit()
-    # Phase 2: final slots by product name.
-    for name, slot in _TARGET_SLOT_BY_NAME.items():
+    # Phase 2: final slots by product id (handles aliases like "Wipes" -> slot 5).
+    for row in rows:
+        canonical = canonical_product_name(row["name"])
+        want = _TARGET_SLOT_BY_NAME.get(canonical) if canonical else None
+        if want is None:
+            continue
         cur.execute(
-            "UPDATE products SET slot_number = ? WHERE name = ?",
-            (int(slot), name),
+            "UPDATE products SET slot_number = ? WHERE id = ?",
+            (int(want), int(row["id"])),
         )
     conn.commit()
 

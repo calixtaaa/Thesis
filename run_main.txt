@@ -4,4 +4,6 @@ export PYTHONNOUSERSITE=1
 # Use all expected expanders for slots 1..10.
 # If your third chip currently appears as 0x26 in i2cdetect, use 0x20,0x21,0x26 temporarily.
 export MCP23017_ADDRESSES=0x20,0x21,0x22
+# Larger fonts/images on the 7" touch LCD (try 1.4–1.8 if still small).
+export UI_LCD_SCALE=1.6
 venv/bin/python main.py

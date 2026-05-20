@@ -29,6 +29,7 @@ from database import (
     update_admin_credentials,
     get_all_products,
     get_product_by_id,
+    resolve_product_slot_number,
     decrement_stock,
     record_transaction,
     get_user_by_uid,
@@ -172,13 +173,24 @@ THEMES = {
     },
 }
 
-# Poppins first, fall back to Segoe UI if not installed
+# Poppins first, fall back to Segoe UI if not installed (sizes tuned for 7" touch LCDs).
 UI_FONT = "Poppins"
-UI_FONT_BOLD = (UI_FONT, 22, "bold")
-UI_FONT_TITLE = (UI_FONT, 20, "bold")
-UI_FONT_BODY = (UI_FONT, 13)
-UI_FONT_SMALL = (UI_FONT, 11)
-UI_FONT_BUTTON = (UI_FONT, 13, "bold")
+UI_FONT_BOLD = (UI_FONT, 26, "bold")
+UI_FONT_TITLE = (UI_FONT, 24, "bold")
+UI_FONT_BODY = (UI_FONT, 16)
+UI_FONT_SMALL = (UI_FONT, 13)
+UI_FONT_BUTTON = (UI_FONT, 16, "bold")
+
+
+def _env_ui_lcd_scale() -> float:
+    """Extra UI scale for small touchscreens (set UI_LCD_SCALE=1.6 on the Pi)."""
+    raw = os.getenv("UI_LCD_SCALE", "").strip()
+    if raw:
+        try:
+            return max(1.0, min(2.5, float(raw)))
+        except ValueError:
+            pass
+    return 1.55 if ON_RPI else 1.0
 
 
 def _hover_scale_btn(btn, normal_padx=10, normal_pady=6, hover_padx=14, hover_pady=10):
@@ -230,34 +242,11 @@ MCP23017_ADDRESSES = [
 ]
 
 
-# Must stay aligned with stepper_mcp.SLOT_LAYOUT (adjacent pairs 1↔2 … 7↔8 swapped).
-_MCP23017_SLOT_LAYOUT: dict[int, tuple[int, tuple[int, int, int, int]]] = {
-    1: (0x20, (4, 5, 6, 7)),
-    2: (0x20, (0, 1, 2, 3)),
-    3: (0x20, (12, 13, 14, 15)),
-    4: (0x20, (8, 9, 10, 11)),
-    5: (0x21, (4, 5, 6, 7)),
-    6: (0x21, (0, 1, 2, 3)),
-    7: (0x21, (12, 13, 14, 15)),
-    8: (0x21, (8, 9, 10, 11)),
-    9: (0x22, (0, 1, 2, 3)),
-    10: (0x22, (4, 5, 6, 7)),
-}
+from stepper_slot_layout import build_mcp23017_stepper_map
 
 
 def _build_mcp23017_stepper_map() -> dict[int, dict]:
-    mapping: dict[int, dict] = {}
-    for slot, (address, pins) in _MCP23017_SLOT_LAYOUT.items():
-        p1, p2, p3, p4 = pins
-        mapping[slot] = {
-            "backend": "mcp23017",
-            "address": address,
-            "in1": p1,
-            "in2": p2,
-            "in3": p3,
-            "in4": p4,
-        }
-    return mapping
+    return build_mcp23017_stepper_map()
 
 
 if STEPPER_BACKEND == "mcp23017":
@@ -390,6 +379,7 @@ class MCP23017StepperBackend:
         self.addresses = addresses
         self.bus = None
         self.olat_cache = {addr: {"A": 0x00, "B": 0x00} for addr in addresses}
+        self.active_pins: dict[int, dict] = {}
 
     def _import_bus(self):
         try:
@@ -439,12 +429,15 @@ class MCP23017StepperBackend:
             self.bus.write_byte_data(addr, self.OLATB, 0x00)
 
         disabled_slots: list[int] = []
-        for slot, cfg in list(product_pins.items()):
+        active_pins: dict[int, dict] = {}
+        for slot, cfg in product_pins.items():
             if cfg.get("backend") != "mcp23017":
                 continue
             if int(cfg.get("address", -1)) not in self.addresses:
                 disabled_slots.append(slot)
-                product_pins.pop(slot, None)
+                continue
+            active_pins[slot] = cfg
+        self.active_pins = active_pins
         if disabled_slots:
             print(
                 "[HW] Disabled MCP slots due to missing expanders: "
@@ -466,11 +459,13 @@ class MCP23017StepperBackend:
             raise RuntimeError("MCP23017 backend is not initialized.")
 
         address = int(pins["address"])
+        # Match stepper_mcp.py: update OLAT per pin so phase timing matches the test tool.
         for key, value in zip(("in1", "in2", "in3", "in4"), phase):
-            self._set_pin_value(address, int(pins[key]), int(value))
-
-        self.bus.write_byte_data(address, self.OLATA, self.olat_cache[address]["A"])
-        self.bus.write_byte_data(address, self.OLATB, self.olat_cache[address]["B"])
+            pin = int(pins[key])
+            self._set_pin_value(address, pin, int(value))
+            port = "A" if pin < 8 else "B"
+            register = self.OLATA if port == "A" else self.OLATB
+            self.bus.write_byte_data(address, register, self.olat_cache[address][port])
 
     def cleanup(self) -> None:
         if self.bus is None:
@@ -618,13 +613,24 @@ def _set_stepper_phase(pins: dict, phase: tuple[int, int, int, int]):
     _stepper_backend.set_phase(pins, phase)
 
 def dispense_from_slot(slot_number: int, quantity: int = 1):
-    pins = PRODUCT_STEPPER_PINS.get(slot_number)
-    print(f"[HW] Dispensing from slot {slot_number} x{quantity}")
+    try:
+        slot_key = int(slot_number)
+    except (TypeError, ValueError):
+        print(f"[HW] WARNING: Invalid slot number {slot_number!r}, skipping dispense")
+        return
+
+    pins = PRODUCT_STEPPER_PINS.get(slot_key)
+    if pins is None and isinstance(_stepper_backend, MCP23017StepperBackend):
+        pins = _stepper_backend.active_pins.get(slot_key)
+    print(f"[HW] Dispensing from slot {slot_key} x{quantity}")
     if not pins:
         if not ON_RPI:
-            print(f"[HW] (Simulated – no pins for slot {slot_number})")
+            print(f"[HW] (Simulated – no pins for slot {slot_key})")
         else:
-            print(f"[HW] WARNING: No stepper pins for slot {slot_number}, skipping")
+            print(
+                f"[HW] WARNING: No stepper pins for slot {slot_key} "
+                f"(backend={STEPPER_BACKEND}), skipping"
+            )
         return
 
     steps = STEPS_PER_PRODUCT * quantity
@@ -722,6 +728,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         # Auto-fit scale for different LCD resolutions (keeps layout consistent)
         try:
             self.after(50, lambda: self._apply_lcd_fit(profile="customer"))
+            self.after(120, self._bootstrap_responsive_ui)
         except Exception:
             pass
         # Keep UI responsive if the window size changes (desktop dev / Windows tablets).
@@ -750,7 +757,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         self.current_theme = THEMES[self.current_theme_name]
         self.configure(bg=self.current_theme["bg"])
         # UI scaling hints (used by customer/admin screens). Default 1.0 for desktop dev.
-        self._lcd_scale = 1.0
+        self._lcd_scale = _env_ui_lcd_scale()
         self._ui_font_name = UI_FONT
         self._ui_font_bold = UI_FONT_BOLD
         self._ui_font_title = UI_FONT_TITLE
@@ -959,14 +966,13 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
             screen_w, screen_h = 0, 0
 
         is_small_lcd = (screen_w and screen_w <= 1024) or (screen_h and screen_h <= 600)
-        # 7-inch LCDs (800x480 / 1024x600) need a larger base scale for readability.
-        base = 1.35 if is_small_lcd else 1.0
+        boost = _env_ui_lcd_scale()
+        # 7-inch LCDs (800x480 / 1024x600) and the Pi kiosk need a larger base scale.
+        base = boost if (ON_RPI or is_small_lcd) else 1.0
 
         # Scale down when the window is smaller than the design size.
-        # Do NOT scale up beyond base (prevents giant UI on big monitors).
         rel = min(w / float(BASE_APP_W), h / float(BASE_APP_H))
-        # Allow a bit more downscaling on tiny windows, but keep it readable.
-        rel = max(0.85, min(1.0, rel))
+        rel = max(0.90, min(1.0, rel))
         return float(base * rel)
 
     def _apply_responsive_scale(self, scale: float) -> None:
@@ -980,27 +986,36 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
         except Exception:
             pass
 
-        # Keep font family, adjust point sizes proportionally.
-        # (Most screens are tuned around scale ~1.0–1.25.)
         try:
             def _pt(n: int) -> int:
-                return max(10, int(round(n * scale)))
+                return max(11, int(round(n * scale)))
 
-            if scale >= 1.10:
-                self._ui_font_bold = (UI_FONT, _pt(22), "bold")
-                self._ui_font_title = (UI_FONT, _pt(20), "bold")
-                self._ui_font_body = (UI_FONT, _pt(13))
-                self._ui_font_small = (UI_FONT, _pt(11))
-                self._ui_font_button = (UI_FONT, _pt(13), "bold")
-            else:
-                # Preserve the default tuples (keeps styling consistent at normal scale).
-                self._ui_font_bold = UI_FONT_BOLD
-                self._ui_font_title = UI_FONT_TITLE
-                self._ui_font_body = UI_FONT_BODY
-                self._ui_font_small = UI_FONT_SMALL
-                self._ui_font_button = UI_FONT_BUTTON
+            self._ui_font_bold = (UI_FONT, _pt(26), "bold")
+            self._ui_font_title = (UI_FONT, _pt(24), "bold")
+            self._ui_font_body = (UI_FONT, _pt(16))
+            self._ui_font_small = (UI_FONT, _pt(13))
+            self._ui_font_button = (UI_FONT, _pt(16), "bold")
         except Exception:
             pass
+
+    def _bootstrap_responsive_ui(self) -> None:
+        """Apply LCD scale once at startup (Pi / small touchscreens)."""
+        try:
+            new_scale = self._compute_responsive_scale()
+            self._last_responsive_scale = float(new_scale)
+            self._apply_responsive_scale(new_scale)
+            builder = getattr(self, "_current_screen_builder", None)
+            if callable(builder):
+                builder()
+        except Exception:
+            pass
+
+    def ui_font(self, pt: int, *, bold: bool = False):
+        """Scaled font tuple for labels/buttons on the current display."""
+        size = max(11, int(round(int(pt) * float(getattr(self, "_lcd_scale", 1.0) or 1.0))))
+        if bold:
+            return (self._ui_font_name, size, "bold")
+        return (self._ui_font_name, size)
 
     def _on_window_configure(self, _event=None) -> None:
         # Debounce: window resize can fire many times per second.
@@ -1043,36 +1058,6 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                 builder()
             except Exception:
                 pass
-
-        # Font + widget scaling for small 7-inch LCDs (800x480/1024x600): bump sizes for readability.
-        try:
-            screen_w = self.winfo_screenwidth()
-            screen_h = self.winfo_screenheight()
-            is_small_lcd = screen_w <= 1024 or screen_h <= 600
-            scale = 1.25 if is_small_lcd else 1.0
-            self._lcd_scale = scale
-
-            # CustomTkinter global scaling (keeps paddings/controls readable).
-            try:
-                ctk.set_widget_scaling(scale)
-            except Exception:
-                pass
-
-            if scale > 1.0:
-                # Keep font family, bump point sizes.
-                self._ui_font_bold = (UI_FONT, 26, "bold")
-                self._ui_font_title = (UI_FONT, 24, "bold")
-                self._ui_font_body = (UI_FONT, 16)
-                self._ui_font_small = (UI_FONT, 13)
-                self._ui_font_button = (UI_FONT, 16, "bold")
-            else:
-                self._ui_font_bold = UI_FONT_BOLD
-                self._ui_font_title = UI_FONT_TITLE
-                self._ui_font_body = UI_FONT_BODY
-                self._ui_font_small = UI_FONT_SMALL
-                self._ui_font_button = UI_FONT_BUTTON
-        except Exception:
-            pass
 
     def _report_window_state(self):
         try:
@@ -2617,13 +2602,7 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
 
     def _build_main_menu_header(self, parent):
         """Main menu top bar: title, menu button, and theme slider."""
-        main_menu_ui.build_main_menu_header(
-            self,
-            parent,
-            ui_font=UI_FONT,
-            ui_font_title=UI_FONT_TITLE,
-            ui_font_small=UI_FONT_SMALL,
-        )
+        main_menu_ui.build_main_menu_header(self, parent)
 
     def _build_main_menu_products(self, parent, products):
         """Scrollable product grid for the customer main menu."""
@@ -3049,10 +3028,11 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                 q = int(it["quantity"])
                 line_total = float(p["price"]) * q
                 decrement_stock(p["id"], q)
-                dispense_from_slot(p["slot_number"], q)
+                slot = resolve_product_slot_number(p)
+                dispense_from_slot(slot, q)
                 ir_ok = wait_for_vend_confirmation(timeout_s=3.0)
                 if not ir_ok:
-                    print(f"[HW] WARNING: No IR vend confirmation for slot {p['slot_number']}")
+                    print(f"[HW] WARNING: No IR vend confirmation for slot {slot} ({p['name']})")
                 record_transaction(p["id"], q, line_total, "cash", ir_confirmed=ir_ok)
             
             # Disable coin acceptor relay after payment is complete
@@ -3126,10 +3106,11 @@ class MainApp(AdminMixin, StaffMixin, ctk.CTk):
                 q = int(it["quantity"])
                 line_total = float(p["price"]) * q
                 decrement_stock(p["id"], q)
-                dispense_from_slot(p["slot_number"], q)
+                slot = resolve_product_slot_number(p)
+                dispense_from_slot(slot, q)
                 ir_ok = wait_for_vend_confirmation(timeout_s=3.0)
                 if not ir_ok:
-                    print(f"[HW] WARNING: No IR vend confirmation for slot {p['slot_number']}")
+                    print(f"[HW] WARNING: No IR vend confirmation for slot {slot} ({p['name']})")
                 record_transaction(
                     product_id=p["id"],
                     quantity=q,

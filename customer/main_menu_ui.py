@@ -196,7 +196,9 @@ def _load_uniform_image(product_name, size=140):
 #  HEADER  (with breadcrumb + chatbot button)
 # ══════════════════════════════════════════════
 
-def build_main_menu_header(app, parent, *, ui_font, ui_font_title, ui_font_small):
+def build_main_menu_header(app, parent):
+    scale = float(getattr(app, "_lcd_scale", 1.0) or 1.0)
+    ui_font = getattr(app, "_ui_font_name", "Poppins")
     top = ctk.CTkFrame(parent, fg_color=app.current_theme["bg"], corner_radius=0)
     top.pack(side=tk.TOP, fill=tk.X)
 
@@ -209,13 +211,13 @@ def build_main_menu_header(app, parent, *, ui_font, ui_font_title, ui_font_small
     ctk.CTkLabel(
         title_block,
         text="SyntaxError™",
-        font=(ui_font, 20, "bold"),
+        font=(ui_font, max(22, int(24 * scale)), "bold"),
         text_color=app.current_theme.get("nav_bg", "#8E4585"),
     ).pack(anchor="w")
     ctk.CTkLabel(
         title_block,
         text="Step 1 of 3  ·  Choose Products",
-        font=(ui_font, 11),
+        font=(ui_font, max(13, int(14 * scale))),
         text_color=app.current_theme.get("muted", app.current_theme["fg"]),
     ).pack(anchor="w")
 
@@ -227,12 +229,12 @@ def build_main_menu_header(app, parent, *, ui_font, ui_font_title, ui_font_small
         icons_frame,
         text="☰",
         command=app.show_role_menu,
-        font=(ui_font, 16, "bold"),
+        font=(ui_font, max(17, int(18 * scale)), "bold"),
         fg_color="transparent",
         hover_color=app.current_theme["button_bg"],
         text_color=app.current_theme["fg"],
-        width=40,
-        height=36,
+        width=int(48 * scale),
+        height=int(42 * scale),
         corner_radius=8,
     )
     menu_btn._hamburger_btn = True
@@ -242,12 +244,12 @@ def build_main_menu_header(app, parent, *, ui_font, ui_font_title, ui_font_small
         icons_frame,
         text="🤖 Ask Hygiene Hero",
         command=app.show_chatbot_screen,
-        font=(ui_font, 14, "bold"),
+        font=(ui_font, max(15, int(16 * scale)), "bold"),
         fg_color=app.current_theme.get("accent", "#50C878"),
         hover_color=app.current_theme.get("accent_hover", "#3DA863"),
         text_color="#ffffff",
         corner_radius=980,
-        height=36,
+        height=int(42 * scale),
     )
     chatbot_btn.pack(side=tk.RIGHT, padx=12, pady=0)
 
@@ -264,7 +266,7 @@ def build_promo_carousel(app, parent, *, grid_kw=None):
         parent,
         fg_color=app.current_theme.get("nav_bg", "#8E4585"),
         corner_radius=12,
-        height=48,
+        height=int(56 * float(getattr(app, "_lcd_scale", 1.0) or 1.0)),
     )
     if grid_kw is not None:
         carousel_frame.grid(**grid_kw)
@@ -276,11 +278,11 @@ def build_promo_carousel(app, parent, *, grid_kw=None):
     promo_label = ctk.CTkLabel(
         carousel_frame,
         textvariable=promo_var,
-        font=(app._ui_font_name, 13, "bold"),
+        font=(app._ui_font_name, max(14, int(15 * float(getattr(app, "_lcd_scale", 1.0) or 1.0))), "bold"),
         text_color="#FFFFFF",
         anchor="center",
     )
-    promo_label.pack(expand=True, fill=tk.BOTH, padx=16, pady=8)
+    promo_label.pack(expand=True, fill=tk.BOTH, padx=16, pady=10)
 
     app._promo_index = 0
 
@@ -538,7 +540,7 @@ def build_main_menu_products(app, parent, products):
     scale = float(getattr(app, "_lcd_scale", 1.0) or 1.0)
     # Keep cards compact so touch scrolling stays smooth.
     # (Large cards can "grab" gestures on small touch screens.)
-    app._product_placeholder_size = int(135 * scale)
+    app._product_placeholder_size = int(175 * scale)
     app._product_card_refs = {}
 
     for idx, product in enumerate(products):
@@ -651,9 +653,9 @@ def build_product_card(app, grid, product, idx):
 
     # ── Product name ──
     scale = float(getattr(app, "_lcd_scale", 1.0) or 1.0)
-    name_font = (app._ui_font_name, int(13 * scale), "bold")
-    price_font = (app._ui_font_name, int(14 * scale), "bold")
-    stock_font = (app._ui_font_name, int(11 * scale))
+    name_font = (app._ui_font_name, max(14, int(15 * scale)), "bold")
+    price_font = (app._ui_font_name, max(15, int(17 * scale)), "bold")
+    stock_font = (app._ui_font_name, max(12, int(13 * scale)))
     name_text = product["name"]
     if len(name_text) > 20:
         name_text = name_text[:20] + "…"
@@ -700,9 +702,9 @@ def build_product_card(app, grid, product, idx):
 
 def build_product_card_button(app, card, product, in_cart):
     scale = float(getattr(app, "_lcd_scale", 1.0) or 1.0)
-    btn_font = (app._ui_font_name, int(12 * scale), "bold")
-    btn_w = int(96 * scale)
-    btn_h = int(34 * scale)
+    btn_font = (app._ui_font_name, max(13, int(14 * scale)), "bold")
+    btn_w = int(110 * scale)
+    btn_h = int(40 * scale)
     if in_cart:
         return ctk.CTkButton(
             card,

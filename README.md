@@ -219,6 +219,28 @@ python rfid_single_reader_test.py --probe-spi
 
 On Raspberry Pi with a 7" touchscreen, the app can run fullscreen; on Windows it uses a resizable window (e.g. 800×480).
 
+#### Skip the login screen and auto-start the app (Pi kiosk)
+
+On the Pi, run once from the project folder:
+
+```bash
+chmod +x scripts/setup_pi_kiosk.sh
+sudo ./scripts/setup_pi_kiosk.sh
+sudo reboot
+```
+
+This enables **desktop auto-login** (no `login:` prompt on tty1) and adds a **graphical autostart** entry that launches `main.py` with a larger UI scale (`UI_LCD_SCALE=1.6`).
+
+To tune text and product image size without re-running the script:
+
+```bash
+export UI_LCD_SCALE=1.7   # increase if still small; decrease if clipped
+```
+
+#### Larger UI on the touch LCD
+
+Set `UI_LCD_SCALE` before starting the app (see `run_main.txt`). Default on the Pi is about **1.55**; the kiosk script uses **1.6**.
+
 ### Website (Development)
 
 ```bash

@@ -18,6 +18,8 @@ from tkinter import messagebox
 import customtkinter as ctk
 
 
+from stepper_slot_layout import SLOT_LAYOUT as _SLOT_LAYOUT_TUPLES
+
 IODIRA = 0x00
 IODIRB = 0x01
 OLATA = 0x14
@@ -28,19 +30,10 @@ DEFAULT_STEP_DELAY = 0.002
 DEFAULT_I2C_BUS = 1
 DEFAULT_ADDRESSES = [0x20, 0x21, 0x22]
 
-# Fixed slot layout used by the test UI and main app.
-# Adjacent pairs (1↔2, 3↔4, 5↔6, 7↔8) swap MCP pin blocks vs sequential order so UI slot matches physical tray.
+# Fixed slot layout used by the test UI and main app (lists for the test UI).
 SLOT_LAYOUT = {
-    1: (0x20, [4, 5, 6, 7]),
-    2: (0x20, [0, 1, 2, 3]),
-    3: (0x20, [12, 13, 14, 15]),
-    4: (0x20, [8, 9, 10, 11]),
-    5: (0x21, [4, 5, 6, 7]),
-    6: (0x21, [0, 1, 2, 3]),
-    7: (0x21, [12, 13, 14, 15]),
-    8: (0x21, [8, 9, 10, 11]),
-    9: (0x22, [0, 1, 2, 3]),
-    10: (0x22, [4, 5, 6, 7]),
+    slot: (address, list(pins))
+    for slot, (address, pins) in _SLOT_LAYOUT_TUPLES.items()
 }
 
 ULN2003_SEQUENCE = [
